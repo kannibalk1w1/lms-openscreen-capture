@@ -1359,7 +1359,7 @@ mod tests {
         ring.push_for_test(&vec![0.25; frames * AUDIO_CHANNELS]);
         let stop = capture.input_boundary_instant().unwrap() + Duration::from_millis(100);
         capture.stop_clock(stop);
-        ring.push_for_test(&vec![0.75; AUDIO_SAMPLE_RATE as usize * AUDIO_CHANNELS]);
+        ring.push_for_test(&vec![0.75; 3 * AUDIO_SAMPLE_RATE as usize * AUDIO_CHANNELS]);
         capture.stop_clock(stop + Duration::from_secs(1));
         let mix = capture.audio.as_mut().unwrap();
         mix.pump(capture.muxer.as_mut().unwrap(), true)

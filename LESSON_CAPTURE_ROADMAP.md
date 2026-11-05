@@ -79,6 +79,12 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
+found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
+fixes delivery ownership and strengthens shared production-handler tests, pending
+exact-SHA rereview. Actual reviews 2/3 and their [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_2_3.md)
+are preserved; privacy implementation is next, with ordinary capture adapter-free.
+
 1. Cursor-click timing is committed as `43c2f91d`; its Claude review is pending.
    Incorporate the completed stop/audio/recovery review's warning-label and test/
    documentation findings without disrupting the active privacy implementation.

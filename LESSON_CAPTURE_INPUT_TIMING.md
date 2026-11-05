@@ -23,7 +23,8 @@ explicitly labeled and may be newer than a delayed button observation.
 ## Evidence contract
 
 Pointer records add `mediaTimeObservation: "reader"`, `dispatchDelayMs`, and
-`late`. Older helper records lack these fields and used dispatch-time media
+`late` (also true for every admitted Stop-drain edge, even in the current
+interval). Older helper records lack these fields and used dispatch-time media
 projection. A delayed event from an already closed interval keeps that interval
 and its original projected media time, even if delivered during Pause or after
 Resume. Journal sequence/IDs still describe append order; media times need not be
