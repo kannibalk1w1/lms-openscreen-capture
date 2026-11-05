@@ -444,3 +444,44 @@ it("ignores timeline review requests for a different project", () => {
 	expect(screen.queryByLabelText("Section 1 label")).toBeNull();
 	expect((screen.getByLabelText("Capture pad") as HTMLTextAreaElement).value).toBe("");
 });
+
+it("discards an optional importer response after the project changes", async () => {
+	const before = window.electronAPI;
+	try {
+		const doc = createEmptyDocument({ title: "A", projectId: "ipc-a" });
+		useProjectStore.setState({ projectId: "ipc-a", document: doc });
+		const capture = new TypingCapture("", () => 0, "late-api-take");
+		capture.observe("PRIVATE_OTHER_PROJECT_CANARY", [], "insertText");
+		const take = capture.finish();
+		let finish: (value: unknown) => void = () => undefined;
+		const importTypingSource = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
+		Object.assign(window, { electronAPI: { importTypingSource } });
+		render(
+			<I18nProvider>
+				<TypingCaptureDialog open onClose={vi.fn()} />
+			</I18nProvider>,
+		);
+		const selected = new File([], "take.json");
+		Object.defineProperty(selected, "text", { value: async () => JSON.stringify(take) });
+		fireEvent.change(screen.getByLabelText("Import typing journal"), {
+			target: { files: [selected] },
+		});
+		await waitFor(() => expect(importTypingSource).toHaveBeenCalledTimes(1));
+		const other = createEmptyDocument({ title: "B", projectId: "ipc-b" });
+		useProjectStore.setState({ projectId: "ipc-b", document: other });
+		await act(async () => {
+			finish([{ take, mode: "captured-edits" }]);
+		});
+		expect(useProjectStore.getState().document?.typingTakes).toBeUndefined();
+		expect(
+			(screen.getByRole("textbox", { name: "Capture pad" }) as HTMLTextAreaElement).value,
+		).not.toContain("PRIVATE_OTHER_PROJECT_CANARY");
+	} finally {
+		window.electronAPI = before;
+	}
+});

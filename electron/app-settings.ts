@@ -7,6 +7,11 @@ import {
 	webcamQualityFrom,
 } from "../src/hooks/webcamCaptureTarget";
 import {
+	type IntegrationSettings,
+	integrationSettingsSchema,
+	normalizeIntegrationSettings,
+} from "../src/lib/applicationIntegrations/schema";
+import {
 	type CapturePrivacyPolicy,
 	capturePrivacyPolicySchema,
 	disabledCapturePrivacyPolicy,
@@ -203,6 +208,14 @@ function validateRecordingPatch(patch: Partial<RecordingPreferences>): void {
 export class AppSettingsStore {
 	constructor(private readonly userData: string) {}
 
+	getIntegrationSettings(): IntegrationSettings {
+		return normalizeIntegrationSettings(readRaw(this.userData).applicationIntegrations);
+	}
+	setIntegrationSettings(value: unknown): IntegrationSettings {
+		const next = integrationSettingsSchema.parse(value);
+		atomicWrite(this.userData, { ...readRaw(this.userData), applicationIntegrations: next });
+		return this.getIntegrationSettings();
+	}
 	getSnapshot(): AppSettingsSnapshot {
 		const raw = readRaw(this.userData);
 		return {

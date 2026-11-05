@@ -101,8 +101,11 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    addresses those and packaging/metadata limits, awaiting its own exact-SHA review.
    It is a bounded collection gate, not complete
    text/media redaction, retention exclusions or pre-export privacy inspection.
-3. Establish the simple optional capability interface, integration controls and
-   disabled/failure/isolation/reopen regressions before deep Godot expansion.
+3. The [first optional boundary](LESSON_CAPTURE_INTEGRATIONS.md) adapts selected-file
+   Godot journal import with durable default-off controls, bounded instance/session/
+   scope/capability routing and disabled/failure/isolation/offline-reopen tests.
+   Live application/project attestation and integration CLI/MCP commands remain open.
+   Review slices 8/9 before deep Godot expansion.
    Continue explicit Godot/video clock bridge under that policy, then shared
    versioned lesson-step/asset manifest and an offline illustrated-guide vertical
    slice, with export and reopening. Expanded semantic capture waits for privacy.

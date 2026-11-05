@@ -171,6 +171,7 @@ import {
 	isWindowsUpdatePending,
 	WINDOWS_UPDATE_PENDING_MESSAGE,
 } from "../windows-update";
+import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
@@ -1957,6 +1958,7 @@ export function registerIpcHandlers(
 		if (typeof paused === "boolean") recordingFlags.pause(paused);
 	});
 	const appSettings = new AppSettingsStore(app.getPath("userData"));
+	registerApplicationIntegrationHandlers();
 	const linuxCaptureStartup = new LinuxCaptureStartup<LinuxNativeCaptureSession>({
 		handle: (channel, handler) => ipcMain.handle(channel, handler),
 		platform: () => process.platform,

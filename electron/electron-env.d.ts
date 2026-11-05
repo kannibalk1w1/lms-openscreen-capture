@@ -70,6 +70,20 @@ interface Window {
 		onSelectedSourceChanged: (
 			callback: (source: ProcessedDesktopSource | null) => void,
 		) => () => void;
+		getApplicationIntegrations?: () => Promise<
+			import("./integrations/applicationIntegrationService").IntegrationSnapshot
+		>;
+		setApplicationIntegrations?: (
+			settings: import("../src/lib/applicationIntegrations/schema").IntegrationSettings,
+		) => Promise<import("./integrations/applicationIntegrationService").IntegrationSettingsResult>;
+		importTypingSource?: (
+			source: string,
+		) => Promise<import("../src/lib/typing/portable").ImportedTypingFile[]>;
+		onApplicationIntegrationsChanged?: (
+			callback: (
+				snapshot: import("./integrations/applicationIntegrationService").IntegrationSnapshot,
+			) => void,
+		) => () => void;
 		getRecordingPrefs: () => Promise<import("./ipc/handlers").RecordingPrefs>;
 		setRecordingPrefs: (
 			prefs: Partial<import("./ipc/handlers").RecordingPrefs>,

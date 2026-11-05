@@ -89,6 +89,25 @@ export const typingTakeSchema = z
 		id: z.string().min(1).max(200),
 		title: z.string().min(1).max(200),
 		producer: z.enum(["openscreen-pad", "godot-codeedit"]),
+		integration: z
+			.union([
+				z
+					.object({
+						version: z.literal(1),
+						adapterId: z.literal("godot-codeedit"),
+						adapterVersion: z.string().min(1).max(200),
+						instanceId: z.string().uuid(),
+						sessionId: z.string().uuid(),
+						artifactId: z.string().uuid(),
+						capability: z.literal("typing.journal-import"),
+						originalClockId: z.string().min(1).max(200),
+						clockRelation: z.literal("unmapped"),
+					})
+					.strict(),
+				z.object({ version: z.literal(1), status: z.literal("unsupported") }).strict(),
+			])
+			.optional()
+			.catch({ version: 1, status: "unsupported" }),
 		coverage: z.enum(["complete", "limited"]).default("complete"),
 		documentName: z.string().min(1).max(1000),
 		offsetEncoding: z.literal("unicode-code-points"),

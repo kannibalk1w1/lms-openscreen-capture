@@ -28,6 +28,7 @@ import {
 } from "@/lib/typing/portable";
 import type { TypingReviewTarget } from "@/lib/typing/review";
 import type { TypingSection, TypingTake } from "@/lib/typing/schema";
+import { ApplicationIntegrationSettings } from "./ApplicationIntegrationSettings";
 import styles from "./TypingCaptureDialog.module.css";
 
 export function TypingCaptureDialog({
@@ -186,7 +187,15 @@ export function TypingCaptureDialog({
 			const source = await selected.text();
 			if (useProjectStore.getState().projectId !== projectId || currentWriteEpoch() !== epoch)
 				return;
-			const files = importTypingFiles(source);
+			let files: ImportedTypingFile[];
+			if (window.electronAPI?.importTypingSource)
+				files = await window.electronAPI.importTypingSource(source);
+			else {
+				JSON.parse(source);
+				files = importTypingFiles(source);
+			} // Core portable data also works in a browser; raw adapters require the main boundary.
+			if (useProjectStore.getState().projectId !== projectId || currentWriteEpoch() !== epoch)
+				return;
 			const imported = files[0].take;
 			setBundleDrafts(files.length > 1 ? files : []);
 			setPlaybackMode(files[0].mode);
@@ -218,6 +227,10 @@ export function TypingCaptureDialog({
 					<DialogDescription>{t("typing.scope")}</DialogDescription>
 				</DialogHeader>
 				<div className={styles.body}>
+					<ApplicationIntegrationSettings />
+					{take?.integration && "status" in take.integration && (
+						<p role="alert">{t("typing.integrations.unsupportedEvidence")}</p>
+					)}
 					<div className={styles.toolbar}>
 						<button
 							type="button"

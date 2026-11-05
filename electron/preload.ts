@@ -179,6 +179,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getSelectedSource: () => {
 		return ipcRenderer.invoke("get-selected-source");
 	},
+	getApplicationIntegrations: () => ipcRenderer.invoke("application-integrations:get"),
+	setApplicationIntegrations: (
+		settings: import("../src/lib/applicationIntegrations/schema").IntegrationSettings,
+	) => ipcRenderer.invoke("application-integrations:set", settings),
+	importTypingSource: (source: string) =>
+		ipcRenderer.invoke("application-integrations:import-typing", source),
+	onApplicationIntegrationsChanged: (
+		callback: (
+			snapshot: import("./integrations/applicationIntegrationService").IntegrationSnapshot,
+		) => void,
+	) => {
+		const listener = (
+			_event: unknown,
+			snapshot: import("./integrations/applicationIntegrationService").IntegrationSnapshot,
+		) => callback(snapshot);
+		ipcRenderer.on("application-integrations:changed", listener);
+		return () => ipcRenderer.removeListener("application-integrations:changed", listener);
+	},
 	getRecordingPrefs: () => {
 		return ipcRenderer.invoke("get-recording-prefs");
 	},

@@ -1,6 +1,9 @@
 # Universal capture and optional application integrations
 
-Architectural requirement, 5 November 2026. Godot is the first deep integration,
+Architectural requirement, 5 November 2026. [Slice 9](../LESSON_CAPTURE_INTEGRATIONS.md)
+implements a bounded first subset: optional selected-file Godot decoder, real durable
+control, instance/session/capability isolation and adapter-free normalized evidence
+reopen. The live/semantic/application-scope manager below remains planned. Godot is the first deep integration,
 not a required installation, runtime or core data model. This is the proposed
 adapter boundary, not a shipped integration manager. See the [product map](PRODUCT_MAP.md),
 [architecture](ARCHITECTURE.md) and [refactor audit](CURRENT_STATE_AUDIT.md#application-agnostic-follow-up-audit).
