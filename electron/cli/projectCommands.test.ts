@@ -104,12 +104,13 @@ describe("runPackCommand", () => {
 		await runPackCommand(project, output, false, recorder().write);
 		expect(await fs.readFile(path.join(output, "clip.mp4.events.ndjson"), "utf8")).toBe(events);
 		expect(await fs.readFile(path.join(output, "clip.mp4.flags.json"), "utf8")).toBe(flags);
-		expect(await fs.readFile(path.join(output, "clip.mp4.capture-policy.json"), "utf8")).toBe(
-			privacy,
-		);
+		expect(
+			JSON.parse(await fs.readFile(path.join(output, "clip.mp4.capture-policy.json"), "utf8")),
+		).toMatchObject({ version: 3, policy: { buttonScope: "global" } });
+		expect(await fs.readFile(`${screen}.capture-policy.json`, "utf8")).toBe(privacy);
 	});
 
-	it("refuses malformed privacy before copying source or private evidence", async () => {
+	it("recovers media while excluding malformed privacy and private evidence", async () => {
 		const screen = await make("rec/clip.mp4", "video bytes");
 		await make("rec/clip.mp4.events.ndjson", "PRIVATE_PACK_CANARY");
 		await make("rec/clip.mp4.capture-policy.json", "PRIVATE_RECEIPT_CANARY");
@@ -119,10 +120,12 @@ describe("runPackCommand", () => {
 		});
 		const output = path.join(root, "packed");
 		const out = recorder();
-		await expect(runPackCommand(project, output, false, out.write)).rejects.toThrow(
-			"privacy is invalid",
+		await expect(runPackCommand(project, output, true, out.write)).resolves.toBe(0);
+		expect((await fs.readdir(output)).sort()).toEqual(["clip.mp4", "demo.openscreen"]);
+		expect(JSON.parse(out.text()).warnings[0]).toContain("media only");
+		expect(await fs.readFile(path.join(output, "demo.openscreen"), "utf8")).not.toContain(
+			"PRIVATE_",
 		);
-		expect(await fs.readdir(output)).toEqual([]);
 	});
 	it("keeps screen and webcam apart when they share a basename", async () => {
 		const screen = await make("rec/a/clip.mp4", "screen");
@@ -258,4 +261,60 @@ describe("a project the editor saved", () => {
 			runPackCommand(project, path.join(root, "packed"), false, recorder().write),
 		).rejects.toThrow("pack does not support projects saved by the editor yet");
 	});
+});
+
+it("packages incomplete Off media without sidecars and reports warnings in JSON", async () => {
+	const screen = await make("rec/clip.mp4", "recoverable media");
+	await make(
+		"rec/clip.mp4.capture-policy.json",
+		JSON.stringify({
+			version: 2,
+			captureId: "92a70db4-a3c7-4375-a272-caa5537ed421",
+			policy: { version: 1, buttonScope: "off", allowedApplications: [], excludedApplications: [] },
+			applicationIdentity: "unavailable",
+			collectionAllowedAtStart: false,
+			suppressedAtStart: false,
+		}),
+	);
+	await make("rec/clip.mp4.cursor.json", "PRIVATE_CURSOR_CANARY");
+	const project = await writeProject("demo.openscreen", {
+		version: 1,
+		media: { screenVideoPath: screen },
+	});
+	const output = path.join(root, "recovered");
+	const out = recorder();
+	expect(await runPackCommand(project, output, true, out.write)).toBe(0);
+	expect(JSON.parse(out.text())).toMatchObject({
+		success: true,
+		cursorData: false,
+		warnings: [expect.stringContaining("pending")],
+	});
+	expect((await fs.readdir(output)).sort()).toEqual(["clip.mp4", "demo.openscreen"]);
+	expect(await fs.readFile(path.join(output, "clip.mp4"), "utf8")).toBe("recoverable media");
+	expect(await fs.readFile(`${screen}.cursor.json`, "utf8")).toBe("PRIVATE_CURSOR_CANARY");
+});
+it("minimizes old receipt identifiers in packed metadata and sidecars while preserving originals", async () => {
+	const screen = await make("rec/clip.mp4");
+	const receipt = JSON.stringify({
+		version: 1,
+		policy: {
+			version: 1,
+			buttonScope: "global",
+			allowedApplications: ["PRIVATE_APP_CANARY"],
+			excludedApplications: [],
+		},
+		applicationIdentity: "unavailable",
+		collectionAllowedAtStart: true,
+		suppressedAtStart: false,
+	});
+	await make("rec/clip.mp4.capture-policy.json", receipt);
+	const project = await writeProject("demo.openscreen", {
+		version: 1,
+		media: { screenVideoPath: screen },
+	});
+	const output = path.join(root, "packed");
+	await runPackCommand(project, output, false, recorder().write);
+	for (const file of await fs.readdir(output))
+		expect(await fs.readFile(path.join(output, file), "utf8")).not.toContain("PRIVATE_APP_CANARY");
+	expect(await fs.readFile(`${screen}.capture-policy.json`, "utf8")).toBe(receipt);
 });

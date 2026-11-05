@@ -35,6 +35,9 @@ class FakeSession {
 	discard() {
 		this.discarded = true;
 	}
+	async discardAndWait() {
+		this.discard();
+	}
 	suppressButtonEvidence() {
 		this.suppressed = true;
 	}
@@ -99,7 +102,7 @@ it.each([
 ])("the actual %s IPC callback rechecks a durable reduction across mkdir before starting readers", async (mode) => {
 	const f = await fixture();
 	const pending = f.handlers.get(`${mode}-native-linux-recording`)!(undefined, request);
-	expect(f.mkdir).toHaveBeenCalledTimes(1);
+	await vi.waitFor(() => expect(f.mkdir).toHaveBeenCalledTimes(1));
 	f.store.setRecordingPreferences({ capturePrivacyPolicy: disabledCapturePrivacyPolicy() });
 	f.manager.requestPolicy(disabledCapturePrivacyPolicy());
 	f.release();

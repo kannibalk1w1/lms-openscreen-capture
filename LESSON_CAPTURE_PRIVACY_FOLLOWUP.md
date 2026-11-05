@@ -1,5 +1,9 @@
 # Privacy lifecycle and source association — overnight slice 6
 
+Historical slice-6 behavior/validation. [Slice 7](LESSON_CAPTURE_PRIVACY_RECOVERY.md)
+supersedes countdown replacement, optional metadata failures, crash recovery,
+packaging and policy metadata after actual Claude review 6.
+
 This slice follows actual Claude review 5 of `9f59c4d4`. The original review is
 preserved in `lesson-capture/CLAUDE_OVERNIGHT_REVIEW_5.md`; the disposition is
 `lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_5.md`. Its findings changed behavior,

@@ -96,7 +96,10 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    Actual [review 5](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_5.md) found two Medium
    gaps; the [privacy lifecycle follow-up](LESSON_CAPTURE_PRIVACY_FOLLOWUP.md) fixes
    asynchronous consent and adds real source-bound import/reopen inspection,
-   awaiting its own exact-SHA re-review. It is a bounded collection gate, not complete
+   reviewed at `d6fd5302`: all review-5 findings fixed, with a new High countdown
+   ownership and Medium optional metadata failure. The [recovery follow-up](LESSON_CAPTURE_PRIVACY_RECOVERY.md)
+   addresses those and packaging/metadata limits, awaiting its own exact-SHA review.
+   It is a bounded collection gate, not complete
    text/media redaction, retention exclusions or pre-export privacy inspection.
 3. Establish the simple optional capability interface, integration controls and
    disabled/failure/isolation/reopen regressions before deep Godot expansion.

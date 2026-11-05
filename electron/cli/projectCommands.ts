@@ -1,4 +1,7 @@
-import { inspectCapturePrivacy } from "../recording/capturePolicyReceipt";
+import {
+	inspectCapturePrivacy,
+	writeCapturePolicyReceipt,
+} from "../recording/capturePolicyReceipt";
 // The two CLI commands that only touch the project file and its media:
 // `openscreen pack` and `openscreen info`. They live outside cliMain.ts so they
 // carry no `electron` import and stay unit-testable — the caller passes the
@@ -64,6 +67,8 @@ export async function runPackCommand(
 	};
 
 	await fs.mkdir(outDir, { recursive: true });
+	if ((await fs.readdir(outDir)).length)
+		throw new Error("Pack destination must be empty to preserve existing media and evidence.");
 
 	const copied: string[] = [];
 	const copyIn = async (sourcePath: string): Promise<string> => {
@@ -83,14 +88,17 @@ export async function runPackCommand(
 
 	const screenSource = await resolveSource(screenVideoPath);
 	const capturePrivacy = await inspectCapturePrivacy(screenSource, data.capturePrivacy);
-	if (["invalid", "mismatch", "pending", "conflict", "unavailable"].includes(capturePrivacy.status))
-		throw new Error(
-			`Capture privacy is ${capturePrivacy.status}; refusing to attribute or package these evidence sidecars.`,
+	const evidenceAllowed = ["bound", "legacy", "missing"].includes(capturePrivacy.status);
+	const warnings: string[] = [];
+	if (!evidenceAllowed)
+		warnings.push(
+			`Capture privacy is ${capturePrivacy.status}; packaged media only, excluding input/cursor/flag evidence and policy sidecars.`,
 		);
-	if (capturePrivacy.status !== "bound" && capturePrivacy.journalPresent)
-		emit(
-			"Warning: input evidence has no source-bound policy receipt; it remains unverified legacy evidence.",
+	else if (capturePrivacy.status !== "bound" && capturePrivacy.journalPresent)
+		warnings.push(
+			"Input evidence has no source-bound policy receipt; it remains unverified legacy evidence.",
 		);
+	for (const warning of warnings) emit(`Warning: ${warning}`);
 	const newScreenPath = await copyIn(screenSource);
 
 	let newWebcamPath: string | undefined;
@@ -100,26 +108,28 @@ export async function runPackCommand(
 
 	// Cursor telemetry sidecar sits at "<video path>.cursor.json".
 	const cursorSidecar = `${screenSource}.cursor.json`;
-	const hasCursorData = await isFile(cursorSidecar);
+	const hasCursorData = evidenceAllowed && (await isFile(cursorSidecar));
 	if (hasCursorData) {
 		await copyIn(cursorSidecar);
 	}
 
 	// Input evidence travels with the source footage, without rewriting events.
 	const eventJournal = `${screenSource}.events.ndjson`;
-	if (await isFile(eventJournal)) await copyIn(eventJournal);
+	if (evidenceAllowed && (await isFile(eventJournal))) await copyIn(eventJournal);
 
-	const capturePolicy = `${screenSource}.capture-policy.json`;
-	if (await isFile(capturePolicy)) await copyIn(capturePolicy);
+	if (evidenceAllowed && capturePrivacy.receipt) {
+		const target = writeCapturePolicyReceipt(newScreenPath, capturePrivacy.receipt);
+		copied.push(target);
+	}
 	const captureBinding = `${screenSource}.capture-policy.binding.json`;
-	if (await isFile(captureBinding)) await copyIn(captureBinding);
-
+	if (evidenceAllowed && (await isFile(captureBinding))) await copyIn(captureBinding);
 	const flagsSidecar = `${screenSource}.flags.json`;
-	if (await isFile(flagsSidecar)) await copyIn(flagsSidecar);
-
+	if (evidenceAllowed && (await isFile(flagsSidecar))) await copyIn(flagsSidecar);
 	const packedProject: PackedProjectData = {
 		...data,
-		capturePrivacy,
+		capturePrivacy: evidenceAllowed
+			? capturePrivacy
+			: { status: capturePrivacy.status, journalPresent: false },
 		media: {
 			...media,
 			screenVideoPath: newScreenPath,
@@ -138,6 +148,7 @@ export async function runPackCommand(
 				projectPath: packedProjectPath,
 				files: [packedProjectPath, ...copied],
 				cursorData: hasCursorData,
+				warnings,
 			})}\n`,
 		);
 	} else {

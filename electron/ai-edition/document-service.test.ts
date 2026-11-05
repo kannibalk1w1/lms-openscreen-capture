@@ -79,6 +79,85 @@ describe("DocumentService", () => {
 		expect(invalid.assets[0].capturePrivacy?.status).toBe("invalid");
 		expect(JSON.stringify(invalid)).not.toContain("PRIVATE_RECEIPT_CANARY");
 	});
+
+	it.each([
+		{ status: "future-status", journalPresent: false },
+		{ status: "missing", journalPresent: false, privateExtra: "PRIVATE_METADATA_CANARY" },
+		{
+			status: "legacy",
+			journalPresent: false,
+			receipt: {
+				version: 1,
+				policy: disabledCapturePrivacyPolicy(),
+				applicationIdentity: "unavailable",
+				collectionAllowedAtStart: true,
+				suppressedAtStart: false,
+			},
+		},
+	])("keeps generic footage usable when optional embedded privacy is unsupported: %j", async (metadata) => {
+		const created = await service.createProject("Optional metadata");
+		const video = path.join(mediaDir, "take.mp4");
+		await fs.writeFile(video, "media");
+		const added = await service.addAsset(created.project.id, { path: video });
+		const file = path.join(tempDir, `${created.project.id}.openscreen`);
+		await fs.writeFile(
+			file,
+			JSON.stringify({
+				...added,
+				assets: added.assets.map((asset) => ({ ...asset, capturePrivacy: metadata })),
+			}),
+		);
+		const before = await fs.readFile(file, "utf8");
+		const reopened = await new DocumentService(tempDir, mediaDir).getProject(created.project.id);
+		expect(reopened.assets[0].originalPath).toBe(video);
+		expect(reopened.assets[0].capturePrivacy?.status).toBe("invalid");
+		expect(JSON.stringify(reopened)).not.toContain("PRIVATE_METADATA_CANARY");
+		expect(await fs.readFile(file, "utf8")).toBe(before);
+	});
+
+	it("minimizes application identifiers when importing and saving older privacy metadata", async () => {
+		const created = await service.createProject("Minimal policy");
+		const video = path.join(mediaDir, "take.mp4");
+		await fs.writeFile(video, "media");
+		const receipt = {
+			version: 2,
+			captureId: randomUUID(),
+			policy: {
+				...disabledCapturePrivacyPolicy(),
+				buttonScope: "global",
+				allowedApplications: ["PRIVATE_APP_CANARY"],
+				excludedApplications: [],
+			},
+			applicationIdentity: "unavailable",
+			collectionAllowedAtStart: true,
+			suppressedAtStart: false,
+		};
+		const original = JSON.stringify(receipt);
+		await fs.writeFile(`${video}.capture-policy.json`, original);
+		await bindCapturePolicyToMedia(video, receipt.captureId);
+		const added = await service.addAsset(created.project.id, { path: video });
+		expect(added.assets[0].capturePrivacy?.status).toBe("bound");
+		expect(JSON.stringify(added)).not.toContain("PRIVATE_APP_CANARY");
+		const file = path.join(tempDir, `${created.project.id}.openscreen`);
+		expect(await fs.readFile(file, "utf8")).not.toContain("PRIVATE_APP_CANARY");
+		const asset = added.assets[0];
+		await service.saveProject({
+			...added,
+			assets: [
+				{
+					...asset,
+					capturePrivacy: {
+						status: "bound",
+						journalPresent: false,
+						receipt: JSON.parse(original),
+						binding: asset.capturePrivacy?.binding,
+					},
+				},
+			],
+		});
+		expect(await fs.readFile(file, "utf8")).not.toContain("PRIVATE_APP_CANARY");
+		expect(await fs.readFile(`${video}.capture-policy.json`, "utf8")).toBe(original);
+	});
 	describe("createProject", () => {
 		it("saves typing evidence and section pacing through an actual disk reopen", async () => {
 			const doc = await service.createProject("Typing proof");

@@ -40,6 +40,8 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import { execFile, spawn } from "node:child_process";
 import { disabledCapturePrivacyPolicy } from "../../../src/lib/capturePrivacy";
+import type { NativeLinuxRecordingRequest } from "../../../src/lib/nativeLinuxRecording";
+import { LinuxCaptureStartup } from "../../ipc/linuxCaptureStartup";
 import {
 	inspectCapturePrivacy,
 	readCapturePolicyReceipt,
@@ -1267,7 +1269,10 @@ it.each([
 		);
 		if (policy)
 			expect(readCapturePolicyReceipt(video)).toMatchObject({
-				policy,
+				policy: {
+					buttonScope: policy.buttonScope,
+					excludedApplicationsConfigured: policy.excludedApplications.length > 0,
+				},
 				applicationIdentity: "unavailable",
 				collectionAllowedAtStart: false,
 			});
@@ -1324,7 +1329,7 @@ it("revokes an authorized take before queued helper lines arrive while retaining
 		expect(JSON.stringify(result.cursor)).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
 		expect(session.helperOutput).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
 		expect(readCapturePolicyReceipt(video).collectionAllowedAtStart).toBe(true);
-		expect(readCapturePolicyReceipt(video).version).toBe(2);
+		expect(readCapturePolicyReceipt(video).version).toBe(3);
 		expect((await inspectCapturePrivacy(video)).status).toBe("bound");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -1414,6 +1419,95 @@ it("keeps revocation effective while the safe capability probe is still pending"
 			expect(readFileSync(join(root, file), "utf8")).not.toContain(
 				"PRIVATE_BUTTON_CANARY_PROBE_REVOKED",
 			);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+it.each([
+	"microphone",
+	"revoke",
+])("renegotiates the same recording identity after a %s change only after actual child exit", async (change) => {
+	const root = mkdtempSync(join(tmpdir(), "countdown-lock-"));
+	try {
+		const children: FakeHelper[] = [];
+		spawnMock.mockImplementation(() => {
+			const child = new FakeHelper();
+			children.push(child);
+			return child as unknown as ReturnType<typeof spawn>;
+		});
+		let policy = { ...disabledCapturePrivacyPolicy(), buttonScope: "global" as "global" | "off" };
+		const handlers = new Map<
+			string,
+			(event: unknown, request: NativeLinuxRecordingRequest) => Promise<unknown>
+		>();
+		const started = vi.fn();
+		const sessions: LinuxNativeCaptureSession[] = [];
+		const manager = new LinuxCaptureStartup({
+			handle: (channel, handler) => {
+				handlers.set(channel, handler);
+			},
+			platform: () => "linux",
+			helperAvailable: () => true,
+			readPolicy: () => policy,
+			mkdir: async () => undefined,
+			recordingsDir: root,
+			filePrefix: "recording-",
+			maxCursorSamples: 100,
+			createSession: (config) => {
+				const session = new LinuxNativeCaptureSession(config);
+				sessions.push(session);
+				return session;
+			},
+			active: () => null,
+			onCandidate: () => undefined,
+			onStarted: started,
+			removeEmptyOutput: async () => undefined,
+		});
+		manager.register();
+		const request: NativeLinuxRecordingRequest = {
+			recordingId: 7,
+			video: { fps: 30 },
+			cursor: { mode: "editable-overlay" },
+			audio: { system: { enabled: false }, microphone: { enabled: false, gain: 1 } },
+		};
+		const preparing = handlers.get("prepare-native-linux-recording")!(null, request);
+		await vi.waitFor(() => expect(children).toHaveLength(1));
+		children[0].emitEvent({ event: "ready", timestampMs: 1000 });
+		children[0].emitEvent({ event: "source-selected", timestampMs: 1010, sourceKind: "window" });
+		expect(await preparing).toMatchObject({ success: true });
+		const next = {
+			...request,
+			audio: { ...request.audio, microphone: { enabled: change === "microphone", gain: 1 } },
+		};
+		if (change === "revoke") {
+			policy = { ...policy, buttonScope: "off" };
+			manager.requestPolicy(policy);
+			manager.confirmPolicy(policy);
+		}
+		const starting = handlers.get("start-native-linux-recording")!(null, next);
+		await vi.waitFor(() => expect(children[0].killed).toBe(true));
+		expect(children).toHaveLength(1);
+		expect(existsSync(join(root, "recording-7.mp4.capture-policy.lock"))).toBe(true);
+		children[0].emit("exit", null, "SIGTERM");
+		await vi.waitFor(() => expect(children).toHaveLength(2));
+		children[1].emitEvent({ event: "ready", timestampMs: 1100 });
+		children[1].emitEvent({ event: "source-selected", timestampMs: 1110, sourceKind: "window" });
+		children[1].emitEvent({
+			event: "capture-started",
+			timestampMs: 1120,
+			path: join(root, "recording-7.mp4"),
+			width: 800,
+			height: 600,
+			fps: 30,
+		});
+		expect(await starting).toMatchObject({ success: true, recordingId: 7 });
+		const args = JSON.parse((spawnMock.mock.calls[1][1] as string[])[0]);
+		expect(args.capturePointerButtons).toBe(change !== "revoke");
+		expect(args.audio.microphone.enabled).toBe(change === "microphone");
+		expect(started).toHaveBeenCalledTimes(1);
+		sessions[1].discard();
+		children[1].emit("exit", null, "SIGTERM");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

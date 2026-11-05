@@ -69,11 +69,31 @@ export const capturePrivacyReceiptSchema = z
 	.discriminatedUnion("version", [
 		z.object({ version: z.literal(1), ...receiptFields }).strict(),
 		z.object({ version: z.literal(2), captureId: z.string().uuid(), ...receiptFields }).strict(),
+		z
+			.object({
+				version: z.literal(3),
+				captureId: z.string().uuid().optional(),
+				policy: z
+					.object({
+						version: z.literal(1),
+						buttonScope: z.enum(["off", "global", "applications"]),
+						excludedApplicationsConfigured: z.boolean(),
+					})
+					.strict(),
+				applicationIdentity: z.literal("unavailable"),
+				collectionAllowedAtStart: z.boolean(),
+				suppressedAtStart: z.boolean(),
+			})
+			.strict(),
 	])
 	.refine(
 		(receipt) =>
 			receipt.collectionAllowedAtStart ===
-			decideButtonCollection(receipt.policy, null, receipt.suppressedAtStart).allowed,
+			(receipt.version === 3
+				? !receipt.suppressedAtStart &&
+					receipt.policy.buttonScope === "global" &&
+					!receipt.policy.excludedApplicationsConfigured
+				: decideButtonCollection(receipt.policy, null, receipt.suppressedAtStart).allowed),
 		"Policy receipt decision is inconsistent",
 	);
 export type CapturePrivacyReceipt = z.infer<typeof capturePrivacyReceiptSchema>;
@@ -96,6 +116,7 @@ export const capturePrivacyInspectionSchema = z
 			"mismatch",
 			"bound",
 			"unavailable",
+			"interrupted",
 			"conflict",
 		]),
 		journalPresent: z.boolean(),
@@ -104,3 +125,40 @@ export const capturePrivacyInspectionSchema = z
 	})
 	.strict();
 export type CapturePrivacyInspection = z.infer<typeof capturePrivacyInspectionSchema>;
+
+/** Optional enrichment must never prevent generic project media from reopening. */
+export const optionalCapturePrivacyInspectionSchema = z.preprocess((value) => {
+	if (value === undefined) return undefined;
+	const parsed = capturePrivacyInspectionSchema.safeParse(value);
+	return parsed.success
+		? {
+				...parsed.data,
+				...(parsed.data.receipt
+					? { receipt: minimizeCapturePrivacyReceipt(parsed.data.receipt) }
+					: {}),
+			}
+		: { status: "invalid", journalPresent: false };
+}, capturePrivacyInspectionSchema.optional());
+
+export function summarizeCapturePrivacyPolicy(policy: CapturePrivacyPolicy) {
+	return {
+		version: 1 as const,
+		buttonScope: policy.buttonScope,
+		excludedApplicationsConfigured: policy.excludedApplications.length > 0,
+	};
+}
+
+/** Persist/export the declared decision without leaking application identifiers. */
+export function minimizeCapturePrivacyReceipt(
+	receipt: CapturePrivacyReceipt,
+): CapturePrivacyReceipt {
+	if (receipt.version === 3) return receipt;
+	return {
+		version: 3,
+		...(receipt.version === 2 ? { captureId: receipt.captureId } : {}),
+		policy: summarizeCapturePrivacyPolicy(receipt.policy),
+		applicationIdentity: receipt.applicationIdentity,
+		collectionAllowedAtStart: receipt.collectionAllowedAtStart,
+		suppressedAtStart: receipt.suppressedAtStart,
+	};
+}

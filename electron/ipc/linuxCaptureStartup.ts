@@ -19,6 +19,7 @@ export interface LinuxStartupSession {
 	waitUntilCapturing(): Promise<void>;
 	arm(): void;
 	discard(): void;
+	discardAndWait(): Promise<void>;
 	suppressButtonEvidence(): void;
 	readonly cursorMode: "metadata" | "embedded";
 	readonly grantedSourceKind: LinuxCaptureSourceKind | undefined;
@@ -51,6 +52,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 	} | null = null;
 	private preparing: { token: symbol; session: T | null } | null = null;
 	private last: T | null = null;
+	private retiring: Promise<void> = Promise.resolve();
 	private starting = false;
 	private revoked = false;
 	constructor(private readonly context: Context<T>) {}
@@ -59,7 +61,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 		this.context.handle("prepare-native-linux-recording", (_, request) => this.prepare(request));
 		this.context.handle("start-native-linux-recording", (_, request) => this.start(request));
 		this.context.handle("cancel-native-linux-prepare", async () => {
-			this.cancel();
+			await this.cancel();
 			return { success: true };
 		});
 	}
@@ -82,12 +84,22 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 		]))
 			session?.suppressButtonEvidence();
 	}
-	cancel() {
-		this.preparing?.session?.discard();
+	cancel(): Promise<void> {
+		const sessions = new Set([this.preparing?.session, this.prepared?.session]);
 		this.preparing = null;
-		this.prepared?.session.discard();
 		this.prepared = null;
+		// Start teardown immediately; retain a barrier for subsequent prepare/start calls.
+		const retiring = [...sessions]
+			.filter((session): session is T => !!session)
+			.map((session) => session.discardAndWait());
+		this.retiring = Promise.all([this.retiring.catch(() => undefined), ...retiring]).then(
+			() => undefined,
+		);
+		// Callers that only invalidate still must not cause an unhandled rejection.
+		void this.retiring.catch(() => undefined);
+		return this.retiring;
 	}
+
 	private canonical(request: NativeLinuxRecordingRequest): NativeLinuxRecordingRequest {
 		return {
 			...request,
@@ -144,7 +156,10 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 	private settings(request: NativeLinuxRecordingRequest) {
 		return JSON.stringify(this.config(request, "", false));
 	}
-	private takePrepared(outputPath: string, request: NativeLinuxRecordingRequest): T | null {
+	private async takePrepared(
+		outputPath: string,
+		request: NativeLinuxRecordingRequest,
+	): Promise<T | null> {
 		const prepared = this.prepared;
 		this.prepared = null;
 		if (!prepared) return null;
@@ -152,7 +167,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			prepared.outputPath !== outputPath ||
 			this.settings(prepared.request) !== this.settings(request)
 		) {
-			prepared.session.discard();
+			await prepared.session.discardAndWait();
 			return null;
 		}
 		return prepared.session;
@@ -162,7 +177,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			return { success: false, reason: "unsupported-platform" };
 		if (this.context.active() || this.starting)
 			return { success: false, reason: "already-recording" };
-		this.cancel();
+		const retired = this.cancel();
 		const token = Symbol("linux-prepare");
 		this.preparing = { token, session: null };
 		try {
@@ -171,6 +186,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 				return { success: false, reason: "missing-helper" };
 			}
 			const { recordingId, outputPath } = this.identity(input);
+			await retired;
 			await this.context.mkdir();
 			if (this.preparing?.token !== token) return { success: false, reason: "cancelled" };
 			const request = this.canonical(input);
@@ -206,8 +222,9 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			outputPath = identity.outputPath;
 			await this.context.mkdir();
 			const request = this.canonical(input);
-			const prepared = this.takePrepared(outputPath, request);
-			if (this.preparing) this.cancel();
+			await this.retiring;
+			const prepared = await this.takePrepared(outputPath, request);
+			if (this.preparing) await this.cancel();
 			const session =
 				prepared ?? this.context.createSession(this.config(request, outputPath, false));
 			candidate = session;

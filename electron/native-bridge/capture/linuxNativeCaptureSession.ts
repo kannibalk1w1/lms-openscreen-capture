@@ -5,6 +5,7 @@ import {
 	type CapturePrivacyPolicy,
 	decideButtonCollection,
 	normalizeCapturePrivacyPolicy,
+	summarizeCapturePrivacyPolicy,
 } from "../../../src/lib/capturePrivacy";
 import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
@@ -126,7 +127,9 @@ export interface LinuxCaptureResult {
 
 export class LinuxNativeCaptureSession {
 	private readonly captureId = randomUUID();
-	private releaseDestination: (() => void) | undefined;
+	private releaseDestination:
+		| import("../../recording/capturePolicyReceipt").CaptureReservation
+		| undefined;
 	private discarded = false;
 	private bindingPromise: Promise<void> | undefined;
 	private readonly privacyPolicy: CapturePrivacyPolicy;
@@ -223,6 +226,7 @@ export class LinuxNativeCaptureSession {
 			...(this.config.deferStart ? { deferStart: true } : {}),
 		};
 
+		this.releaseDestination?.launching();
 		const child = spawn(helperPath, [JSON.stringify(request)], {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -273,6 +277,7 @@ export class LinuxNativeCaptureSession {
 		});
 
 		try {
+			this.releaseDestination?.helper(child.pid);
 			await new Promise<void>((resolve, reject) => {
 				this.readyResolve = resolve;
 				this.readyReject = reject;
@@ -417,7 +422,10 @@ export class LinuxNativeCaptureSession {
 	suppressButtonEvidence() {
 		if (this.inputSuppressed) return;
 		this.inputSuppressed = true;
-		this.journal?.append({ event: "input-policy-suppressed", policy: this.privacyPolicy });
+		this.journal?.append({
+			event: "input-policy-suppressed",
+			policy: summarizeCapturePrivacyPolicy(this.privacyPolicy),
+		});
 		this.write("suppress-input");
 	}
 
@@ -551,6 +559,37 @@ export class LinuxNativeCaptureSession {
 	discard() {
 		this.discarded = true;
 		this.kill();
+		if (!this.process) this.releaseDestination?.();
+	}
+
+	/** Renegotiation may reuse the path only after the previous child actually exits. */
+	async discardAndWait(): Promise<void> {
+		const child = this.process;
+		if (!child) {
+			this.discard();
+			return;
+		}
+		const exited = new Promise<void>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				child.removeListener("exit", done);
+				child.removeListener("error", done);
+				reject(
+					new Error(
+						"Previous Linux capture helper did not exit; its destination remains reserved.",
+					),
+				);
+			}, 5000);
+			const done = () => {
+				clearTimeout(timer);
+				child.removeListener("exit", done);
+				child.removeListener("error", done);
+				resolve();
+			};
+			child.once("exit", done);
+			child.once("error", done);
+		});
+		this.discard();
+		await exited;
 	}
 
 	private write(command: string) {
@@ -568,7 +607,7 @@ export class LinuxNativeCaptureSession {
 		}
 		child.kill("SIGTERM");
 		setTimeout(() => {
-			if (!child.killed) {
+			if (this.process === child) {
 				child.kill("SIGKILL");
 			}
 		}, 500).unref();

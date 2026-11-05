@@ -86,7 +86,12 @@ export type CaptureJournalPayload =
 	| PointerButtonEvidence
 	| InputCaptureStatus
 	| { event: "input-warning"; code: string; message: string }
-	| { event: "input-policy-suppressed"; policy: CapturePrivacyPolicy }
+	| {
+			event: "input-policy-suppressed";
+			policy:
+				| CapturePrivacyPolicy
+				| ReturnType<typeof import("../lib/capturePrivacy").summarizeCapturePrivacyPolicy>;
+	  }
 	| { event: "session-end"; durationMs: number };
 
 export type CaptureJournalRecord = CaptureJournalPayload & {

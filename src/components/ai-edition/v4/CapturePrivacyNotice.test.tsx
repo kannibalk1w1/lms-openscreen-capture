@@ -22,6 +22,7 @@ it.each([
 	"mismatch",
 	"bound",
 	"unavailable",
+	"interrupted",
 	"conflict",
 ] as const)("shows %s association status with its privacy limits", (status) => {
 	render(

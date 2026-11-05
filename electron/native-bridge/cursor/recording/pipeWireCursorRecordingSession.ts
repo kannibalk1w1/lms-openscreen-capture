@@ -171,8 +171,9 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 
 	private handleStdoutChunk(chunk: string) {
 		this.lines.push(chunk, (line) => {
+			let parsed: unknown;
 			try {
-				const parsed: unknown = JSON.parse(line);
+				parsed = JSON.parse(line);
 				if (
 					!parsed ||
 					typeof parsed !== "object" ||
@@ -180,9 +181,14 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 					typeof (parsed as { event?: unknown }).event !== "string"
 				)
 					throw new Error("Invalid helper envelope");
-				this.handleEvent(parsed as PipeWireHelperEvent);
 			} catch {
 				console.error("[cursor-linux] malformed helper record omitted");
+				return;
+			}
+			try {
+				this.handleEvent(parsed as PipeWireHelperEvent);
+			} catch {
+				console.error("[cursor-linux] helper handler failed; record omitted");
 			}
 		});
 	}
