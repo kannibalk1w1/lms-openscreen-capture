@@ -86,6 +86,7 @@ sustained/device matrix, Windows/macOS and remaining manual checklist. The Orca
 provider still lacks screenshot/hotkey/focus support. All original evidence is
 retained and real lesson projects remain untouched.
 
-Next concrete item: make click-effect cursor samples use the same reader-time
-projection and prevent Electron UTC pause ranges from retiming those samples;
-then live explicit Godot/recording clock bridging with measured bounds.
+Subsequent [cursor timing slice](LESSON_CAPTURE_CURSOR_TIMING.md) aligns click-effect
+projection and avoids second UTC pause compaction. Next: privacy collection/
+exclusion foundation from the expanded product brief, then live explicit Godot
+clock bridging with measured bounds.

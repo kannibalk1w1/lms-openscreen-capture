@@ -141,6 +141,12 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     CursorSample {
         timestamp_ms: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        media_time_ms: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        interval_id: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        media_time_observation: Option<&'static str>,
         x: i32,
         y: i32,
         width: i32,
@@ -385,6 +391,9 @@ mod tests {
     fn cursor_samples_omit_asset_fields_when_absent() {
         let value = parse_one(&Event::CursorSample {
             timestamp_ms: 12,
+            media_time_ms: None,
+            interval_id: None,
+            media_time_observation: None,
             x: 100,
             y: 200,
             width: 1920,
@@ -408,6 +417,9 @@ mod tests {
     fn cursor_samples_report_a_click_when_tagged() {
         let value = parse_one(&Event::CursorSample {
             timestamp_ms: 12,
+            media_time_ms: None,
+            interval_id: None,
+            media_time_observation: None,
             x: 100,
             y: 200,
             width: 1920,
@@ -424,6 +436,9 @@ mod tests {
     fn cursor_assets_match_the_native_cursor_asset_contract() {
         let value = parse_one(&Event::CursorSample {
             timestamp_ms: 12,
+            media_time_ms: None,
+            interval_id: None,
+            media_time_observation: None,
             x: 0,
             y: 0,
             width: 1,
@@ -462,6 +477,9 @@ mod tests {
     fn events_carrying_a_meaningful_timestamp_keep_it() {
         let value = parse_one(&Event::CursorSample {
             timestamp_ms: 1234,
+            media_time_ms: None,
+            interval_id: None,
+            media_time_observation: None,
             x: 0,
             y: 0,
             width: 1,

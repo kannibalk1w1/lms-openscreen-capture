@@ -8,8 +8,11 @@ approval of the changes below. The original report is preserved unchanged.
 - **N1 (new Low audio tail): fixed in slice 2.** Stop closes audio rings while
   preserving queued samples/pending mix. A real AAC/software-video fixture tests
   accepted pre-stop count, rejected post-stop callback and frame-bounded duration.
-- **N2 (click effects): next implementation slice.** Journal projection and cursor
-  UTC/pause compaction still differ; no new consumer should join them meanwhile.
+- **N2 (click effects): addressed in slice 3.** Native click/motion telemetry uses
+  the shared encoder projection; Electron retains those media times and compacts
+  only legacy samples. Actual native fixture compares late effect/journal clocks.
+  See [exact coverage](../LESSON_CAPTURE_CURSOR_TIMING.md); further Claude review
+  of this fix is pending until its report arrives.
 - **N3:** docs now state the out-of-order guard is defensive, with no current FIFO
   producer. Kernel overflow has its own raw-reader gap path and never relies on it.
 - **N4:** docs specify retained interval identity, `(mediaTimeMs, intervalId,

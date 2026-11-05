@@ -45,6 +45,72 @@ describe("NdjsonLineReader", () => {
 });
 
 describe("PipeWireCursorAccumulator", () => {
+	it("keeps projected clicks on encoder time across UTC rebasing and legacy pause compaction", () => {
+		const accumulator = new PipeWireCursorAccumulator(100);
+		accumulator.reset(1000);
+		accumulator.addSample(sample(1100, 1, 1)); // legacy before pause
+		accumulator.addSample(sample(1500, 2, 2)); // legacy during pause
+		accumulator.addSample(sample(2100, 3, 3)); // legacy after pause
+		accumulator.addSample(
+			sample(9000, 4, 4, {
+				interactionType: "click",
+				mediaTimeMs: 50,
+				intervalId: 0,
+				mediaTimeObservation: "reader",
+			}),
+		);
+		accumulator.addSample(
+			sample(8000, 5, 5, { mediaTimeMs: 150, intervalId: 1, mediaTimeObservation: "dispatch" }),
+		);
+		const data = accumulator.toRecordingData([{ startMs: 200, endMs: 1000 }]);
+		expect(data.samples.map((point) => point.timeMs)).toEqual([50, 100, 150, 300]);
+		expect(data.samples[0].interactionType).toBe("click");
+		accumulator.rebase(1000000);
+		expect(
+			accumulator
+				.toRecordingData([{ startMs: 0, endMs: 1000000 }])
+				.samples.map((point) => point.timeMs),
+		).toEqual([50, 150]);
+	});
+
+	it("orders projected millisecond ties by interval then arrival and shares the sample bound", () => {
+		const accumulator = new PipeWireCursorAccumulator(3);
+		accumulator.reset(0);
+		accumulator.addSample(
+			sample(1, 1, 1, { mediaTimeMs: 50, intervalId: 1, mediaTimeObservation: "reader" }),
+		);
+		accumulator.addSample(
+			sample(2, 2, 2, { mediaTimeMs: 50, intervalId: 1, mediaTimeObservation: "reader" }),
+		);
+		accumulator.addSample(
+			sample(3, 3, 3, { mediaTimeMs: 50, intervalId: 0, mediaTimeObservation: "reader" }),
+		);
+		accumulator.addSample(
+			sample(4, 4, 4, { mediaTimeMs: 50, intervalId: 1, mediaTimeObservation: "reader" }),
+		);
+		expect(accumulator.sampleCount).toBe(3);
+		expect(accumulator.toRecordingData().samples.map((point) => point.cx * 1920)).toEqual([
+			3, 2, 4,
+		]);
+		accumulator.reset(0);
+		expect(accumulator.sampleCount).toBe(0);
+	});
+
+	it("rejects malformed projected clocks instead of silently treating them as UTC", () => {
+		const accumulator = new PipeWireCursorAccumulator(100);
+		accumulator.reset(0);
+		for (const extra of [
+			{ mediaTimeMs: -1, intervalId: 0 },
+			{ mediaTimeMs: NaN, intervalId: 0 },
+			{ mediaTimeMs: 20, intervalId: -1 },
+			{ mediaTimeMs: 20, intervalId: 0.5 },
+			{ mediaTimeMs: 20 },
+		]) {
+			accumulator.addSample(sample(50, 1, 1, { ...extra, mediaTimeObservation: "reader" }));
+		}
+		expect(accumulator.sampleCount).toBe(0);
+	});
+
 	it("normalises positions against the stream size the helper reports", () => {
 		const accumulator = new PipeWireCursorAccumulator(100);
 		accumulator.reset(1_000);

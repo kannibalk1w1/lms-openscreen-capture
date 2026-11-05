@@ -11,6 +11,7 @@ import type {
 	NativeCursorAsset,
 } from "../../../../src/native/contracts";
 import { clamp } from "../../../../src/utils/math";
+import { type CursorPauseRange, compactCursorTelemetryPauseRanges } from "./cursorPauseRanges";
 
 /**
  * Turns the Linux helper's NDJSON stdout into `CursorRecordingData`.
@@ -68,6 +69,10 @@ export type PipeWireHelperEvent =
 	| {
 			event: "cursor-sample";
 			timestampMs: number;
+			/** Native pause-compacted encoder time; absent from older/cursor-only helpers. */
+			mediaTimeMs?: number;
+			intervalId?: number;
+			mediaTimeObservation?: "reader" | "dispatch";
 			x: number;
 			y: number;
 			width: number;
@@ -138,8 +143,15 @@ export class NdjsonLineReader {
 	}
 }
 
+interface AccumulatedSample {
+	sample: CursorRecordingSample;
+	intervalId: number | null;
+	sequence: number;
+}
+
 export class PipeWireCursorAccumulator {
-	private samples: CursorRecordingSample[] = [];
+	private samples: AccumulatedSample[] = [];
+	private sequence = 0;
 	private assets = new Map<string, NativeCursorAsset>();
 	private startTimeMs = 0;
 
@@ -147,6 +159,7 @@ export class PipeWireCursorAccumulator {
 
 	reset(startTimeMs: number) {
 		this.samples = [];
+		this.sequence = 0;
 		this.assets.clear();
 		this.startTimeMs = startTimeMs;
 	}
@@ -168,8 +181,12 @@ export class PipeWireCursorAccumulator {
 			return;
 		}
 		this.samples = this.samples
-			.map((sample) => ({ ...sample, timeMs: sample.timeMs - shiftMs }))
-			.filter((sample) => sample.timeMs >= 0);
+			.map((entry) =>
+				entry.intervalId !== null
+					? entry
+					: { ...entry, sample: { ...entry.sample, timeMs: entry.sample.timeMs - shiftMs } },
+			)
+			.filter((entry) => entry.sample.timeMs >= 0);
 	}
 
 	addSample(payload: Extract<PipeWireHelperEvent, { event: "cursor-sample" }>) {
@@ -187,19 +204,37 @@ export class PipeWireCursorAccumulator {
 		const width = Math.max(1, payload.width);
 		const height = Math.max(1, payload.height);
 
+		const projected = payload.mediaTimeObservation !== undefined;
+		if (
+			projected &&
+			(!(
+				payload.mediaTimeObservation === "reader" || payload.mediaTimeObservation === "dispatch"
+			) ||
+				!Number.isFinite(payload.mediaTimeMs) ||
+				(payload.mediaTimeMs ?? -1) < 0 ||
+				!Number.isSafeInteger(payload.intervalId) ||
+				(payload.intervalId ?? -1) < 0)
+		)
+			return;
 		this.samples.push({
-			// Clamped, matching the behaviour this was extracted from: a sample
-			// stamped a few milliseconds before the recording's own start is a
-			// clock artefact, not a sample from before the recording.
-			timeMs: Math.max(0, payload.timestampMs - this.startTimeMs),
-			cx: clamp(payload.x / width, 0, 1),
-			cy: clamp(payload.y / height, 0, 1),
-			visible: payload.visible,
-			// The portal never reports a button; the helper tags a sample "click"
-			// only when it read a left-button press from evdev (needs the user in
-			// the `input` group). Everything else — the common case — is a move.
-			interactionType: payload.interactionType ?? "move",
-			...(payload.assetId ? { assetId: payload.assetId } : {}),
+			intervalId: projected ? (payload.intervalId ?? null) : null,
+			sequence: this.sequence++,
+			sample: {
+				// Clamped, matching the behaviour this was extracted from: a sample
+				// stamped a few milliseconds before the recording's own start is a
+				// clock artefact, not a sample from before the recording.
+				timeMs: projected
+					? (payload.mediaTimeMs ?? 0)
+					: Math.max(0, payload.timestampMs - this.startTimeMs),
+				cx: clamp(payload.x / width, 0, 1),
+				cy: clamp(payload.y / height, 0, 1),
+				visible: payload.visible,
+				// The portal never reports a button; the helper tags a sample "click"
+				// only when it read a left-button press from evdev (needs the user in
+				// the `input` group). Everything else — the common case — is a move.
+				interactionType: payload.interactionType ?? "move",
+				...(payload.assetId ? { assetId: payload.assetId } : {}),
+			},
 		});
 
 		if (this.samples.length > this.maxSamples) {
@@ -231,12 +266,32 @@ export class PipeWireCursorAccumulator {
 		return this.samples.length;
 	}
 
-	toRecordingData(): CursorRecordingData {
-		return {
-			version: 2,
-			provider: this.assets.size > 0 ? "native" : "none",
-			samples: this.samples,
+	toRecordingData(pauseRanges: CursorPauseRange[] = []): CursorRecordingData {
+		const metadata = {
+			version: 2 as const,
+			provider: this.assets.size > 0 ? ("native" as const) : ("none" as const),
 			assets: [...this.assets.values()],
 		};
+		const legacy = compactCursorTelemetryPauseRanges(
+			{
+				...metadata,
+				samples: this.samples
+					.filter((entry) => entry.intervalId === null)
+					.map((entry) => entry.sample),
+			},
+			pauseRanges,
+		);
+		// Legacy timestamps retain their old control/UTC compaction. Native samples
+		// already use the encoder clock and must never pass through it again.
+		const ordered = [
+			...legacy.samples.map((sample, sequence) => ({ sample, intervalId: -1, sequence })),
+			...this.samples
+				.filter((entry) => entry.intervalId !== null)
+				.map((entry) => ({ ...entry, intervalId: entry.intervalId ?? 0 })),
+		].sort(
+			(a, b) =>
+				a.sample.timeMs - b.sample.timeMs || a.intervalId - b.intervalId || a.sequence - b.sequence,
+		);
+		return { ...metadata, samples: ordered.map((entry) => entry.sample) };
 	}
 }

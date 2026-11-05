@@ -841,18 +841,21 @@ fn run<W: Write>(
                 device,
             }) => {
                 let content = content_rect(&capture, size);
-                if !paused
-                    && pressed
-                    && code == 0x110
-                    && streaming_since.is_some_and(|since| press_ms >= since)
-                {
-                    emit_sample(
-                        emitter,
-                        &cursor,
-                        content,
-                        &mut pending_asset,
-                        Some(press_ms),
-                    );
+                if pressed && code == 0x110 {
+                    let timing = cursor_timing(&capture, observed_at, config.output_path.is_some());
+                    // Cursor-only legacy sessions retain their streaming guard.
+                    if !matches!(timing, CursorTiming::Legacy)
+                        || (!paused && streaming_since.is_some_and(|since| press_ms >= since))
+                    {
+                        emit_sample(
+                            emitter,
+                            &cursor,
+                            content,
+                            &mut pending_asset,
+                            Some(press_ms),
+                            timing,
+                        );
+                    }
                 }
                 let position = pointer_position(&cursor, content);
                 emit_pointer_evidence(
@@ -1546,6 +1549,7 @@ fn run<W: Write>(
                         content_rect(&capture, size),
                         &mut pending_asset,
                         None,
+                        cursor_timing(&capture, Instant::now(), config.output_path.is_some()),
                     );
                     last_emit = Instant::now();
                 }
@@ -1559,6 +1563,7 @@ fn run<W: Write>(
                         content_rect(&capture, size),
                         &mut pending_asset,
                         None,
+                        cursor_timing(&capture, Instant::now(), config.output_path.is_some()),
                     );
                     last_emit = Instant::now();
                 }
@@ -1580,14 +1585,33 @@ fn run<W: Write>(
             65_536,
             Duration::from_millis(100),
             |message| match message {
-                message @ Message::PointerButton { .. } => emit_pointer_evidence(
-                    emitter,
-                    &mut input_evidence,
-                    &capture,
-                    message,
-                    pointer_position(&cursor, content_rect(&capture, size)),
-                    true,
-                ),
+                message @ Message::PointerButton { .. } => {
+                    if let Message::PointerButton {
+                        timestamp_ms,
+                        observed_at,
+                        code: 0x110,
+                        pressed: true,
+                        ..
+                    } = &message
+                    {
+                        emit_sample(
+                            emitter,
+                            &cursor,
+                            content_rect(&capture, size),
+                            &mut pending_asset,
+                            Some(*timestamp_ms),
+                            cursor_timing(&capture, *observed_at, true),
+                        );
+                    }
+                    emit_pointer_evidence(
+                        emitter,
+                        &mut input_evidence,
+                        &capture,
+                        message,
+                        pointer_position(&cursor, content_rect(&capture, size)),
+                        true,
+                    )
+                }
                 Message::PointerDiscontinuity {
                     device,
                     observed_at,
@@ -1873,13 +1897,34 @@ fn content_rect(capture: &Option<Capture>, size: Option<(i32, i32)>) -> Option<s
 /// tagged `"click"` and stamped with that press time — or `None` for an ordinary
 /// throttled position sample stamped now. Either way a pending new sprite rides
 /// out on it.
+enum CursorTiming {
+    Legacy,
+    Projected(capture_clock::Projection),
+    Excluded,
+}
+
+fn cursor_timing(capture: &Option<Capture>, observed_at: Instant, recording: bool) -> CursorTiming {
+    if !recording {
+        return CursorTiming::Legacy;
+    }
+    capture
+        .as_ref()
+        .and_then(|capture| capture.input_projection(observed_at))
+        .map(CursorTiming::Projected)
+        .unwrap_or(CursorTiming::Excluded)
+}
+
 fn emit_sample<W: Write>(
     emitter: &mut Emitter<W>,
     cursor: &Option<CursorState>,
     content: Option<shim::CropRect>,
     pending_asset: &mut Option<CursorAsset>,
     click: Option<u64>,
+    timing: CursorTiming,
 ) {
+    if matches!(timing, CursorTiming::Excluded) {
+        return;
+    }
     let (Some(state), Some(content)) = (cursor, content) else {
         return;
     };
@@ -1897,6 +1942,22 @@ fn emit_sample<W: Write>(
     };
     let _ = emitter.emit(&Event::CursorSample {
         timestamp_ms: timestamp,
+        media_time_ms: match &timing {
+            CursorTiming::Projected(p) => Some(p.media_time.as_millis() as u64),
+            _ => None,
+        },
+        interval_id: match &timing {
+            CursorTiming::Projected(p) => Some(p.interval_id),
+            _ => None,
+        },
+        media_time_observation: match timing {
+            CursorTiming::Projected(_) => Some(if click.is_some() {
+                "reader"
+            } else {
+                "dispatch"
+            }),
+            _ => None,
+        },
         x,
         y,
         width: content.width,
@@ -1991,6 +2052,7 @@ mod cursor_sample_tests {
             content,
             &mut None,
             None,
+            CursorTiming::Legacy,
         );
         let line = String::from_utf8(buffer).expect("utf8");
         serde_json::from_str(line.trim()).expect("json")
@@ -2097,6 +2159,7 @@ mod cursor_sample_tests {
             None,
             &mut None,
             None,
+            CursorTiming::Legacy,
         );
         assert!(
             buffer.is_empty(),
@@ -2504,19 +2567,44 @@ mod input_stop_tests {
             .send(edge(resume + Duration::from_millis(1), 0x111, false))
             .unwrap();
         sender.send(edge(stop, 0x110, true)).unwrap();
+        let cursor = Some(CursorState {
+            x: 5,
+            y: 5,
+            asset_id: None,
+        });
+        let mut pending_asset = None;
         let mut bytes = Vec::new();
         let mut emitter = Emitter::new(&mut bytes, false);
         let summary =
             input_drain::drain_queued(&receiver, &sender, 100, Duration::from_secs(1), |message| {
                 match message {
-                    message @ Message::PointerButton { .. } => emit_pointer_evidence(
-                        &mut emitter,
-                        &mut state,
-                        &capture,
-                        message,
-                        None,
-                        true,
-                    ),
+                    message @ Message::PointerButton { .. } => {
+                        if let Message::PointerButton {
+                            timestamp_ms,
+                            observed_at,
+                            code: 0x110,
+                            pressed: true,
+                            ..
+                        } = &message
+                        {
+                            emit_sample(
+                                &mut emitter,
+                                &cursor,
+                                content_rect(&capture, Some((32, 24))),
+                                &mut pending_asset,
+                                Some(*timestamp_ms),
+                                cursor_timing(&capture, *observed_at, true),
+                            );
+                        }
+                        emit_pointer_evidence(
+                            &mut emitter,
+                            &mut state,
+                            &capture,
+                            message,
+                            None,
+                            true,
+                        )
+                    }
                     Message::PointerDiscontinuity {
                         device,
                         observed_at,
@@ -2549,6 +2637,38 @@ mod input_stop_tests {
             .filter(|event| event["event"] == "pointer-button")
             .collect();
         assert_eq!(edges.len(), 19);
+        let clicks: Vec<_> = records
+            .iter()
+            .filter(|event| event["event"] == "cursor-sample")
+            .collect();
+        let journal_clicks: Vec<_> = edges
+            .iter()
+            .filter(|event| event["code"] == 0x110 && event["pressed"] == true)
+            .collect();
+        assert_eq!(
+            clicks.len(),
+            2,
+            "paused, pre-start and post-stop presses have no effect sample"
+        );
+        assert_eq!(clicks.len(), journal_clicks.len());
+        for (click, edge) in clicks.iter().zip(journal_clicks) {
+            assert_eq!(click["mediaTimeMs"], edge["mediaTimeMs"]);
+            assert_eq!(click["intervalId"], edge["intervalId"]);
+            assert_eq!(click["mediaTimeObservation"], "reader");
+        }
+        assert!(matches!(
+            cursor_timing(&capture, pause, true),
+            CursorTiming::Excluded
+        ));
+        assert!(matches!(
+            cursor_timing(&capture, resume, true),
+            CursorTiming::Projected(_)
+        ));
+        assert!(matches!(
+            cursor_timing(&capture, stop, true),
+            CursorTiming::Excluded
+        ));
+
         for code in 0x110..=0x117 {
             assert_eq!(
                 edges

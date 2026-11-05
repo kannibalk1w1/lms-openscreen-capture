@@ -534,6 +534,49 @@ describe("LinuxNativeCaptureSession", () => {
 		expect(helper.stdinWrites.filter((line) => line === "resume\n")).toHaveLength(2);
 	});
 
+	it("keeps native projected late clicks and resumed motion out of UTC pause compaction", async () => {
+		const session = newSession(false);
+		await startReady(session);
+		emitCaptureStarted(1000);
+		await flushStdout();
+		vi.spyOn(Date, "now").mockReturnValue(1200);
+		session.pause();
+		vi.mocked(Date.now).mockReturnValue(2200);
+		session.resume();
+		// Arrival and UTC deliberately disagree with the native encoder interval.
+		// This proves pass-through and no second compaction, not native projection.
+		helper.emitEvent({
+			event: "cursor-sample",
+			timestampMs: 1500,
+			mediaTimeMs: 190,
+			intervalId: 0,
+			mediaTimeObservation: "reader",
+			x: 400,
+			y: 300,
+			width: 800,
+			height: 600,
+			visible: true,
+			interactionType: "click",
+		});
+		helper.emitEvent({
+			event: "cursor-sample",
+			timestampMs: 2300,
+			mediaTimeMs: 210,
+			intervalId: 1,
+			mediaTimeObservation: "dispatch",
+			x: 401,
+			y: 300,
+			width: 800,
+			height: 600,
+			visible: true,
+		});
+		await flushStdout();
+		vi.mocked(Date.now).mockReturnValue(2400);
+		const result = await finishCapture(session, 2400);
+		expect(result.cursor.samples.map((point) => point.timeMs)).toEqual([190, 210]);
+		expect(result.cursor.samples[0].interactionType).toBe("click");
+	});
+
 	it("closes the cursor pause range when the recording stops while paused", async () => {
 		const now = vi.spyOn(Date, "now").mockReturnValue(900);
 		const session = newSession();

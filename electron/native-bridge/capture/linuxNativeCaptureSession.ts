@@ -3,10 +3,7 @@ import type { Readable, Writable } from "node:stream";
 import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
 import { CaptureEventJournal } from "../../recording/captureEventJournal";
-import {
-	type CursorPauseRange,
-	compactCursorTelemetryPauseRanges,
-} from "../cursor/recording/cursorPauseRanges";
+import type { CursorPauseRange } from "../cursor/recording/cursorPauseRanges";
 import {
 	NdjsonLineReader,
 	PipeWireCursorAccumulator,
@@ -646,10 +643,7 @@ export class LinuxNativeCaptureSession {
 					durationMs: payload.durationMs,
 					frames: payload.frames,
 					droppedFrames: payload.dropped,
-					cursor: compactCursorTelemetryPauseRanges(
-						this.cursor.toRecordingData(),
-						this.cursorPauseRanges,
-					),
+					cursor: this.cursor.toRecordingData(this.cursorPauseRanges),
 					...(this.sourceKind ? { sourceKind: this.sourceKind } : {}),
 					...(this.videoEncoder ? { videoEncoder: this.videoEncoder } : {}),
 				};

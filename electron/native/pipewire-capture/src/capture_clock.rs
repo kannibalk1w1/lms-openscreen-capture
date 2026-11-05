@@ -17,7 +17,7 @@ pub struct CaptureClock {
     transition: Option<Instant>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Projection {
     pub media_time: Duration,
     pub interval_id: u64,
