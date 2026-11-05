@@ -40,8 +40,10 @@ Examples:
 
 Repeated pause/resume commands are idempotent in the capture loop. Boundary records
 are suppressed until actual capture-started, and no recording journal is created
-for picker input or cursor-only sessions. Start while already paused emits the
-start and paused state. Stop is emitted on capture-loop exit before PipeWire joins
+for picker input or cursor-only sessions. Correction from overnight review: Pause before the first frame keeps the
+encoder unstarted; Resume followed by its first staged frame emits only Start.
+The previously described start-while-paused branch was unreachable and is removed
+in the stop/recovery slice. Stop is emitted on capture-loop exit before PipeWire joins
 and the existing encoder finalization; it is not a trailer-success assertion.
 A missing final boundary/session-end can still identify interrupted evidence.
 

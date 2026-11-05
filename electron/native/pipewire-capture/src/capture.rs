@@ -753,6 +753,13 @@ impl Capture {
 
     pub(crate) fn stop_clock(&mut self, at: Instant) {
         self.clock.stop(at);
+        // Close admission before joining PipeWire or encoding the tail. Queued
+        // pre-stop samples and pending mix data must survive this operation.
+        if let Some(mix) = &self.audio {
+            for input in &mix.inputs {
+                input.ring.pause();
+            }
+        }
     }
 
     /// Wall-clock time since the first staged frame, with paused spans removed.
@@ -1317,6 +1324,98 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn stop_closes_audio_admission_preserves_the_queued_tail_and_bounds_video() {
+        let ring = Arc::new(AudioRing::new(
+            2,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
+        let output = std::env::temp_dir().join("openscreen-capture-audio-stop.mp4");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            vec![AudioSource {
+                label: "microphone",
+                ring: ring.clone(),
+                gain: 1.0,
+                bitrate: 128_000,
+            }],
+            None,
+        )
+        .expect("start");
+        capture
+            .stage(&frame(320, 240, shim::constants().video_format_bgrx))
+            .expect("stage");
+        // A deterministic 100 ms take; callbacks after Stop simulate a delayed
+        // PipeWire join. Both real AAC mixing and the video tail are exercised.
+        let frames = AUDIO_SAMPLE_RATE as usize / 10;
+        ring.push_for_test(&vec![0.25; frames * AUDIO_CHANNELS]);
+        let stop = capture.input_boundary_instant().unwrap() + Duration::from_millis(100);
+        capture.stop_clock(stop);
+        ring.push_for_test(&vec![0.75; AUDIO_SAMPLE_RATE as usize * AUDIO_CHANNELS]);
+        capture.stop_clock(stop + Duration::from_secs(1));
+        let mix = capture.audio.as_mut().unwrap();
+        mix.pump(capture.muxer.as_mut().unwrap(), true)
+            .expect("mix queued audio");
+        assert_eq!(mix.scratch.len(), frames * AUDIO_CHANNELS);
+        assert!(mix.scratch.iter().all(|sample| *sample == 0.25));
+        assert!(mix.inputs[0].pending.is_empty());
+        assert_eq!(
+            ring.dropped_samples(),
+            0,
+            "post-stop input is excluded, not overflow"
+        );
+        let summary = capture.finish().expect("finish");
+        let audio_ms = frames as u64 * 1000 / AUDIO_SAMPLE_RATE as u64;
+        assert_eq!(summary.wall_clock_ms, audio_ms);
+        assert!(summary.duration_ms >= audio_ms && summary.duration_ms <= audio_ms + 34);
+        let _ = std::fs::remove_file(output);
+    }
+
+    #[test]
+    fn a_pause_before_the_first_frame_does_not_start_or_shorten_the_recording() {
+        let output = std::env::temp_dir().join("openscreen-capture-prestart-pause.mp4");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
+        capture.pause();
+        assert!(matches!(
+            capture
+                .stage(&frame(320, 240, shim::constants().video_format_bgrx))
+                .unwrap(),
+            StageOutcome::Frozen
+        ));
+        assert!(!capture.started());
+        assert!(capture.elapsed_active().is_none());
+        capture.resume();
+        assert!(!capture.started());
+        capture
+            .stage(&frame(320, 240, shim::constants().video_format_bgrx))
+            .expect("stage after resume");
+        let start = capture.input_boundary_instant().unwrap();
+        let projection = capture
+            .input_projection(start + Duration::from_millis(100))
+            .unwrap();
+        assert_eq!(projection.interval_id, 0);
+        assert_eq!(projection.media_time, Duration::from_millis(100));
+        capture.stop_clock(start + Duration::from_millis(100));
+        assert_eq!(capture.finish().unwrap().wall_clock_ms, 100);
+        let _ = std::fs::remove_file(output);
     }
 
     #[test]

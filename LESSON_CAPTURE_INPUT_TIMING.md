@@ -12,7 +12,12 @@ remain excluded.
 The driver observation is when the helper reads the event, **not** the kernel
 physical edge time, compositor generation time or synchronized pointer position.
 Protocol timestamps are millisecond values, while internal boundary comparison
-retains full `Instant` precision. The existing latest-frame position is still
+retains full `Instant` precision. Membership is already decided by the helper: do
+not reapply half-open exclusion using floored millisecond timestamps. Consumers
+must retain `intervalId`; order media evidence with `(mediaTimeMs, intervalId,
+sequence)` to disambiguate pause/resume ties. Boundary `timestampMs` is UTC at
+emission; `monotonicMs` is the encoder transition instant. Those are distinct
+observations, not a cross-clock calibration. The existing latest-frame position is still
 explicitly labeled and may be newer than a delayed button observation.
 
 ## Evidence contract
@@ -28,17 +33,16 @@ not overwrite source timestamps to make them increasing.
 Continuity state is retained separately for historical intervals. A delayed
 release can match an observed press in its original interval without joining a
 drag into the resumed interval. Boundaries retain immutable dispatch snapshots;
-late input does not rewrite them. An observation delivered out of order for the
-same device/interval is marked `continuity: "out-of-order"` and does not mutate
-that device's already processed state. No inferred press/release is appended.
+late input does not rewrite them. A defensive guard marks an observation delivered out of order for the
+same device/interval `continuity: "out-of-order"` and does not mutate
+that device's already processed state. Current one-reader-per-device FIFO drivers
+do not produce this reordering; the guard does not detect kernel overflow. No inferred press/release is appended.
 The schema remains version 1 with additive optional TypeScript fields.
 
 Capture-started and boundary monotonic/media timestamps now come from the exact
 encoder transition. Stop freezes the clock before session joining/finalization,
-so finalization latency does not extend the encoded take. Stop currently ends
-the dispatch loop without draining queued input; the next slice handles that
-explicitly. Device-loss continuity and evdev synchronization/recovery also remain
-open. Existing drivers, global scope and physical/tap limits remain unchanged.
+so finalization latency does not extend the encoded take. The subsequent [stop and recovery slice](LESSON_CAPTURE_INPUT_STOP.md) adds
+bounded queue draining, closes audio admission, and records device/kernel gaps. Existing drivers, global scope and physical/tap limits remain unchanged.
 
 ## Validation — 5 November 2026
 
@@ -71,5 +75,7 @@ files prefixed `slice-1-`, plus `computer-capabilities.json`.
 
 Next concrete item: bounded stop-queue drain, explicit device-loss continuity,
 and avoiding synthetic evdev recovery edges; then live Godot clock bridging.
-Claude review will cover baseline native commit `17dd44a8` and this first new
-committed slice; it is pending until its actual report is delivered.
+Claude reviewed baseline `17dd44a8` and head `ffc34ca4`: [actual report](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_1.md).
+No High/Medium defect was found; its Low audio-tail finding and evidence notes
+are addressed in [the follow-up](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_1.md).
+This is partial code/test review, not desktop or production acceptance.

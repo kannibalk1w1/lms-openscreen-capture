@@ -35,6 +35,7 @@ mod encoder;
 mod events;
 mod ffmpeg;
 mod input;
+mod input_drain;
 mod input_evidence;
 mod kwin_input;
 mod portal;
@@ -246,7 +247,14 @@ enum Message {
     /// A pointer reader thread stopped on a device error (typically an unplug);
     /// the string is the OS error. Surfaced as a warning so click capture going
     /// quiet mid-recording is not silent.
-    PointerDeviceLost(String),
+    PointerDiscontinuity {
+        device: String,
+        observed_at: Instant,
+        reason: &'static str,
+        detail: String,
+    },
+    /// FIFO fence for a bounded drain of messages already queued at Stop.
+    InputDrainComplete,
     InputStatus {
         state: &'static str,
         driver: &'static str,
@@ -820,6 +828,7 @@ fn run<W: Write>(
 
         match receiver.recv_timeout(config.tick) {
             Ok(Message::Stop) => break,
+            Ok(Message::InputDrainComplete) => {}
 
             // Button evidence is independent of cursor effects. Journal events use
             // a monotonic start boundary; picker input cannot become lesson input.
@@ -845,38 +854,22 @@ fn run<W: Write>(
                         Some(press_ms),
                     );
                 }
-                if let Some(projection) = capture
-                    .as_ref()
-                    .and_then(|c| c.input_projection(observed_at))
-                {
-                    let position = cursor.as_ref().zip(content).map(|(state, rect)| {
-                        serde_json::json!({
-                            "x": state.x - rect.x, "y": state.y - rect.y,
-                            "width": rect.width, "height": rect.height,
-                            "space": "source-pixels", "observation": "latest-frame"
-                        })
-                    });
-                    let _ = emitter.emit(&Event::PointerButton {
+                let position = pointer_position(&cursor, content);
+                emit_pointer_evidence(
+                    emitter,
+                    &mut input_evidence,
+                    &capture,
+                    Message::PointerButton {
                         timestamp_ms: press_ms,
                         monotonic_ms,
-                        media_time_ms: projection.media_time.as_millis() as u64,
+                        observed_at,
                         code,
                         pressed,
-                        device: device.clone(),
-                        interval_id: projection.interval_id,
-                        media_time_observation: "reader",
-                        dispatch_delay_ms: observed_at.elapsed().as_millis() as u64,
-                        late: paused || projection.interval_id != input_evidence.interval_id,
-                        continuity: input_evidence.observed_edge(
-                            projection.interval_id,
-                            observed_at,
-                            &device,
-                            code,
-                            pressed,
-                        ),
-                        position,
-                    });
-                }
+                        device,
+                    },
+                    position,
+                    false,
+                );
             }
 
             // A reader lost its device (typically an unplug). Report it — if it
@@ -893,11 +886,20 @@ fn run<W: Write>(
                     scope,
                 });
             }
-            Ok(Message::PointerDeviceLost(reason)) => {
-                let _ = emitter.emit(&Event::Warning {
-                    code: "click-capture-device-lost".to_owned(),
-                    message: format!("input capture source stopped delivering clicks: {reason}"),
-                });
+            Ok(Message::PointerDiscontinuity {
+                device,
+                observed_at,
+                reason,
+                detail,
+            }) => {
+                emit_input_discontinuity(
+                    emitter,
+                    &mut input_evidence,
+                    device,
+                    observed_at,
+                    reason,
+                    detail,
+                );
             }
 
             Ok(Message::Pause) => {
@@ -1159,15 +1161,6 @@ fn run<W: Write>(
                             capture.input_boundary_elapsed(),
                             capture.input_boundary_instant(),
                         );
-                        if paused {
-                            emit_input_boundary(
-                                emitter,
-                                &mut input_evidence,
-                                "pause",
-                                capture.input_boundary_elapsed(),
-                                capture.input_boundary_instant(),
-                            );
-                        }
                     }
                 }
                 if let Some(capture) = capture.as_mut() {
@@ -1580,6 +1573,66 @@ fn run<W: Write>(
     if let Some(capture) = capture.as_mut() {
         capture.stop_clock(Instant::now());
     }
+    if input_evidence.started {
+        let drained = input_drain::drain_queued(
+            &receiver,
+            &sender,
+            65_536,
+            Duration::from_millis(100),
+            |message| match message {
+                message @ Message::PointerButton { .. } => emit_pointer_evidence(
+                    emitter,
+                    &mut input_evidence,
+                    &capture,
+                    message,
+                    pointer_position(&cursor, content_rect(&capture, size)),
+                    true,
+                ),
+                Message::PointerDiscontinuity {
+                    device,
+                    observed_at,
+                    reason,
+                    detail,
+                } => {
+                    emit_input_discontinuity(
+                        emitter,
+                        &mut input_evidence,
+                        device,
+                        observed_at,
+                        reason,
+                        detail,
+                    );
+                    None
+                }
+                Message::InputStatus {
+                    state,
+                    driver,
+                    scope,
+                } => {
+                    let _ = emitter.emit(&Event::InputCaptureStatus {
+                        state,
+                        driver,
+                        scope,
+                    });
+                    None
+                }
+                _ => None,
+            },
+        );
+        let _ = emitter.emit(&Event::InputDrain {
+            monotonic_ms: events::monotonic_ms_at(
+                capture.as_ref().unwrap().input_boundary_instant().unwrap(),
+            ),
+            scope: "queued-before-fence",
+            completed: drained.completed,
+            processed_messages: drained.processed_messages,
+            accepted_edges: drained.accepted_edges,
+            excluded_edges: drained.excluded_edges,
+        });
+        if !drained.completed {
+            let _ = emitter.emit(&Event::Warning { code: "click-capture-drain-incomplete".into(), message: "Stop input drain reached its message/time budget; queued evidence may be incomplete".into() });
+        }
+    }
     emit_input_boundary(
         emitter,
         &mut input_evidence,
@@ -1597,6 +1650,88 @@ fn run<W: Write>(
         finish_capture(emitter, capture, frames.as_deref(), &mut exit_code);
     }
     exit_code
+}
+
+fn pointer_position(
+    cursor: &Option<CursorState>,
+    content: Option<shim::CropRect>,
+) -> Option<serde_json::Value> {
+    cursor.as_ref().zip(content).map(|(state, rect)| {
+        serde_json::json!({
+            "x": state.x - rect.x, "y": state.y - rect.y,
+            "width": rect.width, "height": rect.height,
+            "space": "source-pixels", "observation": "latest-frame"
+        })
+    })
+}
+
+/// Both normal dispatch and stop draining use this exact projection path.
+fn emit_pointer_evidence<W: Write>(
+    emitter: &mut Emitter<W>,
+    state: &mut input_evidence::InputEvidence,
+    capture: &Option<Capture>,
+    message: Message,
+    position: Option<serde_json::Value>,
+    closing: bool,
+) -> Option<bool> {
+    let Message::PointerButton {
+        timestamp_ms,
+        monotonic_ms,
+        observed_at,
+        code,
+        pressed,
+        device,
+    } = message
+    else {
+        return None;
+    };
+    let Some(capture) = capture.as_ref() else {
+        return Some(false);
+    };
+    let Some(projection) = capture.input_projection(observed_at) else {
+        return Some(false);
+    };
+    let continuity =
+        state.observed_edge(projection.interval_id, observed_at, &device, code, pressed);
+    let _ = emitter.emit(&Event::PointerButton {
+        timestamp_ms,
+        monotonic_ms,
+        media_time_ms: projection.media_time.as_millis() as u64,
+        code,
+        pressed,
+        device,
+        interval_id: projection.interval_id,
+        media_time_observation: "reader",
+        dispatch_delay_ms: observed_at.elapsed().as_millis() as u64,
+        late: closing || capture.is_paused() || projection.interval_id != state.interval_id,
+        continuity,
+        position,
+    });
+    Some(true)
+}
+
+fn emit_input_discontinuity<W: Write>(
+    emitter: &mut Emitter<W>,
+    state: &mut input_evidence::InputEvidence,
+    device: String,
+    observed_at: Instant,
+    reason: &'static str,
+    detail: String,
+) {
+    let cleared_buttons = state.interrupt_device(&device);
+    if state.started {
+        let _ = emitter.emit(&Event::InputDiscontinuity {
+            monotonic_ms: events::monotonic_ms_at(observed_at),
+            device,
+            reason,
+            button_state_observation: "dispatch",
+            cleared_buttons,
+        });
+    }
+    let _ = emitter.emit(&Event::Warning {
+        code: "click-capture-device-lost".into(),
+        message: format!("input capture continuity interrupted ({reason}): {detail}"),
+    });
 }
 
 /// Boundary instants come from the same clock transitions used by the encoder.
@@ -2274,5 +2409,164 @@ mod capture_fallback_tests {
             assert_eq!(value["schemaVersion"], 1);
             assert_eq!(value["buttonStateObservation"], "dispatch");
         }
+    }
+}
+
+#[cfg(test)]
+mod input_stop_tests {
+    use super::*;
+
+    #[test]
+    fn queued_native_edges_project_through_pause_stop_and_loss_without_synthetic_edges() {
+        let output = std::env::temp_dir().join("openscreen-input-stop-projection.mp4");
+        let (mut capture, _) = Capture::start(
+            &output,
+            32,
+            24,
+            30,
+            Some(1_000_000),
+            Some(encoder::Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        capture
+            .stage(&shim::Frame {
+                pixels: vec![0x30; 32 * 24 * 4],
+                stride: 32 * 4,
+                width: 32,
+                height: 24,
+                video_format: shim::constants().video_format_bgrx,
+                pts_ns: -1,
+                crop: shim::CropRect {
+                    x: 0,
+                    y: 0,
+                    width: 32,
+                    height: 24,
+                },
+                has_crop: false,
+                dmabuf: None,
+            })
+            .unwrap();
+        let start = capture.input_boundary_instant().unwrap();
+        capture.pause();
+        let pause = capture.input_boundary_instant().unwrap();
+        capture.resume();
+        let resume = capture.input_boundary_instant().unwrap();
+        let stop = resume + Duration::from_millis(100);
+        capture.stop_clock(stop);
+        let capture = Some(capture);
+        let mut state = input_evidence::InputEvidence::default();
+        state.begin();
+        state.resume();
+        let (sender, receiver) = mpsc::channel();
+        let edge = |at, code, pressed| Message::PointerButton {
+            timestamp_ms: 9000,
+            monotonic_ms: events::monotonic_ms_at(at),
+            observed_at: at,
+            code,
+            pressed,
+            device: "mouse".into(),
+        };
+        sender
+            .send(edge(start - Duration::from_nanos(1), 0x110, true))
+            .unwrap();
+        for (i, code) in (0x110..=0x117).enumerate() {
+            sender
+                .send(edge(
+                    start + Duration::from_nanos((i * 2 + 1) as u64),
+                    code,
+                    true,
+                ))
+                .unwrap();
+            sender
+                .send(edge(
+                    start + Duration::from_nanos((i * 2 + 2) as u64),
+                    code,
+                    false,
+                ))
+                .unwrap();
+        }
+        sender
+            .send(edge(pause - Duration::from_nanos(1), 0x110, true))
+            .unwrap();
+        sender.send(edge(pause, 0x110, false)).unwrap(); // paused observation
+        sender.send(edge(resume, 0x111, true)).unwrap();
+        sender
+            .send(Message::PointerDiscontinuity {
+                device: "mouse".into(),
+                observed_at: resume,
+                reason: "device-lost",
+                detail: "fixture unplug".into(),
+            })
+            .unwrap();
+        sender
+            .send(edge(resume + Duration::from_millis(1), 0x111, false))
+            .unwrap();
+        sender.send(edge(stop, 0x110, true)).unwrap();
+        let mut bytes = Vec::new();
+        let mut emitter = Emitter::new(&mut bytes, false);
+        let summary =
+            input_drain::drain_queued(&receiver, &sender, 100, Duration::from_secs(1), |message| {
+                match message {
+                    message @ Message::PointerButton { .. } => emit_pointer_evidence(
+                        &mut emitter,
+                        &mut state,
+                        &capture,
+                        message,
+                        None,
+                        true,
+                    ),
+                    Message::PointerDiscontinuity {
+                        device,
+                        observed_at,
+                        reason,
+                        detail,
+                    } => {
+                        emit_input_discontinuity(
+                            &mut emitter,
+                            &mut state,
+                            device,
+                            observed_at,
+                            reason,
+                            detail,
+                        );
+                        None
+                    }
+                    _ => None,
+                }
+            });
+        assert!(summary.completed);
+        assert_eq!(summary.accepted_edges, 19);
+        assert_eq!(summary.excluded_edges, 3);
+        let records: Vec<serde_json::Value> = String::from_utf8(bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let edges: Vec<_> = records
+            .iter()
+            .filter(|event| event["event"] == "pointer-button")
+            .collect();
+        assert_eq!(edges.len(), 19);
+        for code in 0x110..=0x117 {
+            assert_eq!(
+                edges
+                    .iter()
+                    .filter(|edge| edge["code"] == code && edge["intervalId"] == 0)
+                    .count(),
+                if code == 0x110 { 3 } else { 2 }
+            );
+        }
+        assert!(edges.iter().all(|edge| edge["late"] == true));
+        assert_eq!(edges.last().unwrap()["continuity"], "unmatched-release");
+        let loss = records
+            .iter()
+            .find(|event| event["event"] == "input-discontinuity")
+            .unwrap();
+        assert_eq!(loss["clearedButtons"].as_array().unwrap().len(), 2);
+        assert!(state.close_interval().is_empty());
+        capture.unwrap().finish().unwrap();
+        let _ = std::fs::remove_file(output);
     }
 }

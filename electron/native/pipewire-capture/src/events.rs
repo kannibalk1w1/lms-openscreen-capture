@@ -42,6 +42,23 @@ pub struct CursorAsset {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
+    InputDiscontinuity {
+        monotonic_ms: u64,
+        device: String,
+        reason: &'static str,
+        button_state_observation: &'static str,
+        cleared_buttons: Vec<crate::input_evidence::InterruptedButton>,
+    },
+    #[serde(rename_all = "camelCase")]
+    InputDrain {
+        monotonic_ms: u64,
+        scope: &'static str,
+        completed: bool,
+        processed_messages: usize,
+        accepted_edges: usize,
+        excluded_edges: usize,
+    },
+    #[serde(rename_all = "camelCase")]
     CaptureBoundary {
         timestamp_ms: u64,
         monotonic_ms: u64,

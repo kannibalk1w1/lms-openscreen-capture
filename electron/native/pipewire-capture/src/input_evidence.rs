@@ -10,6 +10,13 @@ pub struct ButtonIdentity {
     pub code: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterruptedButton {
+    pub interval_id: u64,
+    pub code: u16,
+}
+
 #[derive(Default)]
 pub struct InputEvidence {
     pub started: bool,
@@ -73,6 +80,25 @@ impl InputEvidence {
         None
     }
 
+    /// Forget this source's continuity only. This records uncertainty, never releases.
+    pub fn interrupt_device(&mut self, device: &str) -> Vec<InterruptedButton> {
+        let mut cleared = Vec::new();
+        for (interval_id, down) in &mut self.down {
+            down.retain(|button| {
+                if button.device != device {
+                    return true;
+                }
+                cleared.push(InterruptedButton {
+                    interval_id: *interval_id,
+                    code: button.code,
+                });
+                false
+            });
+        }
+        self.last_observed.retain(|(_, source), _| source != device);
+        cleared
+    }
+
     /// Snapshot at boundary dispatch. Retain historical state so a later delivery
     /// from this interval can be reconciled without touching the resumed interval.
     pub fn close_interval(&mut self) -> Vec<ButtonIdentity> {
@@ -122,6 +148,33 @@ mod tests {
         assert!(state.close_interval().is_empty());
         assert_eq!(state.observed_edge(0, at, "other", 0x110, true), None);
         assert_eq!(state.close_interval().len(), 1);
+    }
+
+    #[test]
+    fn device_loss_clears_only_that_sources_historical_and_current_continuity() {
+        let mut state = InputEvidence::default();
+        state.begin();
+        state.edge("lost", 0x110, true);
+        state.resume();
+        state.edge("lost", 0x111, true);
+        state.edge("other", 0x110, true);
+        assert_eq!(
+            state.interrupt_device("lost"),
+            vec![
+                InterruptedButton {
+                    interval_id: 0,
+                    code: 0x110
+                },
+                InterruptedButton {
+                    interval_id: 1,
+                    code: 0x111
+                }
+            ]
+        );
+        assert_eq!(state.edge("lost", 0x111, false), Some("unmatched-release"));
+        assert_eq!(state.edge("other", 0x110, false), None);
+        assert!(state.close_interval().is_empty());
+        assert!(state.interrupt_device("lost").is_empty());
     }
 
     #[test]

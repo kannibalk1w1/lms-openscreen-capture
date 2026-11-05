@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use evdev::{Device, EventType, KeyCode};
+use evdev::{raw_stream::RawDevice, EventType, KeyCode, SynchronizationCode};
 
 use crate::events::timestamp_ms;
 use crate::Message;
@@ -88,7 +88,7 @@ pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
 /// check-and-insert is one locked step so two scans cannot both adopt one path.
 fn scan_once(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
     let before = opened.lock().unwrap().len();
-    for (path, device) in evdev::enumerate() {
+    for (path, device) in evdev::raw_stream::enumerate() {
         if !device_reports_left_button(&device) {
             continue;
         }
@@ -123,7 +123,7 @@ fn report_status(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>
 /// device, so a tap is invisible at the evdev layer we read. The consequence is
 /// documented for users under "Mouse clicks on Wayland" in the installation docs:
 /// on a touchpad only hard presses are captured, taps are not.
-fn device_reports_left_button(device: &Device) -> bool {
+fn device_reports_left_button(device: &RawDevice) -> bool {
     device
         .supported_keys()
         .is_some_and(|keys| keys.contains(KeyCode::BTN_LEFT))
@@ -138,7 +138,7 @@ fn device_reports_left_button(device: &Device) -> bool {
 /// On EVERY exit it drops `path` from `opened`, so a device reconnecting on the
 /// same node path is re-adopted by the next scan.
 fn read_device(
-    mut device: Device,
+    mut device: RawDevice,
     path: PathBuf,
     sender: Sender<Message>,
     opened: Arc<Mutex<HashSet<PathBuf>>>,
@@ -147,6 +147,7 @@ fn read_device(
         opened.lock().unwrap().remove(&path);
         report_status(&sender, &opened);
     };
+    let mut recovery = RecoveryFilter::default();
     loop {
         let events = match device.fetch_events() {
             Ok(events) => events,
@@ -156,13 +157,28 @@ fn read_device(
             // than ending silently, so click capture going quiet mid-recording
             // is answerable from the log; the watcher re-adopts it on a replug.
             Err(err) => {
+                // Enqueue discontinuity before making this path available for a
+                // replacement reader; recovered edges must follow the reset.
+                let _ = sender.send(Message::PointerDiscontinuity {
+                    device: path.display().to_string(), observed_at: std::time::Instant::now(),
+                    reason: "device-lost", detail: format!("{err}; remaining devices continue; reconnect a device to restore lost coverage"),
+                });
                 release();
-                let _ = sender.send(Message::PointerDeviceLost(format!("{err}; remaining devices continue; reconnect a device to restore lost coverage")));
                 return;
             }
         };
         for event in events {
-            if is_pointer_edge(event.event_type(), event.code(), event.value()) {
+            if event.event_type() == EventType::SYNCHRONIZATION
+                && event.code() == SynchronizationCode::SYN_DROPPED.0
+            {
+                let _ = sender.send(Message::PointerDiscontinuity {
+                    device: path.display().to_string(), observed_at: std::time::Instant::now(),
+                    reason: "kernel-overflow", detail: "evdev SYN_DROPPED: incomplete packet ignored through next SYN_REPORT; physical edges cannot be reconstructed".into(),
+                });
+            }
+            if recovery.accept(event.event_type(), event.code())
+                && is_pointer_edge(event.event_type(), event.code(), event.value())
+            {
                 let observed_at = std::time::Instant::now();
                 let message = Message::PointerButton {
                     timestamp_ms: timestamp_ms(),
@@ -181,9 +197,62 @@ fn read_device(
     }
 }
 
+/// RawDevice never fabricates resynchronization edges. After kernel overflow,
+/// ignore the incomplete packet through SYN_REPORT, then resume raw observation.
+#[derive(Default)]
+struct RecoveryFilter {
+    dropping: bool,
+}
+impl RecoveryFilter {
+    fn accept(&mut self, kind: EventType, code: u16) -> bool {
+        if kind == EventType::SYNCHRONIZATION && code == SynchronizationCode::SYN_DROPPED.0 {
+            self.dropping = true;
+            return false;
+        }
+        if self.dropping {
+            if kind == EventType::SYNCHRONIZATION && code == SynchronizationCode::SYN_REPORT.0 {
+                self.dropping = false;
+            }
+            return false;
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kernel_overflow_excludes_the_incomplete_packet_without_reconstructing_edges() {
+        let mut recovery = RecoveryFilter::default();
+        let records = [
+            (EventType::KEY, 0x110, 1),
+            (
+                EventType::SYNCHRONIZATION,
+                SynchronizationCode::SYN_DROPPED.0,
+                0,
+            ),
+            (EventType::KEY, 0x110, 0),
+            (EventType::KEY, 0x111, 1),
+            (
+                EventType::SYNCHRONIZATION,
+                SynchronizationCode::SYN_REPORT.0,
+                0,
+            ),
+            (EventType::KEY, 0x111, 0),
+        ];
+        let edges: Vec<_> = records
+            .into_iter()
+            .filter(|(kind, code, value)| {
+                recovery.accept(*kind, *code) && is_pointer_edge(*kind, *code, *value)
+            })
+            .collect();
+        assert_eq!(
+            edges,
+            vec![(EventType::KEY, 0x110, 1), (EventType::KEY, 0x111, 0)]
+        );
+    }
 
     #[test]
     fn counted_buttons_have_exactly_one_down_and_one_up() {

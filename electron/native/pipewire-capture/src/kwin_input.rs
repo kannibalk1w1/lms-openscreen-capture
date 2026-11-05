@@ -53,9 +53,12 @@ pub fn spawn_reader(sender: &Sender<Message>) -> super::input::ClickCapture {
             driver: DRIVER,
             scope: SCOPE,
         });
-        let _ = sender.send(Message::PointerDeviceLost(format!(
-            "KWin stream ended: {reason}; restart recording to reconnect"
-        )));
+        let _ = sender.send(Message::PointerDiscontinuity {
+            device: DRIVER.into(),
+            observed_at: std::time::Instant::now(),
+            reason: "stream-lost",
+            detail: format!("KWin stream ended: {reason}; restart recording to reconnect"),
+        });
     });
     super::input::ClickCapture::Active
 }

@@ -1017,3 +1017,53 @@ it("retains late historical reader projections in journal arrival order without 
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+it("persists device discontinuities and incomplete stop drain without creating releases", async () => {
+	const root = mkdtempSync(join(tmpdir(), "native-stop-drain-"));
+	try {
+		const video = join(root, "take.mp4");
+		const session = newSession(false, video);
+		await startReady(session);
+		emitCaptureStarted(1050);
+		const loss = {
+			event: "input-discontinuity",
+			monotonicMs: 500,
+			device: "mouse",
+			reason: "kernel-overflow",
+			buttonStateObservation: "dispatch",
+			clearedButtons: [{ intervalId: 0, code: 0x110 }],
+		};
+		const drain = {
+			event: "input-drain",
+			monotonicMs: 600,
+			scope: "queued-before-fence",
+			completed: false,
+			processedMessages: 65536,
+			acceptedEdges: 2,
+			excludedEdges: 1,
+		};
+		helper.emitEvent(loss);
+		helper.emitEvent(drain);
+		helper.emitEvent({
+			event: "warning",
+			code: "click-capture-drain-incomplete",
+			message: "Queued evidence may be incomplete",
+		});
+		await flushStdout();
+		expect(session.inputCaptureHealth.warning).toBe("Queued evidence may be incomplete");
+		await finishCapture(session, 600);
+		const records = readFileSync(`${video}.events.ndjson`, "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		expect(records.find((record) => record.event === "input-discontinuity")).toMatchObject(loss);
+		expect(records.find((record) => record.event === "input-drain")).toMatchObject(drain);
+		expect(records.filter((record) => record.event === "pointer-button")).toHaveLength(0);
+		expect(records.find((record) => record.event === "input-warning")).toMatchObject({
+			code: "click-capture-drain-incomplete",
+		});
+		expect(records.at(-1).event).toBe("session-end");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});

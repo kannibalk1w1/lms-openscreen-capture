@@ -515,6 +515,8 @@ export class LinuxNativeCaptureSession {
 				this.inputStatus = payload;
 				this.journal?.append(payload);
 				return;
+			case "input-discontinuity":
+			case "input-drain":
 			case "capture-boundary":
 				if (this.capturing && !this.stopped) this.journal?.append(payload);
 				return;

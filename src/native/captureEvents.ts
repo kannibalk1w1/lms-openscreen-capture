@@ -8,6 +8,25 @@ export interface CaptureEventPosition {
 	observation: "latest-frame";
 }
 
+export interface InputDiscontinuityEvidence {
+	event: "input-discontinuity";
+	monotonicMs: number;
+	device: string;
+	reason: "device-lost" | "stream-lost" | "kernel-overflow";
+	buttonStateObservation: "dispatch";
+	clearedButtons: { intervalId: number; code: number }[];
+}
+
+export interface InputDrainEvidence {
+	event: "input-drain";
+	monotonicMs: number;
+	scope: "queued-before-fence";
+	completed: boolean;
+	processedMessages: number;
+	acceptedEdges: number;
+	excludedEdges: number;
+}
+
 export interface CaptureBoundaryEvidence {
 	event: "capture-boundary";
 	timestampMs: number;
@@ -60,6 +79,8 @@ export type CaptureJournalPayload =
 			application: null;
 			window: null;
 	  }
+	| InputDiscontinuityEvidence
+	| InputDrainEvidence
 	| CaptureBoundaryEvidence
 	| PointerButtonEvidence
 	| InputCaptureStatus

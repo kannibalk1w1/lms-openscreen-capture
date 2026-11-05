@@ -38,7 +38,8 @@ catalog, direct editing links and exports.
 dispatch-time continuity markers are local; see [coverage/limits](LESSON_CAPTURE_INPUT_BOUNDARIES.md).
 
 **Reader-time projection delivered:** [shared encoder clock and historical intervals](LESSON_CAPTURE_INPUT_TIMING.md).
-**Next implementation:** stop-queue drain/device-loss continuity and counted capture-boundary input tests.
+**Stop/recovery delivered:** [bounded queue drain, audio admission and raw input gaps](LESSON_CAPTURE_INPUT_STOP.md).
+**Next implementation:** shared click-effect timing, then live Godot clock bridging; counted capture-boundary acceptance remains open.
 Broader application/IME/Windows acceptance and physical tap/recovery checks remain
 open before promoting capture drivers.
 
