@@ -229,6 +229,10 @@ interface Window {
 		}>;
 		onTeachingFlagRequested: (callback: () => void) => () => void;
 		onRecordingFlagsSaveError: (callback: () => void) => () => void;
+		saveTypingExport?: (file: {
+			name: string;
+			content: string;
+		}) => Promise<import("./ipc/typingExportFile").TypingExportSaveResult>;
 		getRecordingFlagsStatus: () => Promise<import("../src/lib/recordingFlags").RecordingFlagStatus>;
 		addRecordingFlag: () => Promise<
 			import("../src/lib/recordingFlags").RecordingFlagStatus & { success: boolean }

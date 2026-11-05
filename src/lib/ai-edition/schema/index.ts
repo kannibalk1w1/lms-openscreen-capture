@@ -19,7 +19,7 @@ import { z } from "zod";
 import { toAspectRatioToken } from "../../../utils/aspectRatioUtils";
 import { LAYOUT_PRESETS } from "../../layoutTypes";
 import { clampToBound } from "../../projectDefaults";
-import { recordingFlagSchema } from "../../recordingFlags";
+import { recordingClockSchema, recordingFlagSchema } from "../../recordingFlags";
 import { codePresentationSchema } from "../../typing/presentationSchema";
 import { typingTakeSchema } from "../../typing/schema";
 // Cycle-safe: `document/ids` only pulls `uuid`, and `timeline/timelineMap`'s
@@ -199,6 +199,7 @@ export const assetSchema = z.object({
 	cameraTrack: cameraTrackSchema,
 	// Source-time teaching flags follow every placement of this recording.
 	recordingFlags: z.array(recordingFlagSchema).max(10000).optional(),
+	recordingClock: recordingClockSchema.optional(),
 });
 
 // A crop is a sub-rectangle of the source video, expressed as fractions

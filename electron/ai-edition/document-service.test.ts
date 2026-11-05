@@ -373,11 +373,25 @@ describe("DocumentService", () => {
 			const videoPath = path.join(mediaDir, "take.mp4");
 			await fs.writeFile(videoPath, "fixture");
 			const flags = [{ id: "flag-1", timeMs: 1234, label: "Retry here" }];
-			await fs.writeFile(`${videoPath}.flags.json`, JSON.stringify({ version: 1, flags }));
+			await fs.writeFile(
+				`${videoPath}.flags.json`,
+				JSON.stringify({
+					version: 1,
+					flags,
+					recordingClock: {
+						sessionId: "7570d5c5-7f90-40b3-ace4-ac27839e318b",
+						clock: "recording-control-active-ms",
+						segments: [{ id: "s", startMs: 0, endMs: 2000 }],
+					},
+				}),
+			);
 			const result = await service.addAsset(doc.project.id, { path: videoPath });
 			expect(result.assets[0].recordingFlags).toEqual(flags);
 			await fs.rm(`${videoPath}.flags.json`);
-			expect((await service.getProject(doc.project.id)).assets[0].recordingFlags).toEqual(flags);
+			const reopened = (await service.getProject(doc.project.id)).assets[0];
+			expect(reopened.recordingFlags).toEqual(flags);
+			expect(reopened.recordingClock).toEqual(result.assets[0].recordingClock);
+			expect(reopened.recordingClock?.segments[0].endMs).toBe(2000);
 		});
 		it("appends a video asset and sets primaryAssetId on the first add", async () => {
 			const doc = await service.createProject("P");

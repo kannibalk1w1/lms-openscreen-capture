@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { AnnotationRegion } from "@/components/video-editor/types";
 import { useScopedT } from "@/contexts/I18nContext";
@@ -5,6 +6,52 @@ import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import { codePanelForRegion } from "@/lib/typing/presentation";
 import type { CodePresentation } from "@/lib/typing/presentationSchema";
 import styles from "./v4/TypingCaptureDialog.module.css";
+
+function CodeNumberInput({
+	value,
+	min,
+	max,
+	onCommit,
+}: {
+	value: number;
+	min: number;
+	max: number;
+	onCommit: (value: number) => void;
+}) {
+	const [draft, setDraft] = useState(String(value));
+	useEffect(() => setDraft(String(value)), [value]);
+	return (
+		<input
+			type="number"
+			min={min}
+			max={max}
+			value={draft}
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={(event) => {
+				const raw = event.currentTarget.value,
+					next = Number(raw);
+				setDraft(String(value));
+				if (
+					raw.trim() &&
+					Number.isFinite(next) &&
+					next >= min &&
+					next <= max &&
+					Math.round(next) !== value
+				)
+					onCommit(Math.round(next));
+			}}
+			onKeyDown={(event) => {
+				if (event.key === "Escape") {
+					event.currentTarget.value = String(value);
+					setDraft(String(value));
+					event.currentTarget.blur();
+				}
+				if (event.key === "Enter") event.currentTarget.blur();
+			}}
+		/>
+	);
+}
+
 export function CodePresentationControls({
 	region,
 	onChange,
@@ -81,16 +128,11 @@ export function CodePresentationControls({
 			).map(([key, min, max]) => (
 				<label className={styles.field} key={key}>
 					{t(`code.${key}`)}
-					<input
-						type="number"
+					<CodeNumberInput
+						value={data[key]}
 						min={min}
 						max={max}
-						value={data[key]}
-						onChange={(e) => {
-							const value = Number(e.target.value);
-							if (Number.isFinite(value) && value >= min && value <= max)
-								change({ [key]: Math.round(value) });
-						}}
+						onCommit={(value) => change({ [key]: value })}
 					/>
 				</label>
 			))}

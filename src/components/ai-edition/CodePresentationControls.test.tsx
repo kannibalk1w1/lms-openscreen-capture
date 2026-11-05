@@ -37,3 +37,38 @@ it("offers independent pause/play and blur switches plus style and excerpt contr
 	expect(screen.getByLabelText("Code font size")).toBeTruthy();
 	expect(commit).toHaveBeenCalledTimes(2);
 });
+
+it("allows intermediate font digits, commits once on blur and restores invalid numeric drafts", () => {
+	const region = annotationRegionSchema.parse({
+		id: "a",
+		type: "image",
+		content: "",
+		startMs: 0,
+		endMs: 4000,
+		position: { x: 10, y: 10 },
+		size: { width: 80, height: 80 },
+		style: {},
+		zIndex: 1,
+		codeData: { takeId: "t", sectionId: "s" },
+	});
+	const change = vi.fn(),
+		commit = vi.fn();
+	render(
+		<I18nProvider>
+			<CodePresentationControls region={region} onChange={change} onCommit={commit} />
+		</I18nProvider>,
+	);
+	const input = screen.getByLabelText("Code font size") as HTMLInputElement;
+	fireEvent.change(input, { target: { value: "" } });
+	fireEvent.change(input, { target: { value: "2" } });
+	fireEvent.change(input, { target: { value: "24" } });
+	expect(input.value).toBe("24");
+	expect(commit).not.toHaveBeenCalled();
+	fireEvent.blur(input);
+	expect(change).toHaveBeenCalledWith({ codeData: { ...region.codeData, fontSize: 24 } });
+	expect(commit).toHaveBeenCalledTimes(1);
+	fireEvent.change(input, { target: { value: "999" } });
+	fireEvent.blur(input);
+	expect(input.value).toBe(String(region.codeData!.fontSize));
+	expect(commit).toHaveBeenCalledTimes(1);
+});

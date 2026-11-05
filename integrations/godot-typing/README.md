@@ -30,7 +30,9 @@ changes, not a claim about every internal editor operation or physical key edge.
 
 Each JSONL record has `schemaVersion`, session ID, sequence and elapsed milliseconds.
 The header carries the original unsaved text, script identity and UTC start time.
-Snapshots contain text and up to 32 carets/selections in Unicode-code-point offsets.
+New journals contain compact contiguous text replacements and separate selection
+changes (up to 32 carets, in Unicode-code-point offsets). Unchanged observations
+are deduplicated. Older full-buffer snapshot journals remain importable.
 Local logical/physical key identifiers are separate records; the importer labels
 text changes `observed-text-change` rather than inferring paste/undo causes from keys.
 The final record closes the journal. Records are flushed to disk as they arrive;
@@ -40,7 +42,7 @@ first importer rather than silently presented as a complete take.
 This is an independent typing session, with no video clock mapping or video
 pause synchronisation. It has no pause button. Stop/start another journal when
 needed. The pad inside OpenScreen has its own pause control. Capture limits are
-10,000 journal records, 8 MiB JSONL and 200,000 UTF-16 code units of text, with a
+50,000 journal records, 8 MiB JSONL and 200,000 UTF-16 code units of text, with a
 24-hour clock bound. Hitting a limit marks the finished journal `limited` and the
 OpenScreen review shows that warning. Normalized takes also have an 8 MiB limit.
 Other editor plugins can alter signal delivery; external script editors and
@@ -52,3 +54,19 @@ automatic bracket completion and indentation, then a script switch. Its unsaved
 buffer was reconstructed exactly from the imported journal. Keys for auto-pair
 and Enter were injected through the editor viewport; this is not OS keyboard or
 IME acceptance. Windows/macOS and older Godot versions remain unverified.
+
+## Explicit recording association in OpenScreen
+
+The addon still records its independent elapsed clock. OpenScreen can now pair a
+section's first edit with an explicitly chosen recording flag, persist the source
+session/pause interval and place its code presentation on matching footage. This
+requires a newly recorded/imported flags sidecar with session metadata. It does
+not make Godot aware of recording pauses or map every edit to encoder time. Use
+separate sections/takes across recording pauses, and calibrate each onset. See
+[association workflow and limits](../../LESSON_CAPTURE_ASSOCIATION.md).
+
+The capture-pad event budget remains 10,000. Normalized takes can hold up to
+50,000 events within the same 8 MiB bound. Both press and release key evidence
+are preserved; limits still stop capture visibly rather than dropping edits.
+The review-driven compact-journal regression and its exact coverage are recorded
+in [association validation](../../LESSON_CAPTURE_ASSOCIATION.md).

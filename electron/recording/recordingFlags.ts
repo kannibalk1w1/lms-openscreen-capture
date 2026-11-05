@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
-import { type RecordingFlag, recordingFlagsFileSchema } from "../../src/lib/recordingFlags";
+import {
+	type RecordingClock,
+	type RecordingFlag,
+	recordingFlagsFileSchema,
+} from "../../src/lib/recordingFlags";
 import { DEFAULT_SHORTCUTS, type ShortcutBinding } from "../../src/lib/shortcuts";
 import { bindingToAccelerator } from "../shortcutAccelerator";
 
 /** Monotonic, pause-compacted take clock. Portal registrations may outlive unregister
  * in Electron 41; their inactive callbacks route only to the focused editor. */
 export class RecordingFlags {
+	private clock: RecordingClock | undefined;
 	private binding = DEFAULT_SHORTCUTS.addFlag;
 	private accelerator: string | null = null;
 	private running = false;
@@ -68,6 +73,11 @@ export class RecordingFlags {
 		this.running = true;
 		this.pending = true;
 		this.startAt = this.now();
+		this.clock = {
+			sessionId: randomUUID(),
+			clock: "recording-control-active-ms",
+			segments: [{ id: randomUUID(), startMs: 0, endMs: 0 }],
+		};
 		this.pausedAt = null;
 		this.pausedMs = 0;
 		this.flags = [];
@@ -76,11 +86,26 @@ export class RecordingFlags {
 	}
 	pause(paused: boolean) {
 		if (!this.running) return;
-		if (paused && this.pausedAt === null) this.pausedAt = this.now();
+		if (paused && this.pausedAt === null) {
+			this.closeSegment();
+			this.pausedAt = this.now();
+		}
 		if (!paused && this.pausedAt !== null) {
 			this.pausedMs += this.now() - this.pausedAt;
 			this.pausedAt = null;
+			const last = this.clock?.segments.at(-1);
+			if (this.clock && this.clock.segments.length >= 1000) this.clock = undefined;
+			else if (last)
+				this.clock?.segments.push({ id: randomUUID(), startMs: last.endMs, endMs: last.endMs });
 		}
+	}
+	private closeSegment() {
+		const segment = this.clock?.segments.at(-1);
+		if (segment && this.pausedAt === null)
+			segment.endMs = Math.max(
+				segment.startMs,
+				Math.round(this.now() - this.startAt - this.pausedMs),
+			);
 	}
 	add(): RecordingFlag | null {
 		const now = this.now();
@@ -95,16 +120,19 @@ export class RecordingFlags {
 			id: randomUUID(),
 			timeMs: Math.max(0, Math.round(now - this.startAt - this.pausedMs)),
 			label: "",
+			segmentId: this.clock?.segments.at(-1)?.id,
 		};
 		this.flags.push(flag);
 		this.lastFlagAt = now;
 		return flag;
 	}
 	stop(discard = false) {
+		if (this.running) this.closeSegment();
 		this.running = false;
 		this.unregister();
 		if (discard) {
 			this.pending = false;
+			this.clock = undefined;
 			this.flags = [];
 		}
 	}
@@ -123,23 +151,27 @@ export class RecordingFlags {
 		this.stop();
 		const snapshot = this.flags;
 		this.pending = false;
-		if (snapshot.length)
+		if (this.clock || snapshot.length)
 			await fs.writeFile(
 				`${videoPath}.flags.json`,
-				JSON.stringify({ version: 1, flags: snapshot }, null, 2),
+				JSON.stringify({ version: 1, flags: snapshot, recordingClock: this.clock }, null, 2),
 				"utf8",
 			);
 	}
 }
 
-export async function readRecordingFlags(videoPath: string): Promise<RecordingFlag[]> {
+export async function readRecordingFlagData(videoPath: string) {
 	try {
 		const file = `${videoPath}.flags.json`;
 		if ((await fs.stat(file)).size > 2 * 1024 * 1024) throw new Error("flags file too large");
-		return recordingFlagsFileSchema.parse(JSON.parse(await fs.readFile(file, "utf8"))).flags;
+		return recordingFlagsFileSchema.parse(JSON.parse(await fs.readFile(file, "utf8")));
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT")
 			console.warn("[recording-flags] could not read flags", error);
-		return [];
+		return { version: 1 as const, flags: [] as RecordingFlag[] };
 	}
+}
+
+export async function readRecordingFlags(videoPath: string): Promise<RecordingFlag[]> {
+	return (await readRecordingFlagData(videoPath)).flags;
 }

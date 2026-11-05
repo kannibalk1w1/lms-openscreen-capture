@@ -61,6 +61,7 @@ import {
 } from "@/lib/ai-edition/timeline/virtual-preview";
 import { firstTimelineBusyView } from "@/lib/ai-edition/transcription/status";
 import { isTextEditingTarget, matchesShortcut } from "@/lib/shortcuts";
+import type { TypingReviewTarget } from "@/lib/typing/review";
 import { nativeBridgeClient } from "@/native";
 import type { AiEditionProjectSummary } from "@/native/contracts";
 import { resolveVisibleClips } from "@/native/sceneDescription";
@@ -1046,6 +1047,7 @@ export function NewEditorShell() {
 	// Voiceover recording (the one audio gesture that is not a file import). The
 	// dialog owns the mic; the shell owns the transport and the placement.
 	const [typingOpen, setTypingOpen] = useState(false);
+	const [typingReviewTarget, setTypingReviewTarget] = useState<TypingReviewTarget | null>(null);
 	const [voiceoverFlow, setVoiceoverFlow] = useState<{ maxDurationSec: number } | null>(null);
 	// The playhead as it was when RECORDING STARTED. Recording plays the video so
 	// the user can narrate what they see, which means the live playhead has moved
@@ -1782,6 +1784,7 @@ export function NewEditorShell() {
 									disabled={!hasProject}
 									onClick={() => {
 										setPlaying(false);
+										setTypingReviewTarget(null);
 										setTypingOpen(true);
 									}}
 								>
@@ -1929,6 +1932,11 @@ export function NewEditorShell() {
 						/>
 					) : null}
 					<V4Timeline
+						onReviewTypingSection={(target) => {
+							setPlaying(false);
+							setTypingReviewTarget(target);
+							setTypingOpen(true);
+						}}
 						onAnnotationRowCountChange={setAnnotationRowCount}
 						tl={tl}
 						setCurrentTime={handleSeek}
@@ -1999,6 +2007,7 @@ export function NewEditorShell() {
 			<TypingCaptureDialog
 				key={document?.project.id ?? "none"}
 				open={typingOpen && hasProject}
+				initialSelection={typingReviewTarget}
 				onClose={() => setTypingOpen(false)}
 			/>
 			<ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} document={document} />

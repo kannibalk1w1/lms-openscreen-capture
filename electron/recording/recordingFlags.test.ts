@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RecordingFlags, readRecordingFlags } from "./recordingFlags";
+import { RecordingFlags, readRecordingFlagData, readRecordingFlags } from "./recordingFlags";
 
 let directory: string;
 beforeEach(async () => {
@@ -126,4 +126,58 @@ it("distinguishes portal requests from observed hotkeys and makes stale portal c
 	callbacks.get("F8")!();
 	expect(idle).toHaveBeenCalledOnce();
 	expect(flags.status().count).toBe(2);
+});
+
+it("persists session identity and immutable pause intervals, including paused stop and empty-flag takes", async () => {
+	const { flags, advance } = fixture();
+	flags.start();
+	advance(1000);
+	const first = flags.add()!;
+	advance(500);
+	flags.pause(true);
+	flags.pause(true);
+	advance(5000);
+	flags.pause(false);
+	flags.pause(false);
+	advance(1000);
+	const second = flags.add()!;
+	flags.pause(true);
+	advance(9000);
+	flags.stop();
+	advance(9000);
+	const file = path.join(directory, "clock.mp4");
+	await flags.persist(file);
+	const data = await readRecordingFlagData(file);
+	expect(data.recordingClock).toMatchObject({
+		clock: "recording-control-active-ms",
+		segments: [
+			{ id: first.segmentId, startMs: 0, endMs: 1500 },
+			{ id: second.segmentId, startMs: 1500, endMs: 2500 },
+		],
+	});
+	expect(first.segmentId).not.toBe(second.segmentId);
+	flags.start();
+	advance(100);
+	const next = path.join(directory, "empty.mp4");
+	await flags.persist(next);
+	const empty = await readRecordingFlagData(next);
+	expect(empty.flags).toEqual([]);
+	expect(empty.recordingClock?.sessionId).not.toBe(data.recordingClock?.sessionId);
+	expect(empty.recordingClock?.segments[0]).toMatchObject({ startMs: 0, endMs: 100 });
+});
+
+it("bounds clock evidence without discarding flags when too many pause intervals are recorded", async () => {
+	const { flags, advance } = fixture();
+	flags.start();
+	advance(1000);
+	flags.add();
+	for (let i = 0; i < 1000; i++) {
+		flags.pause(true);
+		flags.pause(false);
+	}
+	const file = path.join(directory, "bounded.mp4");
+	await flags.persist(file);
+	const data = await readRecordingFlagData(file);
+	expect(data.flags).toHaveLength(1);
+	expect(data.recordingClock).toBeUndefined();
 });

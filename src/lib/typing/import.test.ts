@@ -67,3 +67,77 @@ it("roundtrips portable take JSON without assuming ScriptWriter compatibility", 
 	const take = capture.finish();
 	expect(importTypingTake(JSON.stringify(take))).toEqual(take);
 });
+
+it("imports compact Godot edit/selection records while validating replacement preconditions", () => {
+	const header = journal()[0];
+	const records = [
+		header,
+		{
+			event: "typing-edit",
+			atMs: 10,
+			start: 1,
+			removed: "😀",
+			inserted: "界\n\t",
+			selections: [{ anchor: 4, focus: 4 }],
+		},
+		{ event: "typing-selection", atMs: 20, selections: [{ anchor: 0, focus: 1 }] },
+		{ event: "typing-stop", atMs: 30 },
+	].map((record, sequence) => ({
+		...record,
+		schemaVersion: 1,
+		sessionId: header.sessionId,
+		sequence,
+	}));
+	const encode = () => records.map((r) => JSON.stringify(r)).join("\n");
+	const take = importTypingTake(encode());
+	expect(sectionPlayback(take, take.sections[0]).finalText).toBe("a界\n\t");
+	expect(take.events[1]).toMatchObject({
+		event: "selection",
+		selections: [{ anchor: 0, focus: 1 }],
+	});
+	Object.assign(records[1], { removed: "wrong" });
+	expect(() => importTypingTake(encode())).toThrow("precondition");
+});
+
+it("retains 4,000 Godot character edits and both key edges within the bounded evidence budget", () => {
+	const header = { ...journal()[0], initialText: "" };
+	const records: object[] = [header];
+	const append = (record: object) =>
+		records.push({
+			...record,
+			schemaVersion: 1,
+			sessionId: header.sessionId,
+			sequence: records.length,
+		});
+	for (let i = 0; i < 4000; i++) {
+		const key = {
+			event: "typing-key",
+			atMs: i,
+			key: "A",
+			code: "65",
+			ctrl: false,
+			shift: false,
+			alt: false,
+			meta: false,
+			repeat: false,
+		};
+		append({ ...key, pressed: true });
+		append({
+			event: "typing-edit",
+			atMs: i,
+			start: i,
+			removed: "",
+			inserted: "a",
+			selections: [{ anchor: i + 1, focus: i + 1 }],
+		});
+		append({ ...key, pressed: false });
+	}
+	append({ event: "typing-stop", atMs: 4000 });
+	const source = records.map((r) => JSON.stringify(r)).join("\n");
+	expect(new TextEncoder().encode(source).length).toBeLessThan(8 * 1024 * 1024);
+	const take = importTypingTake(source);
+	expect(take.coverage).toBe("complete");
+	expect(take.events.filter((e) => e.event === "key")).toHaveLength(8000);
+	expect(take.events.filter((e) => e.event === "text-edit")).toHaveLength(4000);
+	expect(sectionPlayback(take, take.sections[0]).finalText).toBe("a".repeat(4000));
+});

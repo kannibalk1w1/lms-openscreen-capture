@@ -79,3 +79,11 @@ compiled and exercised here.
 Next: associate Godot capture sessions with recording media time and preserve clock
 anchors/pause boundaries, so code sections can be placed automatically on the right
 source clip. Portable text/JSON/playback-file exports follow.
+
+## Subsequent association slice
+
+[Explicit section onset association](LESSON_CAPTURE_ASSOCIATION.md) now offers
+recorded-flag placement for Godot sections. New recording session/pause metadata
+bounds initial placement on matching source footage; independent takes retain
+playhead placement. Live edit-level synchronization remains open. Next: portable
+section JSON/text/playback-file exports.

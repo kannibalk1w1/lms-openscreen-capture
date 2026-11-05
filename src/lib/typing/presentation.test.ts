@@ -92,3 +92,16 @@ it("persists styling and projects code into the native scene with a source clock
 		codePanel: { originSec: 3, durationSec: 3, blurBackground: false, pauseBackground: false },
 	});
 });
+
+it("reuses token frames across source/geometry changes and recompiles when evidence or styling changes", () => {
+	const { doc, data, take } = fixture();
+	const faithful = { ...data, mode: "faithful" as const };
+	const first = codePanelForRegion(doc, faithful, 2, 5)!;
+	const moved = codePanelForRegion(doc, { ...faithful, blurBackground: false }, 8, 3)!;
+	expect(moved.frames).toBe(first.frames);
+	expect(moved).toMatchObject({ originSec: 8, durationSec: 3, blurBackground: false });
+	const light = codePanelForRegion(doc, { ...faithful, theme: "light" }, 2, 5)!;
+	expect(light.frames).not.toBe(first.frames);
+	doc.typingTakes = [{ ...take, initialText: take.initialText }];
+	expect(codePanelForRegion(doc, faithful, 2, 5)!.frames).not.toBe(first.frames);
+});

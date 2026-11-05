@@ -1,3 +1,4 @@
+import { associatedTypingPlacement } from "../../typing/association";
 import { sectionPlayback } from "../../typing/capture";
 import { codePanelForRegion } from "../../typing/presentation";
 import { codePresentationSchema } from "../../typing/presentationSchema";
@@ -26,21 +27,25 @@ export async function saveTypingTake(take: TypingTake): Promise<boolean> {
 	);
 }
 
-/** Add the selected typing section at the playhead, anchored inside its carrier clip. */
+/** Place at an explicit recording anchor, or at the playhead for independent takes. */
 export async function addCodePresentation(take: TypingTake, sectionId: string): Promise<boolean> {
 	const initial = useProjectStore.getState(),
 		epoch = currentWriteEpoch(),
 		projectId = initial.projectId;
-	const time = initial.currentTimeSec;
+	const playhead = initial.currentTimeSec;
 	if ((await waitForDocumentSaves()) !== "idle") return false;
 	const state = useProjectStore.getState(),
 		doc = state.document;
 	if (!doc || state.projectId !== projectId || currentWriteEpoch() !== epoch) return false;
-	const clip = doc.timeline.clips.find(
-		(c) => time >= c.timelineStartSec && time < c.timelineEndSec,
-	);
-	const section = take.sections.find((s) => s.id === sectionId);
-	if (!clip || !section) throw new Error("Place the playhead inside a video clip first");
+	const validated = typingTakeSchema.parse(take);
+	const section = validated.sections.find((s) => s.id === sectionId);
+	if (!section) throw new Error("Typing section is missing");
+	const placement = associatedTypingPlacement(doc, section, playhead);
+	const time = placement?.time ?? playhead;
+	const clip =
+		placement?.clip ??
+		doc.timeline.clips.find((c) => time >= c.timelineStartSec && time < c.timelineEndSec);
+	if (!clip) throw new Error("Place the playhead inside a video clip first");
 	const playback = sectionPlayback(take, section);
 	const edit = take.events[section.startSequence];
 	const firstLine =
@@ -50,9 +55,9 @@ export async function addCodePresentation(take: TypingTake, sectionId: string): 
 					Array.from(playback.beforeText).slice(0, edit.start).join("").split("\n").length - 2,
 				)
 			: 1;
-	const sourceStart = clip.sourceStartSec + time - clip.timelineStartSec;
+	const sourceStart = placement?.sourceStart ?? clip.sourceStartSec + time - clip.timelineStartSec;
 	const duration = Math.min(
-		clip.timelineEndSec - time,
+		placement?.maxDuration ?? clip.timelineEndSec - time,
 		Math.max(
 			2,
 			Array.from(

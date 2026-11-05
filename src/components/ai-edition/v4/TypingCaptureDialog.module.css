@@ -14,3 +14,8 @@
 .error { color: var(--destructive, #d95050); font-size: 12px; }
 
 .body { display: grid; gap: 16px; min-height: 0; overflow-y: auto; max-height: calc(90vh - 160px); padding-right: 4px; }
+
+.sectionSelection { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.section .sectionSelection input { flex: none; min-width: 0; width: 16px; }
+
+.section[data-selected="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }

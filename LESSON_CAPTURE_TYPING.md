@@ -57,7 +57,7 @@ is claimed.
 
 Project `typingTakes` is additive and optional: old projects load without a
 migration. At most 20 takes are stored per project. Text is limited to 200,000
-UTF-16 code units; take/import data to 8 MiB; events to 10,000, including a reserved
+UTF-16 code units; take/import data to 8 MiB; events to 50,000 (the pad remains limited to 10,000), including a reserved
 stop; duration to 24 hours. The pad stops early at its conservative evidence budget
 and reports `limited` coverage when a bound is reached. These small-snippet limits
 are deliberate for this first slice. Godot JSONL and normalized JSON are validated
@@ -102,3 +102,18 @@ The subsequent [code-presentation slice](LESSON_CAPTURE_CODE_PRESENTATION.md) no
 provides the styled in-video result. Next: connect the Godot capture clock to the
 recording clock for explicit source-time alignment and reliable automatic placement;
 portable section JSON/text/playback-file exports follow. See the current roadmap.
+
+## Subsequent recording-association slice
+
+Godot sections can now explicitly pair their first edit to a captured recording
+flag and use source placement with persisted session/pause metadata. Independent
+takes keep playhead placement. This does not map the independent typing clock to
+the encoder clock; see [workflow and exact limits](LESSON_CAPTURE_ASSOCIATION.md).
+Next: portable JSON/text/playback-file exports.
+
+## Subsequent portable export slice
+
+Sections now offer JSON, full resulting code/text and captured-edit playback-file
+downloads. Both JSON formats reopen through the existing import control without
+the original video. See [formats, workflow and limits](LESSON_CAPTURE_EXPORTS.md).
+Next: multi-section bundles and clean teaching-playback recipes.

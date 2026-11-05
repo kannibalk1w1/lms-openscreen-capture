@@ -1,6 +1,6 @@
 import {
+	MAX_PAD_TYPING_EVENTS,
 	MAX_TYPING_BYTES,
-	MAX_TYPING_EVENTS,
 	MAX_TYPING_TEXT,
 	type TypingEvent,
 	type TypingSection,
@@ -110,7 +110,7 @@ export class TypingCapture {
 		if (
 			!force &&
 			(event.atMs > 86400000 ||
-				this.events.length >= MAX_TYPING_EVENTS - 1 ||
+				this.events.length >= MAX_PAD_TYPING_EVENTS - 1 ||
 				this.bytes + size > MAX_TYPING_BYTES / 2)
 		)
 			throw new Error("Typing capture limit reached");
@@ -179,6 +179,7 @@ export function sectionPlayback(take: TypingTake, section: TypingSection) {
 	let beforeText = value;
 	const startMs = take.events[section.startSequence].atMs;
 	for (const event of take.events) {
+		if (event.sequence > section.endSequence) break;
 		if (event.sequence === section.startSequence) beforeText = value;
 		if (event.event === "text-edit") value = applyTextEdit(value, event);
 		if (

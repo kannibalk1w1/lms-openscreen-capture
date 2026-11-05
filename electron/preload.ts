@@ -267,6 +267,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.on("recording-flags:save-error", listener);
 		return () => ipcRenderer.removeListener("recording-flags:save-error", listener);
 	},
+	saveTypingExport: (file: { name: string; content: string }) =>
+		ipcRenderer.invoke("typing-export:save", file),
 	getRecordingFlagsStatus: () => ipcRenderer.invoke("recording-flags:status"),
 	addRecordingFlag: () => ipcRenderer.invoke("recording-flags:add"),
 	setRecordingFlagsPaused: (paused: boolean) =>

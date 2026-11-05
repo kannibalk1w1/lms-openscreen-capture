@@ -1,0 +1,20 @@
+.lane { position: relative; height: 62px; border-bottom: 1px solid var(--border-soft); background: color-mix(in oklab, var(--accent) 6%, transparent); }
+.caption { position: sticky; left: 8px; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; z-index: 1; }
+.caption button { padding: 2px 5px; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--surface-2); }
+.marker { position: absolute; top: 25px; max-width: 145px; padding: 3px 6px; display: flex; align-items: center; gap: 4px; border: 1px solid var(--accent); border-radius: 5px; background: var(--surface-2); color: var(--fg); font-size: 11px; transform: translateX(-4px); }
+.marker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marker[data-trimmed="true"] { opacity: .55; border-style: dashed; }
+.marker:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dialog { width: min(920px, 95vw); max-width: 920px; max-height: 90vh; overflow-y: auto; background: var(--surface-1); }
+.layout { display: flex; gap: 16px; flex-wrap: wrap; }
+.list { flex: 1 1 210px; max-height: 380px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.list button { text-align: left; padding: 8px; border: 1px solid var(--border-soft); border-radius: 5px; background: var(--surface-2); }
+.list button[aria-pressed="true"] { border-color: var(--accent); }
+.list small { display: block; color: var(--muted); }
+.detail { flex: 2 1 320px; display: grid; align-content: start; gap: 10px; font-size: 12px; min-width: 0; }
+.detail textarea { width: 100%; height: 170px; resize: vertical; font: 12px/1.5 monospace; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 5px; padding: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.detail button, .detail select, .search { padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 5px; }
+.detail button:disabled { opacity: .5; }
+.hint { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.error { color: var(--destructive, #d95050); }

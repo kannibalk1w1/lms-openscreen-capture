@@ -85,6 +85,7 @@ import {
 	zoomTransitions,
 } from "@/lib/ai-edition/timeline/zoom-transitions";
 import { formatBinding } from "@/lib/shortcuts";
+import type { TypingReviewTarget } from "@/lib/typing/review";
 import { nativeBridgeClient } from "@/native/client";
 import { TransportBar } from "../TransportBar";
 import type { VideoSource } from "../VirtualPreview";
@@ -92,6 +93,7 @@ import styles from "./EditorShellV4.module.css";
 import { LayoutLane } from "./LayoutLane";
 import { LayoutPicker } from "./LayoutPicker";
 import { TeachingFlagLane } from "./TeachingFlagLane";
+import { TypingSectionLane } from "./TypingSectionLane";
 
 // The AI option's prompt — sent straight to the chat agent via the prompt-bus.
 //
@@ -654,6 +656,7 @@ export function V4Timeline({
 	onEditClip,
 	onAddVoiceover,
 	onAnnotationRowCountChange,
+	onReviewTypingSection,
 }: {
 	tl: TimelineApi;
 	setCurrentTime: (sec: number) => void;
@@ -670,6 +673,7 @@ export function V4Timeline({
 	onAddVoiceover: () => void;
 	/** Exact rendered annotation row count, including the current drag preview. */
 	onAnnotationRowCountChange?: (rowCount: number) => void;
+	onReviewTypingSection?: (target: TypingReviewTarget) => void;
 }) {
 	const t = useScopedT("timeline");
 	const ts = useScopedT("settings");
@@ -2437,6 +2441,14 @@ export function V4Timeline({
 									total={total}
 									onSeek={setCurrentTime}
 									shortcut={formatBinding(shortcuts.addFlag, isMac)}
+								/>
+								<TypingSectionLane
+									total={total}
+									onSeek={setCurrentTime}
+									onReview={onReviewTypingSection}
+									onOpenReview={() => {
+										if (playing) onTogglePlay();
+									}}
 								/>
 								<div
 									className={styles.tlLane}

@@ -176,6 +176,7 @@ import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorW
 import { registerRecordingPrefsHandlers } from "./recordingPrefs";
 import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./recordingStream";
 import { type SelectSourceContext, selectSourceWithOwnership } from "./selectSourceOwnership";
+import { saveTypingExportFile } from "./typingExportFile";
 
 const PROJECT_FILE_EXTENSION = "openscreen";
 const recordingFlags = new RecordingFlags({
@@ -4290,6 +4291,18 @@ export function registerIpcHandlers(
 	ipcMain.handle("get-asset-base-path", () => {
 		return resolveAssetBasePath();
 	});
+
+	ipcMain.handle("typing-export:save", async (event, request: unknown) =>
+		saveTypingExportFile(request, async (name) => {
+			const result = await showSaveDialogOver(BrowserWindow.fromWebContents(event.sender), {
+				title: "Save typing export",
+				defaultPath: path.join(app.getPath("downloads"), name),
+				filters: [{ name: "Typing export", extensions: [name.split(".").at(-1)!] }],
+				properties: ["createDirectory", "showOverwriteConfirmation"],
+			});
+			return result.canceled ? null : (result.filePath ?? null);
+		}),
+	);
 
 	ipcMain.handle(
 		"pick-export-save-path",

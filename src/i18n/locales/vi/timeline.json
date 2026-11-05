@@ -174,7 +174,34 @@
 		"save": "Save take to project",
 		"savedNotice": "Typing take saved",
 		"limitedSource": "This take ended at a capture limit. Replay covers the preserved edits only.",
-		"startError": "Starting text is too large. Use a smaller snippet."
+		"startError": "Starting text is too large. Use a smaller snippet.",
+		"anchorHint": "Optionally match each section’s first edit to a flag dropped during that recording. This is a human timing cue, not frame-accurate sync. Each section needs its own anchor after a pause. Presentation stops at the next pause or clip boundary.",
+		"recordingAnchor": "Recording anchor for section {{number}}",
+		"manualPlacement": "Independent take · place at playhead",
+		"retainedAnchor": "Saved recording anchor (flag or footage unavailable)",
+		"addAssociated": "Add code at recording flag",
+		"export": {
+			"section": "Section JSON",
+			"text": "Resulting code/text",
+			"playback": "Playback recipe",
+			"sectionLabel": "Export section {{number}} as JSON",
+			"textLabel": "Export section {{number}} resulting text",
+			"playbackLabel": "Export section {{number}} playback recipe",
+			"hint": "Export sections with their starting buffers. Section, playback and bundle JSON files can be imported here without the video. Resulting code/text is the full buffer at that section’s end. Playback previews use the section speed and never type into another app.",
+			"error": "Could not export this section. Choose a smaller section if it exceeds the file limit."
+		},
+		"playbackMode": "Preview / recipe style",
+		"capturedPlayback": "Captured edits",
+		"cleanPlayback": "Clean teaching version",
+		"bundle": {
+			"member": "Imported bundle section",
+			"importHint": "Each member has its own starting buffer. Review, preview and save members separately. Changes are kept while switching within this imported bundle.",
+			"include": "Include",
+			"includeLabel": "Include section {{number}} in bundle",
+			"export": "Export selected bundle ({{count}})",
+			"hint": "Choose 1–20 sections from this take. Style applies to preview, playback recipes and bundles; section JSON keeps the captured edits. Each bundle member keeps its own starting buffer.",
+			"reexport": "Export imported bundle"
+		}
 	},
 	"code": {
 		"title": "Code presentation",
@@ -199,5 +226,24 @@
 		"clockHint": "Pause picture freezes the screen and camera frames for this region. The timeline and original audio keep running; it resumes at the current timeline moment.",
 		"empty": "Add a saved typing section using Typing capture",
 		"excerptError": "Choose fewer lines or a shorter excerpt (up to 12,000 characters and 1,000 captured edits)."
+	},
+	"typingReview": {
+		"title": "Typing sections",
+		"all": "Review sections ({{count}})",
+		"onsetHint": "Markers show explicitly paired recording cues, not the duration or exact timing of every edit. Review each section independently; its original text and edit evidence remain saved.",
+		"resultExcerpt": "Result excerpt (up to 12,000 characters)",
+		"edit": "Open section in typing capture",
+		"seek": "Seek occurrence {{number}} · {{time}}",
+		"search": "Find typing sections",
+		"showing": "Showing {{count}} of {{total}} saved sections.",
+		"empty": "No saved sections match. Save a typing take to review it here.",
+		"status": {
+			"linked": "Recording cue linked",
+			"independent": "Independent take · no video time",
+			"unavailable": "Recording cue unavailable in current clips",
+			"trimmed": "Trimmed out"
+		},
+		"more": "Show 100 more sections",
+		"recipeStyle": "Playback recipe style"
 	}
 }

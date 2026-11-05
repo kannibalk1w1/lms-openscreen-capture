@@ -2,10 +2,22 @@ import { z } from "zod";
 
 export const MAX_TYPING_TEXT = 200000;
 export const MAX_TYPING_BYTES = 8 * 1024 * 1024;
-export const MAX_TYPING_EVENTS = 10000;
+export const MAX_TYPING_EVENTS = 50000;
+export const MAX_PAD_TYPING_EVENTS = 10000;
 const text = z.string().max(MAX_TYPING_TEXT);
 const offset = z.number().int().nonnegative().max(MAX_TYPING_TEXT);
 const time = z.number().int().nonnegative().max(86400000);
+export const typingExcerptSourceSchema = z
+	.object({
+		takeId: z.string().min(1).max(200),
+		sectionId: z.string().min(1).max(220),
+		projectId: z.string().min(1).max(200).optional(),
+		startSequence: z.number().int().nonnegative(),
+		endSequence: z.number().int().nonnegative(),
+		startAtMs: time,
+		endAtMs: time,
+	})
+	.strict();
 export const selectionSchema = z.object({ anchor: offset, focus: offset });
 export type TypingSelection = z.infer<typeof selectionSchema>;
 const base = {
@@ -55,12 +67,20 @@ export const typingEventSchema = z.discriminatedUnion("event", [
 	}),
 ]);
 export type TypingEvent = z.infer<typeof typingEventSchema>;
+export const typingSourceAnchorSchema = z.object({
+	method: z.literal("manual-recording-flag"),
+	recordingSessionId: z.string().uuid(),
+	segmentId: z.string().min(1).max(200),
+	flagId: z.string().min(1).max(200),
+	mediaTimeMs: time,
+});
 export const typingSectionSchema = z.object({
 	id: z.string().min(1).max(220),
 	label: z.string().max(200),
 	startSequence: z.number().int().nonnegative(),
 	endSequence: z.number().int().nonnegative(),
 	speed: z.number().min(0.25).max(4),
+	sourceAnchor: typingSourceAnchorSchema.optional(),
 });
 export type TypingSection = z.infer<typeof typingSectionSchema>;
 export const typingTakeSchema = z
@@ -73,6 +93,7 @@ export const typingTakeSchema = z
 		documentName: z.string().min(1).max(1000),
 		offsetEncoding: z.literal("unicode-code-points"),
 		clock: z.literal("session-active-ms"),
+		sourceExcerpt: typingExcerptSourceSchema.optional(),
 		startedAt: z.string().datetime(),
 		initialText: text,
 		durationMs: time,
@@ -134,6 +155,18 @@ export const typingTakeSchema = z
 		let previousEnd = -1;
 		const sectionIds = new Set<string>();
 		for (const section of take.sections) {
+			if (section.sourceAnchor && take.producer !== "godot-codeedit")
+				fail("Only Godot sections support recording anchors");
+			if (
+				section.sourceAnchor &&
+				take.events
+					.slice(section.startSequence, section.endSequence + 1)
+					.some(
+						(event) =>
+							event.event === "boundary" && ["pause", "resume", "blur"].includes(event.reason),
+					)
+			)
+				fail("An associated section cannot cross a typing boundary");
 			if (
 				sectionIds.has(section.id) ||
 				section.startSequence <= previousEnd ||

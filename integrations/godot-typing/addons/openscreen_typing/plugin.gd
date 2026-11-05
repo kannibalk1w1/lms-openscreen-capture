@@ -99,7 +99,7 @@ func _write(payload: Dictionary) -> void:
 	payload["sequence"] = _sequence
 	payload["atMs"] = 0 if _sequence == 0 else mini(elapsed, 86400000)
 	var line := JSON.stringify(payload)
-	if payload.event != "typing-stop" and (_sequence >= 9999 or _file.get_position() + line.to_utf8_buffer().size() > MAX_BYTES - 1024):
+	if payload.event != "typing-stop" and (_sequence >= 49999 or _file.get_position() + line.to_utf8_buffer().size() > MAX_BYTES - 1024):
 		_limited = true
 		call_deferred("_stop_capture")
 		return

@@ -2,6 +2,7 @@ import hljs from "highlight.js/lib/core";
 import type { AxcutDocument } from "../ai-edition/schema";
 import { sectionPlayback } from "./capture";
 import type { CodePresentation } from "./presentationSchema";
+import type { TypingTake } from "./schema";
 import gdscript from "./vendor/gdscript";
 
 hljs.registerLanguage("gdscript", (api) => {
@@ -80,6 +81,8 @@ export function highlightGdscript(text: string, theme: "dark" | "light"): CodeTo
 	}
 	return tokens;
 }
+const panelFrames = new WeakMap<TypingTake, Map<string, CodeFrame[]>>();
+
 export function codePanelForRegion(
 	doc: AxcutDocument,
 	data: CodePresentation,
@@ -89,6 +92,9 @@ export function codePanelForRegion(
 	const take = doc.typingTakes?.find((t) => t.id === data.takeId),
 		section = take?.sections.find((s) => s.id === data.sectionId);
 	if (!take || !section) return null;
+	const cacheKey = JSON.stringify([section, data.mode, data.theme, data.firstLine, data.lineCount]);
+	const cached = panelFrames.get(take)?.get(cacheKey);
+	if (cached) return { ...data, originSec, durationSec, title: take.documentName, frames: cached };
 	const playback = sectionPlayback(take, section);
 	const snippet = (text: string) =>
 		text
@@ -130,5 +136,10 @@ export function codePanelForRegion(
 			),
 		);
 	}
+	const entries = panelFrames.get(take) ?? new Map<string, CodeFrame[]>();
+	// Keep at most two compiled variants per live take; old immutable takes can be collected.
+	if (entries.size >= 2) entries.delete(entries.keys().next().value!);
+	entries.set(cacheKey, frames);
+	panelFrames.set(take, entries);
 	return { ...data, originSec, durationSec, title: take.documentName, frames };
 }

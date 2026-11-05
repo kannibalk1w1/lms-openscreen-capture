@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { groupTypingSections, textChange } from "./capture";
+import { applyTextEdit, groupTypingSections, textChange } from "./capture";
+import {
+	type ImportedTypingFile,
+	parsePortableTypingFile,
+	parsePortableTypingFiles,
+} from "./portable";
 import {
 	MAX_TYPING_BYTES,
 	MAX_TYPING_EVENTS,
@@ -41,6 +46,8 @@ export function importTypingTake(source: string): TypingTake {
 	if (source.trimStart().startsWith("{")) {
 		try {
 			const data: unknown = JSON.parse(source);
+			if (data && typeof data === "object" && "format" in data)
+				return parsePortableTypingFile(data);
 			return typingTakeSchema.parse(data);
 		} catch (error) {
 			if (!(error instanceof SyntaxError)) throw error;
@@ -91,6 +98,25 @@ export function importTypingTake(source: string): TypingTake {
 				selection = JSON.stringify(snapshot.selections);
 				break;
 			}
+			case "typing-edit": {
+				const edit = typingEventSchema.parse({
+					...(raw as object),
+					...base,
+					event: "text-edit",
+					inputType: "observed-text-change",
+				});
+				if (edit.event !== "text-edit") throw new Error("Invalid text edit");
+				value = applyTextEdit(value, edit);
+				events.push(edit);
+				selection = JSON.stringify(edit.selections);
+				break;
+			}
+			case "typing-selection": {
+				const event = typingEventSchema.parse({ ...(raw as object), ...base, event: "selection" });
+				events.push(event);
+				if (event.event === "selection") selection = JSON.stringify(event.selections);
+				break;
+			}
 			case "typing-key":
 				events.push(typingEventSchema.parse({ ...(raw as object), ...base, event: "key" }));
 				break;
@@ -124,4 +150,17 @@ export function importTypingTake(source: string): TypingTake {
 		events,
 		sections: groupTypingSections(events),
 	});
+}
+
+/** Bundle-aware import is all-or-nothing; never merges independent baselines. */
+export function importTypingFiles(source: string): ImportedTypingFile[] {
+	if (new TextEncoder().encode(source).length > MAX_TYPING_BYTES)
+		throw new Error("Typing file exceeds 8 MiB");
+	try {
+		const data: unknown = JSON.parse(source);
+		if (data && typeof data === "object" && "format" in data) return parsePortableTypingFiles(data);
+	} catch (error) {
+		if (!(error instanceof SyntaxError)) throw error;
+	}
+	return [{ take: importTypingTake(source), mode: "captured-edits" }];
 }

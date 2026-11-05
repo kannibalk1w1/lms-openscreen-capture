@@ -15,18 +15,27 @@ configurable recording hotkey and source-time persistence; see
 are described in LESSON_CAPTURE_ANNOTATIONS.md, LESSON_CAPTURE_SVG_ARROWS.md and
 LESSON_CAPTURE_CURSORS.md.
 
-**Next implementation:** an in-video GDScript presentation from captured Godot
-edits. Add a typing/code timeline layer: blur the underlying footage, show a styled
-syntax-coloured code panel, animate the code/caret at a teaching pace, and render
-it consistently in edited preview and video export. Preserve original edits and
-offer a cleaned teaching version. Background freeze/play and faithful/clean replay
-are presentation choices being clarified with the user. JSON/text/playback-file
-exports are secondary to this visible video result.
+**Current implementation:** the in-video code layer is delivered, followed by
+[explicit Godot section/recording association](LESSON_CAPTURE_ASSOCIATION.md).
+Sections can be paired to recorded flag cues and placed on matching source footage,
+with persisted recording UUIDs and pause intervals. This is human-calibrated onset
+placement; continuous Godot/encoder clock synchronization remains open.
 
-The scoped pad and optional Godot unsaved-buffer adapter are the capture/review
-foundation; see [LESSON_CAPTURE_TYPING.md](LESSON_CAPTURE_TYPING.md). Their clocks
-are not yet aligned to video. Broader application/IME/Windows acceptance and physical
-tap/recovery checks remain open before promoting capture drivers.
+**Current export slice:** single-section portable JSON, resulting code/text and
+captured-edit playback recipes with standalone re-import and text precondition
+validation; see [typing exports](LESSON_CAPTURE_EXPORTS.md).
+
+**Current bundle slice:** [multi-section bundles and clean teaching playback](LESSON_CAPTURE_BUNDLES.md)
+retain independent baselines and original edit evidence, with import/edit/re-export.
+
+**Current timeline slice:** [source-linked typing-section review](LESSON_CAPTURE_TYPING_TIMELINE.md)
+provides onset markers, per-occurrence seeking, a searchable independent-section
+catalog, direct editing links and exports.
+
+**Next implementation:** native pause/resume journal records and button-edge
+reconciliation across capture boundaries, followed by counted helper tests.
+Broader application/IME/Windows acceptance and physical tap/recovery checks remain
+open before promoting capture drivers.
 
 ## Completed first slice
 
@@ -137,12 +146,19 @@ drag/resize geometry, light/dark theme, font size, excerpt and line numbers. Nat
 preview and MP4 export share rendering. Original source/edit evidence is retained.
 Pause picture holds screen/camera frames while timeline and original audio continue.
 
-Next useful slice: **synchronize Godot typing capture with recording media time**.
-Introduce an explicit recording/session association and clock anchor, preserve
-pause/resume boundaries, import sections onto the correct source clip and verify
-placement after a trim/split. Keep manual placement for independent takes; never
-infer exact alignment from the existing independent typing clock. Then add portable
-section JSON/text/playback-file exports with re-import validation.
+Delivered local association slice: select a saved recording flag for a Godot
+section's first edit, preserve recording-session and pause-interval identity, and
+place it on the matching source clip. Split/trim/repeated-footage cases are guarded;
+independent takes retain manual placement. See [coverage and limits](LESSON_CAPTURE_ASSOCIATION.md).
+This is explicit human calibration, not a live shared Godot/encoder clock.
+
+The first [portable export slice](LESSON_CAPTURE_EXPORTS.md) now provides one
+section per JSON/text/captured-edit playback file, with standalone re-import.
+[Bundles and clean playback](LESSON_CAPTURE_BUNDLES.md) now add independent
+member review, editing and re-export. [Typing-section timeline review](LESSON_CAPTURE_TYPING_TIMELINE.md) now provides
+source-onset markers, catalog/seek/edit/export actions. Next useful slice: **native
+pause/resume journal boundaries and button-edge reconciliation**. Live edit-level encoder alignment, automatic
+Godot recording-pause awareness and physical desktop timing acceptance remain open.
 
 The opt-in KWin driver has passed its nested-compositor counted test. Physical
 libinput taps, OS/global hotkey delivery, visual HUD and recovery/device checks,

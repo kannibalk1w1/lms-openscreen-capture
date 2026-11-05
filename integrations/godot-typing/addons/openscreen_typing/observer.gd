@@ -4,10 +4,14 @@ extends RefCounted
 # One explicitly selected CodeEdit only. No desktop/global keyboard listener.
 var editor: CodeEdit
 var sink: Callable
+var _previous_text := ""
+var _previous_selections: Array = []
 
 func begin(target: CodeEdit, receiver: Callable) -> void:
 	editor = target
 	sink = receiver
+	_previous_text = editor.text
+	_previous_selections = []
 	editor.text_changed.connect(snapshot)
 	editor.caret_changed.connect(snapshot)
 	editor.gui_input.connect(_key)
@@ -42,7 +46,26 @@ func snapshot() -> void:
 		if editor.has_selection(index):
 			anchor = _offset(editor.get_selection_origin_line(index), editor.get_selection_origin_column(index))
 		selections.append({"anchor": anchor, "focus": focus})
-	sink.call({"event": "typing-snapshot", "text": editor.text, "selections": selections})
+	var current_text := editor.text
+	if current_text.to_utf16_buffer().size() > 400000:
+		# Let the journal writer mark the same text limit without persisting a partial edit.
+		sink.call({"event": "typing-snapshot", "text": current_text})
+		return
+	if current_text != _previous_text:
+		# Godot String indices are Unicode code points, as in the journal contract.
+		var start := 0
+		var end_before := _previous_text.length()
+		var end_after := current_text.length()
+		while start < end_before and start < end_after and _previous_text[start] == current_text[start]:
+			start += 1
+		while end_before > start and end_after > start and _previous_text[end_before - 1] == current_text[end_after - 1]:
+			end_before -= 1
+			end_after -= 1
+		sink.call({"event": "typing-edit", "start": start, "removed": _previous_text.substr(start, end_before - start), "inserted": current_text.substr(start, end_after - start), "selections": selections})
+	elif selections != _previous_selections:
+		sink.call({"event": "typing-selection", "selections": selections})
+	_previous_text = current_text
+	_previous_selections = selections
 
 func _key(event: InputEvent) -> void:
 	if event is InputEventKey:
