@@ -1,3 +1,4 @@
+import { ArrowDrawingLayer } from "./ArrowDrawingLayer";
 // Hosts the native D3D preview canvas (the sole pixel source) plus the
 // interactive-only DOM overlays (zoom gimbal, annotations, webcam drag) that
 // still need real hitboxes. The shared source of truth is `useEditorSettings`,
@@ -102,6 +103,9 @@ interface PreviewCanvasProps {
 	onAnnotationChange?: (id: string, patch: Partial<AxcutAnnotationRegion>) => void;
 	onAnnotationBlurDataChange?: (id: string, blurData: BlurData) => void;
 	onAnnotationCommit?: () => void;
+	arrowDrawing?: boolean;
+	onDrawArrow?: (patch: Partial<AxcutAnnotationRegion>) => void;
+	onCancelArrow?: () => void;
 	seekTarget: { timeSec: number; requestId: number; preservePlayback?: boolean } | null;
 	onTimeChange: (sec: number) => void;
 	onSeek: (sec: number) => void;
@@ -537,6 +541,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 					onCommit={props.onAnnotationCommit}
 				/>
 			) : null}
+			{props.arrowDrawing && props.onDrawArrow && props.onCancelArrow && (
+				<ArrowDrawingLayer onDraw={props.onDrawArrow} onCancel={props.onCancelArrow} />
+			)}
 		</div>
 	);
 }

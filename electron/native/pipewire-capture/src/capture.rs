@@ -36,8 +36,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::encoder::{
-    AudioEncoder, Backend, EncodeStats, Muxer, TrackId, VideoEncoder, VideoParams,
-    AUDIO_CHANNELS, AUDIO_SAMPLE_RATE,
+    AudioEncoder, Backend, EncodeStats, Muxer, TrackId, VideoEncoder, VideoParams, AUDIO_CHANNELS,
+    AUDIO_SAMPLE_RATE,
 };
 use crate::ffmpeg as ff;
 use crate::shim::{self, AudioRing};
@@ -107,8 +107,18 @@ impl AudioMix {
             input.ring.drain_into(&mut input.pending);
         }
 
-        let shortest = self.inputs.iter().map(|i| i.pending.len()).min().unwrap_or(0);
-        let longest = self.inputs.iter().map(|i| i.pending.len()).max().unwrap_or(0);
+        let shortest = self
+            .inputs
+            .iter()
+            .map(|i| i.pending.len())
+            .min()
+            .unwrap_or(0);
+        let longest = self
+            .inputs
+            .iter()
+            .map(|i| i.pending.len())
+            .max()
+            .unwrap_or(0);
         // Normally consume only what every input can supply, so none runs ahead.
         // When one has fallen far behind — or at flush, when nothing more is
         // coming — take the longest and let the short ones contribute silence,
@@ -143,7 +153,9 @@ impl AudioMix {
 
         let id = self.track;
         let scratch = std::mem::take(&mut self.scratch);
-        let result = self.encoder.push(&scratch, |packet| muxer.write(id, packet));
+        let result = self
+            .encoder
+            .push(&scratch, |packet| muxer.write(id, packet));
         self.scratch = scratch;
         result
     }
@@ -181,7 +193,8 @@ const BITS_PER_PIXEL: f64 = 0.1;
 /// `computeBitrate(TARGET_WIDTH, TARGET_HEIGHT)`, whose constants are 4K, so a
 /// 1080p capture asked for 76.5 Mbit/s and produced 44 MB for 18 seconds.
 fn default_bitrate(width: i32, height: i32, fps: i32) -> i64 {
-    let pixels_per_second = f64::from(width.max(1)) * f64::from(height.max(1)) * f64::from(fps.max(1));
+    let pixels_per_second =
+        f64::from(width.max(1)) * f64::from(height.max(1)) * f64::from(fps.max(1));
     // Floor so that a tiny window capture still gets enough bits to look sharp,
     // ceiling so that a 4K/120 stream cannot ask for something no disk wants.
     ((pixels_per_second * BITS_PER_PIXEL) as i64).clamp(2_000_000, 60_000_000)
@@ -317,7 +330,12 @@ impl Capture {
                 // alongside it below.
                 let encoder = unsafe {
                     VideoEncoder::open_importing(
-                        VideoParams { width, height, fps, bitrate },
+                        VideoParams {
+                            width,
+                            height,
+                            fps,
+                            bitrate,
+                        },
                         importer.device(),
                         importer.output_frames_ctx(),
                     )?
@@ -326,14 +344,22 @@ impl Capture {
             }
             None => {
                 let encoder = VideoEncoder::open(
-                    VideoParams { width, height, fps, bitrate },
+                    VideoParams {
+                        width,
+                        height,
+                        fps,
+                        bitrate,
+                    },
                     forced,
                     |backend, error| rejected.push(format!("{}: {error}", backend.as_str())),
                 )?;
                 (encoder, None)
             }
         };
-        let selection = Selection { backend: encoder.backend(), rejected };
+        let selection = Selection {
+            backend: encoder.backend(),
+            rejected,
+        };
 
         // Every track must exist before the header: MP4 fixes its track list
         // there, so an audio stream opened later could not be added at all.
@@ -343,7 +369,11 @@ impl Capture {
         let audio = if audio_sources.is_empty() {
             None
         } else {
-            let bitrate = audio_sources.iter().map(|s| s.bitrate).max().unwrap_or(128_000);
+            let bitrate = audio_sources
+                .iter()
+                .map(|s| s.bitrate)
+                .max()
+                .unwrap_or(128_000);
             let encoder = AudioEncoder::open(bitrate)?;
             let track = muxer.add_stream(encoder.codec_context())?;
             Some(AudioMix {
@@ -379,7 +409,12 @@ impl Capture {
                 frames_written: 0,
                 committed_width: width,
                 committed_height: height,
-                content: shim::CropRect { x: 0, y: 0, width, height },
+                content: shim::CropRect {
+                    x: 0,
+                    y: 0,
+                    width,
+                    height,
+                },
             },
             selection,
         ))
@@ -408,10 +443,7 @@ impl Capture {
     fn read_origin(&self, frame: &shim::Frame) -> (i32, i32) {
         let max_x = (frame.width - self.committed_width).max(0);
         let max_y = (frame.height - self.committed_height).max(0);
-        (
-            frame.crop.x.clamp(0, max_x),
-            frame.crop.y.clamp(0, max_y),
-        )
+        (frame.crop.x.clamp(0, max_x), frame.crop.y.clamp(0, max_y))
     }
 
     /// Converts a captured frame into the encoder's staging buffer. Nothing is
@@ -631,7 +663,10 @@ impl Capture {
     /// Samples the rings had to discard because the encoder fell behind, per
     /// track. Audible if non-zero, unlike a dropped video frame.
     pub fn dropped_audio(&self) -> Vec<(&'static str, u64)> {
-        self.audio.as_ref().map(AudioMix::dropped).unwrap_or_default()
+        self.audio
+            .as_ref()
+            .map(AudioMix::dropped)
+            .unwrap_or_default()
     }
 
     pub fn is_paused(&self) -> bool {
@@ -718,7 +753,7 @@ impl Capture {
     /// `None` until the timeline has started. The single source of both the PTS
     /// clock (`current_index`) and the divergence telemetry (`wall_clock_ms`), so
     /// the two cannot drift apart by construction.
-    fn elapsed_active(&self) -> Option<Duration> {
+    pub(crate) fn elapsed_active(&self) -> Option<Duration> {
         let epoch = self.epoch?;
         let mut elapsed = epoch.elapsed().saturating_sub(self.paused_total);
         if let Some(since) = self.paused_at {
@@ -780,7 +815,12 @@ mod tests {
             height,
             video_format: format,
             pts_ns: -1,
-            crop: shim::CropRect { x: 0, y: 0, width, height },
+            crop: shim::CropRect {
+                x: 0,
+                y: 0,
+                width,
+                height,
+            },
             has_crop: false,
             dmabuf: None,
         }
@@ -788,12 +828,7 @@ mod tests {
 
     /// A window's frame: a monitor-sized buffer whose content is the rectangle
     /// at (x, y). This is what mutter actually delivers for a window stream.
-    fn cropped_frame(
-        width: i32,
-        height: i32,
-        crop: shim::CropRect,
-        format: u32,
-    ) -> shim::Frame {
+    fn cropped_frame(width: i32, height: i32, crop: shim::CropRect, format: u32) -> shim::Frame {
         let mut frame = frame(width, height, format);
         frame.crop = crop;
         frame.has_crop = true;
@@ -813,7 +848,10 @@ mod tests {
             c.video_format_bgra,
             c.video_format_rgba,
         ] {
-            assert!(pixel_format(id).is_ok(), "SPA format {id} is offered but not convertible");
+            assert!(
+                pixel_format(id).is_ok(),
+                "SPA format {id} is offered but not convertible"
+            );
         }
     }
 
@@ -826,9 +864,17 @@ mod tests {
     #[test]
     fn the_timeline_does_not_start_until_the_first_frame_is_staged() {
         let output = std::env::temp_dir().join("openscreen-capture-epoch.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         assert!(!capture.started());
         // Nothing staged: advance must not write a frame of uninitialised memory.
         assert_eq!(capture.advance().expect("advance"), 0);
@@ -847,9 +893,17 @@ mod tests {
         // Under variable-rate output a long static gap is one held frame, so the
         // event loop's heartbeat is simulated — a tick every ~30 ms.
         let output = std::env::temp_dir().join("openscreen-capture-static.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         capture
             .stage(&frame(320, 240, shim::constants().video_format_bgrx))
             .expect("stage");
@@ -860,7 +914,11 @@ mod tests {
         }
 
         let summary = capture.finish().expect("finish");
-        assert!(summary.frames >= 1, "a static screen must still produce frames, got {}", summary.frames);
+        assert!(
+            summary.frames >= 1,
+            "a static screen must still produce frames, got {}",
+            summary.frames
+        );
         assert!(
             summary.duration_ms >= 130,
             "the timeline must track the ~150 ms elapsed, got {} ms",
@@ -878,28 +936,51 @@ mod tests {
     #[test]
     fn a_window_is_staged_from_its_crop_inside_a_larger_frame() {
         let output = std::env::temp_dir().join("openscreen-capture-crop.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         // A 1920x1080 stream carrying a 320x240 window at (100, 50).
         let staged = capture.stage(&cropped_frame(
             1920,
             1080,
-            shim::CropRect { x: 100, y: 50, width: 320, height: 240 },
+            shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 320,
+                height: 240,
+            },
             shim::constants().video_format_bgrx,
         ));
 
-        assert!(staged.is_ok(), "a crop inside the frame must stage: {staged:?}");
+        assert!(
+            staged.is_ok(),
+            "a crop inside the frame must stage: {staged:?}"
+        );
 
         // Frames are clock-driven, so let the timeline advance far enough for the
         // staged picture to actually reach the encoder at the cropped geometry.
         std::thread::sleep(Duration::from_millis(120));
         let written = capture.advance().expect("advance");
-        assert!(written >= 1, "the cropped picture should have been encoded, wrote {written}");
+        assert!(
+            written >= 1,
+            "the cropped picture should have been encoded, wrote {written}"
+        );
 
         let summary = capture.finish().expect("finish");
-        assert!(summary.frames >= 1, "the cropped picture must reach the file, got {}", summary.frames);
+        assert!(
+            summary.frames >= 1,
+            "the cropped picture must reach the file, got {}",
+            summary.frames
+        );
         let _ = std::fs::remove_file(&output);
     }
 
@@ -910,28 +991,51 @@ mod tests {
     #[test]
     fn the_content_rect_is_the_window_the_file_shows() {
         let output = std::env::temp_dir().join("openscreen-capture-content.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         // Before a frame is staged there is nothing cropped yet, so the whole
         // committed size sits at the origin.
         assert_eq!(
             capture.content_rect(),
-            shim::CropRect { x: 0, y: 0, width: 320, height: 240 }
+            shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 320,
+                height: 240
+            }
         );
 
         capture
             .stage(&cropped_frame(
                 1920,
                 1080,
-                shim::CropRect { x: 100, y: 50, width: 320, height: 240 },
+                shim::CropRect {
+                    x: 100,
+                    y: 50,
+                    width: 320,
+                    height: 240,
+                },
                 shim::constants().video_format_bgrx,
             ))
             .expect("stage");
         assert_eq!(
             capture.content_rect(),
-            shim::CropRect { x: 100, y: 50, width: 320, height: 240 }
+            shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 320,
+                height: 240
+            }
         );
 
         // The window moved. The file follows its origin at the committed size,
@@ -940,13 +1044,23 @@ mod tests {
             .stage(&cropped_frame(
                 1920,
                 1080,
-                shim::CropRect { x: 700, y: 400, width: 320, height: 240 },
+                shim::CropRect {
+                    x: 700,
+                    y: 400,
+                    width: 320,
+                    height: 240,
+                },
                 shim::constants().video_format_bgrx,
             ))
             .expect("stage");
         assert_eq!(
             capture.content_rect(),
-            shim::CropRect { x: 700, y: 400, width: 320, height: 240 }
+            shim::CropRect {
+                x: 700,
+                y: 400,
+                width: 320,
+                height: 240
+            }
         );
 
         // An origin that would read past the buffer is clamped for the pixels,
@@ -956,13 +1070,23 @@ mod tests {
             .stage(&cropped_frame(
                 1920,
                 1080,
-                shim::CropRect { x: 1800, y: 1000, width: 320, height: 240 },
+                shim::CropRect {
+                    x: 1800,
+                    y: 1000,
+                    width: 320,
+                    height: 240,
+                },
                 shim::constants().video_format_bgrx,
             ))
             .expect("stage");
         assert_eq!(
             capture.content_rect(),
-            shim::CropRect { x: 1600, y: 840, width: 320, height: 240 }
+            shim::CropRect {
+                x: 1600,
+                y: 840,
+                width: 320,
+                height: 240
+            }
         );
 
         let _ = capture.finish();
@@ -975,18 +1099,34 @@ mod tests {
     #[test]
     fn a_crop_against_the_right_edge_is_not_rejected_as_truncated() {
         let output = std::env::temp_dir().join("openscreen-capture-edge.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         let staged = capture.stage(&cropped_frame(
             1920,
             1080,
-            shim::CropRect { x: 1600, y: 840, width: 320, height: 240 },
+            shim::CropRect {
+                x: 1600,
+                y: 840,
+                width: 320,
+                height: 240,
+            },
             shim::constants().video_format_bgrx,
         ));
 
-        assert!(staged.is_ok(), "a crop at the far corner must stage: {staged:?}");
+        assert!(
+            staged.is_ok(),
+            "a crop at the far corner must stage: {staged:?}"
+        );
         let _ = capture.finish();
         let _ = std::fs::remove_file(&output);
     }
@@ -998,21 +1138,40 @@ mod tests {
     #[test]
     fn a_shrunken_window_is_read_from_inside_the_frame() {
         let output = std::env::temp_dir().join("openscreen-capture-shrunk.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         // Origin so close to the edge that a 320x240 read from it would overrun.
         let frame = cropped_frame(
             400,
             300,
-            shim::CropRect { x: 380, y: 290, width: 20, height: 10 },
+            shim::CropRect {
+                x: 380,
+                y: 290,
+                width: 20,
+                height: 10,
+            },
             shim::constants().video_format_bgrx,
         );
-        assert!(capture.crop_diverged(&frame), "20x10 must not look like the committed 320x240");
+        assert!(
+            capture.crop_diverged(&frame),
+            "20x10 must not look like the committed 320x240"
+        );
 
         let staged = capture.stage(&frame);
-        assert!(staged.is_ok(), "the read must be clamped back inside the frame: {staged:?}");
+        assert!(
+            staged.is_ok(),
+            "the read must be clamped back inside the frame: {staged:?}"
+        );
         let _ = capture.finish();
         let _ = std::fs::remove_file(&output);
     }
@@ -1024,18 +1183,34 @@ mod tests {
     fn a_stable_odd_sized_window_is_not_reported_as_resized() {
         let output = std::env::temp_dir().join("openscreen-capture-odd.mp4");
         // 321x241 rounds to the 320x240 the encoder is opened at.
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         let frame = cropped_frame(
             1920,
             1080,
-            shim::CropRect { x: 0, y: 0, width: 321, height: 241 },
+            shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 321,
+                height: 241,
+            },
             shim::constants().video_format_bgrx,
         );
 
-        assert!(!capture.crop_diverged(&frame), "an unchanged odd crop is not a resize");
+        assert!(
+            !capture.crop_diverged(&frame),
+            "an unchanged odd crop is not a resize"
+        );
         let _ = capture.finish();
         let _ = std::fs::remove_file(&output);
     }
@@ -1043,9 +1218,17 @@ mod tests {
     #[test]
     fn an_uncropped_frame_reports_no_divergence() {
         let output = std::env::temp_dir().join("openscreen-capture-nocrop.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         assert!(!capture.crop_diverged(&frame(320, 240, shim::constants().video_format_bgrx)));
         let _ = capture.finish();
@@ -1055,9 +1238,17 @@ mod tests {
     #[test]
     fn paused_time_does_not_advance_the_timeline() {
         let output = std::env::temp_dir().join("openscreen-capture-pause.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         capture
             .stage(&frame(320, 240, shim::constants().video_format_bgrx))
             .expect("stage");
@@ -1069,7 +1260,11 @@ mod tests {
         assert_eq!(capture.advance().expect("advance"), 0);
         capture.resume();
         // And the paused interval is not owed back as a burst of held frames.
-        assert_eq!(capture.advance().expect("advance"), 1, "only frame 0 is due");
+        assert_eq!(
+            capture.advance().expect("advance"),
+            1,
+            "only frame 0 is due"
+        );
 
         let _ = std::fs::remove_file(&output);
     }
@@ -1085,7 +1280,10 @@ mod tests {
         let ring = Arc::new(AudioRing::new(1, 8, AUDIO_CHANNELS));
         let capacity = 1 * 8 * AUDIO_CHANNELS;
         ring.push_for_test(&vec![0.5; capacity * 3]);
-        assert!(ring.dropped_samples() > 0, "the ring must have overflowed for this test to mean anything");
+        assert!(
+            ring.dropped_samples() > 0,
+            "the ring must have overflowed for this test to mean anything"
+        );
 
         let output = std::env::temp_dir().join("openscreen-capture-audio-preroll.mp4");
         let (mut capture, _) = Capture::start(
@@ -1095,7 +1293,12 @@ mod tests {
             30,
             Some(1_000_000),
             Some(Backend::Software),
-            vec![AudioSource { label: "system", ring: ring.clone(), gain: 1.0, bitrate: 128_000 }],
+            vec![AudioSource {
+                label: "system",
+                ring: ring.clone(),
+                gain: 1.0,
+                bitrate: 128_000,
+            }],
             None,
         )
         .expect("start");
@@ -1132,7 +1335,12 @@ mod tests {
             30,
             Some(1_000_000),
             Some(Backend::Software),
-            vec![AudioSource { label: "system", ring: ring.clone(), gain: 1.0, bitrate: 128_000 }],
+            vec![AudioSource {
+                label: "system",
+                ring: ring.clone(),
+                gain: 1.0,
+                bitrate: 128_000,
+            }],
             None,
         )
         .expect("start");
@@ -1143,7 +1351,10 @@ mod tests {
         // Mid-take: the encoder falls far enough behind that the ring overflows.
         ring.push_for_test(&vec![0.5; capacity * 3]);
         let dropped = ring.dropped_samples();
-        assert!(dropped > 0, "the ring must have overflowed for this test to mean anything");
+        assert!(
+            dropped > 0,
+            "the ring must have overflowed for this test to mean anything"
+        );
 
         capture.pause();
         // A long pause. Nothing that arrives during it belongs to the recording,
@@ -1164,7 +1375,11 @@ mod tests {
         // A boosted microphone that clips must clip flat. An out-of-range float
         // survives until AAC quantises it, and then wraps to the opposite
         // polarity — which sounds like a burst of noise, not like clipping.
-        let ring = Arc::new(AudioRing::new(1, AUDIO_SAMPLE_RATE as usize, AUDIO_CHANNELS));
+        let ring = Arc::new(AudioRing::new(
+            1,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
         ring.push_for_test(&[0.9, -0.9, 0.4, -0.4]);
 
         let output = std::env::temp_dir().join("openscreen-capture-gain.mp4");
@@ -1175,7 +1390,12 @@ mod tests {
             30,
             Some(1_000_000),
             Some(Backend::Software),
-            vec![AudioSource { label: "microphone", ring, gain: 4.0, bitrate: 128_000 }],
+            vec![AudioSource {
+                label: "microphone",
+                ring,
+                gain: 4.0,
+                bitrate: 128_000,
+            }],
             None,
         )
         .expect("start");
@@ -1202,8 +1422,16 @@ mod tests {
         // — an HTML5 <video>, which plays only the default track and cannot
         // switch — heard whichever came first. With system audio silent, that
         // was silence, while the microphone sat in a track nothing selects.
-        let system = Arc::new(AudioRing::new(1, AUDIO_SAMPLE_RATE as usize, AUDIO_CHANNELS));
-        let mic = Arc::new(AudioRing::new(1, AUDIO_SAMPLE_RATE as usize, AUDIO_CHANNELS));
+        let system = Arc::new(AudioRing::new(
+            1,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
+        let mic = Arc::new(AudioRing::new(
+            1,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
         let output = std::env::temp_dir().join("openscreen-capture-one-track.mp4");
         let (mut capture, _) = Capture::start(
             &output,
@@ -1213,8 +1441,18 @@ mod tests {
             Some(1_000_000),
             Some(Backend::Software),
             vec![
-                AudioSource { label: "system", ring: system.clone(), gain: 1.0, bitrate: 128_000 },
-                AudioSource { label: "microphone", ring: mic.clone(), gain: 1.0, bitrate: 128_000 },
+                AudioSource {
+                    label: "system",
+                    ring: system.clone(),
+                    gain: 1.0,
+                    bitrate: 128_000,
+                },
+                AudioSource {
+                    label: "microphone",
+                    ring: mic.clone(),
+                    gain: 1.0,
+                    bitrate: 128_000,
+                },
             ],
             None,
         )
@@ -1233,7 +1471,10 @@ mod tests {
         capture.advance().expect("advance");
 
         let mix = capture.audio.as_ref().unwrap();
-        assert_eq!(mix.track, track, "there is exactly one audio track, and it never changes");
+        assert_eq!(
+            mix.track, track,
+            "there is exactly one audio track, and it never changes"
+        );
         // The mixed scratch must carry BOTH contributions summed, not one of them.
         assert!(
             mix.scratch.iter().any(|s| (*s - 0.75).abs() < 1e-4),
@@ -1252,8 +1493,16 @@ mod tests {
         // strictly on min(available) would then wait for it forever and the
         // whole audio track would stop — including the system audio that is
         // still arriving. AUDIO_STARVE_SAMPLES is what breaks that deadlock.
-        let system = Arc::new(AudioRing::new(2, AUDIO_SAMPLE_RATE as usize, AUDIO_CHANNELS));
-        let dead = Arc::new(AudioRing::new(2, AUDIO_SAMPLE_RATE as usize, AUDIO_CHANNELS));
+        let system = Arc::new(AudioRing::new(
+            2,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
+        let dead = Arc::new(AudioRing::new(
+            2,
+            AUDIO_SAMPLE_RATE as usize,
+            AUDIO_CHANNELS,
+        ));
         let output = std::env::temp_dir().join("openscreen-capture-starve.mp4");
         let (mut capture, _) = Capture::start(
             &output,
@@ -1263,8 +1512,18 @@ mod tests {
             Some(1_000_000),
             Some(Backend::Software),
             vec![
-                AudioSource { label: "system", ring: system.clone(), gain: 1.0, bitrate: 128_000 },
-                AudioSource { label: "microphone", ring: dead, gain: 1.0, bitrate: 128_000 },
+                AudioSource {
+                    label: "system",
+                    ring: system.clone(),
+                    gain: 1.0,
+                    bitrate: 128_000,
+                },
+                AudioSource {
+                    label: "microphone",
+                    ring: dead,
+                    gain: 1.0,
+                    bitrate: 128_000,
+                },
             ],
             None,
         )
@@ -1293,9 +1552,17 @@ mod tests {
         // deleted slice of the timeline. Wall-clock PTS represents it as a single
         // held frame whose PTS jumps to real time: one encode, honest duration.
         let output = std::env::temp_dir().join("openscreen-capture-catchup.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 60, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            60,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         capture
             .stage(&frame(320, 240, shim::constants().video_format_bgrx))
             .expect("stage");
@@ -1328,9 +1595,17 @@ mod tests {
         // in finish() could then encode when a stop follows a pause (#512). Pause
         // must hold that privacy boundary — the staged picture freezes.
         let output = std::env::temp_dir().join("openscreen-capture-pause-stage.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 30, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
 
         // Pause BEFORE any frame is staged, then a frame arrives during the pause.
         capture.pause();
@@ -1340,10 +1615,16 @@ mod tests {
             StageOutcome::Frozen,
             "a frame arriving while paused is Frozen — not Staged (nothing staged) nor Dropped (nothing failed)",
         );
-        assert!(!capture.started(), "a frame received while paused must not start the timeline");
+        assert!(
+            !capture.started(),
+            "a frame received while paused must not start the timeline"
+        );
 
         let summary = capture.finish().expect("finish");
-        assert_eq!(summary.frames, 0, "nothing captured while paused may reach the file");
+        assert_eq!(
+            summary.frames, 0,
+            "nothing captured while paused may reach the file"
+        );
         let _ = std::fs::remove_file(&output);
     }
 
@@ -1356,9 +1637,17 @@ mod tests {
         // current_index() freezes at the pause boundary, so the tail write is
         // both safe and required while paused.
         let output = std::env::temp_dir().join("openscreen-capture-pause-finish.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 60, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            60,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         capture
             .stage(&frame(320, 240, shim::constants().video_format_bgrx))
             .expect("stage");
@@ -1378,7 +1667,9 @@ mod tests {
         assert!(
             skew <= 60,
             "duration {} ms and wall-clock {} ms diverged by {} ms",
-            summary.duration_ms, summary.wall_clock_ms, skew
+            summary.duration_ms,
+            summary.wall_clock_ms,
+            skew
         );
         let _ = std::fs::remove_file(&output);
     }
@@ -1391,9 +1682,17 @@ mod tests {
         // than real time (55.2 s for 61 s in the field report); wall-clock PTS
         // keeps duration ~= elapsed, and the wall-clock telemetry agrees with it.
         let output = std::env::temp_dir().join("openscreen-capture-sparse.mp4");
-        let (mut capture, _) =
-            Capture::start(&output, 320, 240, 60, Some(1_000_000), Some(Backend::Software), Vec::new(), None)
-                .expect("start");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            60,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
         capture
             .stage(&frame(320, 240, shim::constants().video_format_bgrx))
             .expect("stage");
@@ -1416,10 +1715,16 @@ mod tests {
         assert!(
             skew <= 60,
             "duration {} ms and wall-clock {} ms diverged by {} ms",
-            summary.duration_ms, summary.wall_clock_ms, skew
+            summary.duration_ms,
+            summary.wall_clock_ms,
+            skew
         );
         // Variable-rate, not a duplicate burst: far fewer than 400 ms × 60 fps.
-        assert!(summary.frames < 10, "expected a handful of held frames, got {}", summary.frames);
+        assert!(
+            summary.frames < 10,
+            "expected a handful of held frames, got {}",
+            summary.frames
+        );
         let _ = std::fs::remove_file(&output);
     }
 }

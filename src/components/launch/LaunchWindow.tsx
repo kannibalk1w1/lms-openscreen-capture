@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import { getAvailableLocales, getLocaleName } from "@/i18n/loader";
 import { offersEditableCursor } from "@/lib/editableCursorAvailability";
@@ -56,7 +57,9 @@ import {
 	HUD_POPOVER_GAP,
 	HUD_STACK_GAP,
 } from "./hudGeometry";
+import { InputCaptureNotice } from "./InputCaptureNotice";
 import styles from "./LaunchWindow.module.css";
+import { RecordingFlagControl } from "./RecordingFlagControl";
 
 // Locale list is computed once at module load; keeping the reference stable lets
 // the language menu sit behind a memo boundary.
@@ -85,6 +88,10 @@ function hudBarMaxHeightCss(): string {
 /** Launches the floating recording HUD and its recorder controls. */
 export function LaunchWindow() {
 	const t = useScopedT("launch");
+	useEffect(
+		() => window.electronAPI?.onRecordingFlagsSaveError?.(() => toast.error(t("flags.saveError"))),
+		[t],
+	);
 	// The update-check label is shared with the app menu and the tray, which read it from
 	// `common`. A second copy under `launch` drifted from it in en and ar before it ever shipped.
 	const tCommon = useScopedT("common");
@@ -1180,7 +1187,9 @@ export function LaunchWindow() {
 
 	const versionLabel = appInfo ? t("deviceSettings.version", { version: appInfo.version }) : null;
 
-	const hasNotices = Boolean(systemLocaleSuggestion) || softwareEncoderFallbackNoticeVisible;
+	const showInputCapture = recording && getPlatform() === "linux";
+	const hasNotices =
+		Boolean(systemLocaleSuggestion) || softwareEncoderFallbackNoticeVisible || showInputCapture;
 
 	return (
 		// Avoid w-screen/h-screen: 100vw can exceed the inner layout width when scrollbars
@@ -1330,18 +1339,21 @@ export function LaunchWindow() {
 						)}
 
 						{recording && (
-							<HudRecordingControls
-								vertical={isVertical}
-								paused={paused}
-								saving={saving}
-								canPause={canPauseRecording}
-								pauseLabel={paused ? t("tooltips.resumeRecording") : t("tooltips.pauseRecording")}
-								restartLabel={t("tooltips.restartRecording")}
-								cancelLabel={t("tooltips.cancelRecording")}
-								onTogglePause={togglePaused}
-								onRestart={restartRecording}
-								onCancel={cancelRecording}
-							/>
+							<>
+								<RecordingFlagControl disabled={saving || paused} />
+								<HudRecordingControls
+									vertical={isVertical}
+									paused={paused}
+									saving={saving}
+									canPause={canPauseRecording}
+									pauseLabel={paused ? t("tooltips.resumeRecording") : t("tooltips.pauseRecording")}
+									restartLabel={t("tooltips.restartRecording")}
+									cancelLabel={t("tooltips.cancelRecording")}
+									onTogglePause={togglePaused}
+									onRestart={restartRecording}
+									onCancel={cancelRecording}
+								/>
+							</>
 						)}
 
 						{!isLinuxHud && (
@@ -1438,6 +1450,7 @@ export function LaunchWindow() {
 								data-testid="hud-notice-column"
 								className={styles.hudNoticeColumn}
 							>
+								{showInputCapture && <InputCaptureNotice />}
 								{systemLocaleSuggestion && (
 									<HudNotice
 										title={t("systemLanguagePrompt.title")}

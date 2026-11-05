@@ -94,6 +94,13 @@ export async function runPackCommand(
 		await copyIn(cursorSidecar);
 	}
 
+	// Input evidence travels with the source footage, without rewriting events.
+	const eventJournal = `${screenSource}.events.ndjson`;
+	if (await isFile(eventJournal)) await copyIn(eventJournal);
+
+	const flagsSidecar = `${screenSource}.flags.json`;
+	if (await isFile(flagsSidecar)) await copyIn(flagsSidecar);
+
 	const packedProject: PackedProjectData = {
 		...data,
 		media: {

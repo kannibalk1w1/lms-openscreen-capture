@@ -153,5 +153,24 @@
 			"screenRequired": "K nahrávání je potřeba nahrávání obrazovky.",
 			"ready": "Vše je připraveno."
 		}
+	},
+	"inputCapture": {
+		"unknown": "Input evidence: checking availability",
+		"partial": "Input evidence: partial coverage",
+		"unavailable": "Input evidence: unavailable",
+		"disabled": "Input evidence: disabled",
+		"failed": "Input evidence: could not save journal",
+		"interrupted": "Input evidence: capture interrupted",
+		"physicalScope": "Physical mouse buttons across the desktop. Trackpad taps, scrolling and typing are not captured.",
+		"compositorScope": "Mouse buttons and trackpad taps across the desktop. Scrolling and typing are not captured."
+	},
+	"flags": {
+		"add": "Add flag",
+		"shortcut": "Add flag · {{key}}",
+		"unavailable": "Global flag hotkey unavailable. Use this button or choose another binding in Keyboard Shortcuts.",
+		"noHotkey": "No hotkey",
+		"saveError": "The recording was saved, but its flags could not be saved.",
+		"requested": "Hotkey requested",
+		"approvalPending": "Allow the desktop shortcut request, then press {{key}}. Until it responds, use the flag button."
 	}
 }

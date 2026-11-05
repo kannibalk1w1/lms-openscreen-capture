@@ -1,0 +1,9 @@
+.lane { position: relative; height: 54px; border-bottom: 1px solid var(--border-soft); background: color-mix(in oklab, #e7ac3a 5%, transparent); }
+.caption { position: sticky; left: 8px; top: 0; display: inline-block; padding-top: 3px; color: var(--muted); font-size: 10px; pointer-events: none; }
+.flag { position: absolute; top: 19px; width: 20px; height: 33px; padding: 0; background: transparent; border: 0; color: #d79c2c; cursor: pointer; display: flex; align-items: flex-start; }
+.flag:hover, .flag:focus-visible { color: var(--fg); outline: 1px solid var(--accent); border-radius: 3px; }
+.stem { position: absolute; left: 1px; top: 13px; height: 18px; border-left: 1px solid currentColor; }
+.editor { display: grid; gap: 10px; width: 240px; background: var(--surface-1); color: var(--fg); font-size: 12px; }
+.editor label { display: grid; gap: 6px; }
+.editor input { width: 100%; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--surface-2); padding: 6px; }
+.editor button { display: flex; align-items: center; gap: 6px; }

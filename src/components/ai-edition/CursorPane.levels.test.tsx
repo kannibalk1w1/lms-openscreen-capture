@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/contexts/I18nContext";
 import { LOCALE_STORAGE_KEY } from "@/i18n/config";
 import { assetSchema, clipSchema, createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import * as customCursorModule from "@/lib/cursor/customCursors";
 import { type NativeCursorType, nativeBridgeClient } from "@/native";
 import { CursorPane } from "./RightPanes";
 
@@ -218,4 +220,96 @@ describe("CursorPane click impact", () => {
 		renderWithCursor({ cursorShow: false });
 		expect(toggle()).toBeNull();
 	});
+});
+
+it("offers click location rings independently of 3D, bounce and screen impact", () => {
+	renderWithCursor({ cursorModel3d: false, cursorClickBounce: 0, cursorClickImpact: false });
+	fireEvent.click(screen.getByRole("button", { name: "Highlight click locations" }));
+	expect(useProjectStore.getState().document?.legacyEditor).toMatchObject({
+		cursorClickMarkers: true,
+		cursorModel3d: false,
+		cursorClickBounce: 0,
+		cursorClickImpact: false,
+	});
+});
+
+it("offers importing a cursor for each state and restores the theme cursor", () => {
+	const custom = {
+		dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+		hotspotX: 0.1,
+		hotspotY: 0.2,
+	};
+	renderWithCursor({ cursorCustom: { arrow: custom } });
+	expect(screen.getByLabelText("Import cursor PNG").getAttribute("accept")).toBe("image/png,.png");
+	expect((screen.getByLabelText("Import cursor PNG") as HTMLInputElement).hidden).toBe(true);
+	const picker = vi
+		.spyOn(screen.getByLabelText("Import cursor PNG"), "click")
+		.mockImplementation(() => undefined);
+	fireEvent.click(screen.getByRole("button", { name: "Import cursor PNG" }));
+	expect(picker).toHaveBeenCalledOnce();
+	picker.mockRestore();
+	fireEvent.click(screen.getByRole("button", { name: "Use theme cursor for this state" }));
+	expect(useProjectStore.getState().document?.legacyEditor).toMatchObject({ cursorCustom: {} });
+});
+
+it("imports a cursor and sets its hotspot at the clicked image point", async () => {
+	const custom = {
+		dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+		hotspotX: 0,
+		hotspotY: 0,
+	};
+	const importer = vi.spyOn(customCursorModule, "importCustomCursor").mockResolvedValue(custom);
+	try {
+		renderWithCursor({});
+		fireEvent.change(screen.getByLabelText("Cursor state"), { target: { value: "text" } });
+		fireEvent.change(screen.getByLabelText("Import cursor PNG"), {
+			target: { files: [new File(["PNG"], "pointer.png", { type: "image/png" })] },
+		});
+		await waitFor(() =>
+			expect(useProjectStore.getState().document?.legacyEditor).toMatchObject({
+				cursorCustom: { text: custom },
+			}),
+		);
+		const target = screen.getByRole("button", { name: "Cursor hotspot" });
+		vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+			left: 10,
+			top: 20,
+			width: 128,
+			height: 128,
+		} as DOMRect);
+		fireEvent.click(target, { clientX: 74, clientY: 52 });
+		expect(useProjectStore.getState().document?.legacyEditor).toMatchObject({
+			cursorCustom: { text: { hotspotX: 0.5, hotspotY: 0.25 } },
+		});
+	} finally {
+		importer.mockRestore();
+	}
+});
+
+it("does not apply an unfinished cursor import to another project", async () => {
+	let finish!: (image: customCursorModule.CustomCursor) => void;
+	const importer = vi.spyOn(customCursorModule, "importCustomCursor").mockImplementation(
+		() =>
+			new Promise((resolve) => {
+				finish = resolve;
+			}),
+	);
+	try {
+		renderWithCursor({});
+		fireEvent.change(screen.getByLabelText("Import cursor PNG"), {
+			target: { files: [new File(["PNG"], "pointer.png", { type: "image/png" })] },
+		});
+		const next = createEmptyDocument({ projectId: "next", title: "Next" });
+		act(() => useProjectStore.setState({ projectId: "next", document: next }));
+		await act(async () => {
+			finish({
+				dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+				hotspotX: 0,
+				hotspotY: 0,
+			});
+		});
+		expect(useProjectStore.getState().document).toBe(next);
+	} finally {
+		importer.mockRestore();
+	}
 });

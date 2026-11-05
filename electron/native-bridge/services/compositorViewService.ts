@@ -10,16 +10,20 @@ import {
 	type WebFrameMain,
 	webContents,
 } from "electron";
+import { resolveSvgAnnotation } from "../../../src/lib/ai-edition/annotations/arrowSvg";
 import type { ShaderEffectCheck } from "../../../src/lib/ai-edition/shaderEffects";
 import {
+	CURSOR_KINDS,
 	type CursorKind,
 	readCursorAsArrow,
 	resolveCursorSprites,
 } from "../../../src/lib/cursor/cursorThemes";
+import { readCustomCursors } from "../../../src/lib/cursor/customCursors";
 import type {
 	CompositorSharedFrameMeta,
 	CompositorSharedFrameReceipt,
 } from "../../../src/native/contracts";
+import type { SceneAnnotation } from "../../../src/native/sceneDescription";
 import type { ExportJob } from "../../ipc/exportJobs";
 import type {
 	ClipInput,
@@ -155,8 +159,11 @@ export function resolveSceneAssetPaths(sceneJson: string): string {
 	try {
 		const scene = JSON.parse(sceneJson) as {
 			background?: { kind?: string; path?: string };
+			annotations?: SceneAnnotation[];
+			output?: { width: number; height: number };
 			cursor?: {
 				theme?: string;
+				custom?: unknown;
 				asArrow?: unknown;
 				model3d?: boolean;
 				cursorSprites?: Record<string, SceneCursorSprite>;
@@ -168,6 +175,10 @@ export function resolveSceneAssetPaths(sceneJson: string): string {
 			};
 		};
 		let changed = false;
+		if (scene.annotations && scene.output) {
+			scene.annotations = scene.annotations.map((a) => resolveSvgAnnotation(a, scene.output!));
+			changed = true;
+		}
 		// Both backgrounds go through this: the screen's, and the camera's under the "custom"
 		// mode. The camera one was missed, and the failure is silent — the compositor gets
 		// "/wallpapers/wallpaper1.jpg", `image::open` cannot find it, and the PiP falls back to
@@ -197,6 +208,21 @@ export function resolveSceneAssetPaths(sceneJson: string): string {
 				scene.cursor.model3d === true,
 			);
 			changed = true;
+		}
+		if (scene.cursor?.cursorSprites) {
+			for (const [type, custom] of Object.entries(readCustomCursors(scene.cursor.custom))) {
+				scene.cursor.cursorSprites[type] = {
+					path: custom.dataUrl,
+					hotspotX: custom.hotspotX,
+					hotspotY: custom.hotspotY,
+				};
+			}
+			for (const kind of readCursorAsArrow(scene.cursor.asArrow, undefined, [])) {
+				for (const type of CURSOR_KINDS[kind]) {
+					if (scene.cursor.cursorSprites.arrow)
+						scene.cursor.cursorSprites[type] = scene.cursor.cursorSprites.arrow;
+				}
+			}
 		}
 		// The scene asks for an effect; this process says where the model is. A model that
 		// does not resolve leaves `modelPath` unset, which turns the effect off in the

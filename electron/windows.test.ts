@@ -100,6 +100,9 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+	// Geometry tests start the HUD poll via the topmost handler. Retire it before
+	// restoring the platform: a real timer must not outlive this minimal window fake.
+	electron.handlers.get("hud-overlay-ignore-mouse-events")?.({}, false);
 	Object.defineProperty(process, "platform", { value: REAL_PLATFORM, configurable: true });
 	Reflect.deleteProperty(process, "getSystemVersion");
 });

@@ -53,7 +53,11 @@ export function AddAudioLayerDialog({
 	open: boolean;
 	maxDurationSec: number;
 	onClose: () => void;
-	onComplete: (assetId: string, durationSec: number) => void;
+	onComplete: (
+		assetId: string,
+		durationSec: number,
+		createCaptions: boolean,
+	) => void | Promise<void>;
 	onRecordingStart: () => void | Promise<void>;
 	onRecordingStop: () => void;
 }) {
@@ -62,6 +66,7 @@ export function AddAudioLayerDialog({
 	const [busy, setBusy] = useState(false);
 	const [recording, setRecording] = useState(false);
 	const [elapsedSec, setElapsedSec] = useState(0);
+	const [createCaptions, setCreateCaptions] = useState(true);
 	const recorderRef = useRef<MediaRecorder | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
 	const chunksRef = useRef<Blob[]>([]);
@@ -82,6 +87,7 @@ export function AddAudioLayerDialog({
 			setRecording(false);
 			recordingRef.current = false;
 			setElapsedSec(0);
+			setCreateCaptions(true);
 		}
 		return () => {
 			if (timerRef.current) clearInterval(timerRef.current);
@@ -142,7 +148,7 @@ export function AddAudioLayerDialog({
 					toast.error(t("audio.importFailed"));
 					return;
 				}
-				onComplete(asset.id, durationSec);
+				await onComplete(asset.id, durationSec, createCaptions);
 			} catch (err) {
 				toast.error(t("audio.importFailed"), {
 					description: err instanceof Error ? err.message : String(err),
@@ -151,7 +157,7 @@ export function AddAudioLayerDialog({
 				setBusy(false);
 			}
 		},
-		[onComplete, t],
+		[onComplete, createCaptions, t],
 	);
 
 	const startRecording = useCallback(async () => {
@@ -320,9 +326,19 @@ export function AddAudioLayerDialog({
 				</>
 			) : (
 				<>
+					<label className={styles.voiceoverCaptionOption} title={t("audio.createCaptionsHint")}>
+						<input
+							type="checkbox"
+							checked={createCaptions}
+							disabled={busy}
+							onChange={(event) => setCreateCaptions(event.target.checked)}
+						/>
+						{t("audio.createCaptions")}
+					</label>
 					<button
 						type="button"
 						onClick={() => void startRecording()}
+						disabled={busy}
 						className={styles.voiceoverBarBtn}
 					>
 						<Mic size={16} />

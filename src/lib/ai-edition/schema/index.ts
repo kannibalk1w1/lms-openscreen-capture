@@ -19,6 +19,9 @@ import { z } from "zod";
 import { toAspectRatioToken } from "../../../utils/aspectRatioUtils";
 import { LAYOUT_PRESETS } from "../../layoutTypes";
 import { clampToBound } from "../../projectDefaults";
+import { recordingFlagSchema } from "../../recordingFlags";
+import { codePresentationSchema } from "../../typing/presentationSchema";
+import { typingTakeSchema } from "../../typing/schema";
 // Cycle-safe: `document/ids` only pulls `uuid`, and `timeline/timelineMap`'s
 // transitive value-imports (region-ventilation, virtual-preview) import from this
 // module TYPE-ONLY, so requiring them here never re-enters schema at runtime.
@@ -194,6 +197,8 @@ export const assetSchema = z.object({
 	// no schema-version bump (an older build simply drops the key on save).
 	transcriptionFailure: assetTranscriptionFailureSchema.nullish(),
 	cameraTrack: cameraTrackSchema,
+	// Source-time teaching flags follow every placement of this recording.
+	recordingFlags: z.array(recordingFlagSchema).max(10000).optional(),
 });
 
 // A crop is a sub-rectangle of the source video, expressed as fractions
@@ -407,13 +412,35 @@ export const blurDataSchema = z
 	})
 	.optional();
 
+const arrowPointSchema = z.object({
+	x: z.number().finite().min(0).max(1),
+	y: z.number().finite().min(0).max(1),
+});
+export const svgAssetSchema = z.object({
+	svg: z.string().max(400000),
+	width: z.number().finite().positive().max(1e6),
+	height: z.number().finite().positive().max(1e6),
+});
 export const figureDataSchema = z
 	.object({
+		linePattern: z.enum(["solid", "dashed"]).optional(),
+		headEnds: z.enum(["end", "both", "none"]).optional(),
+		headStyle: z.enum(["open", "triangle", "custom"]).optional(),
+		headSvg: svgAssetSchema.optional(),
+		headScale: z.number().finite().min(0.25).max(4).optional(),
 		arrowDirection: z
 			.enum(["up", "down", "left", "right", "up-right", "up-left", "down-right", "down-left"])
 			.default("right"),
 		color: z.string().default("#34B27B"),
 		strokeWidth: z.number().nonnegative().default(4),
+		connector: z
+			.object({
+				shape: z.enum(["straight", "curved", "elbow"]),
+				tail: arrowPointSchema,
+				head: arrowPointSchema,
+				bend: arrowPointSchema,
+			})
+			.optional(),
 	})
 	.optional();
 
@@ -464,6 +491,8 @@ export const annotationRegionSchema = endGteStart(
 		content: z.string().default(""),
 		textContent: z.string().optional(),
 		imageContent: z.string().optional(),
+		imageRotation: z.number().finite().min(-180).max(180).optional(),
+		codeData: codePresentationSchema.optional(),
 		// The box `position`, `size` and the text size are measured against. `"frame"`, the output
 		// frame: where text, images and arrows are placed, so padding and the footage's size never
 		// move them. Absent, the footage (screen rect): a privacy blur always, since it must stay on
@@ -764,6 +793,7 @@ const documentSchemaShape = z.object({
 		speedRanges: [],
 		captionRanges: [],
 	}),
+	typingTakes: z.array(typingTakeSchema).max(20).optional(),
 	annotations: z.array(annotationRegionSchema).default([]),
 	zoomRanges: z.array(zoomRegionSchema).default([]),
 	// Agent-written shader effects (docs/shader-effects.md). Optional rather than defaulted, like

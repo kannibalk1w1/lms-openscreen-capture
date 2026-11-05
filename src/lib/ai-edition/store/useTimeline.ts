@@ -504,10 +504,10 @@ export function useTimeline() {
 	);
 
 	const addAnnotation = useCallback(
-		async (durationSec = DEFAULT_NEW_REGION_SEC) => {
+		async (durationSec = DEFAULT_NEW_REGION_SEC, patch: Partial<AnnotationRegion> = {}) => {
 			if (!document) return;
 			const timeMs = Math.round(playheadSec() * 1000);
-			const draft: AnnotationRegion = {
+			const defaults: AnnotationRegion = {
 				id: createId("ann"),
 				startMs: timeMs,
 				endMs: timeMs + Math.round(durationSec * 1000),
@@ -538,11 +538,13 @@ export function useTimeline() {
 				},
 				zIndex: Math.max(0, ...document.annotations.map((a) => a.zIndex)) + 1,
 			};
+			const draft = { ...defaults, ...patch };
 			const frameAspect = resolveAspectRatioValue(
 				document,
 				getEditorSettings(document).aspectRatio,
 			);
-			const ann: AnnotationRegion = { ...draft, ...fitTextBox(draft, frameAspect) };
+			const ann: AnnotationRegion =
+				draft.type === "text" ? { ...draft, ...fitTextBox(draft, frameAspect) } : draft;
 			const created = anchorRegionsWithDerivedMs([ann], document.timeline.clips, () =>
 				createId("ann"),
 			);

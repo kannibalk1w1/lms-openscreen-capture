@@ -5,14 +5,17 @@ import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EditorDialogsProvider } from "@/contexts/EditorDialogsContext";
+import { getCaptionSettings } from "@/lib/ai-edition/captions";
 import type { AxcutAsset, AxcutClip, AxcutDocument } from "@/lib/ai-edition/schema";
 import { createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { useTranscriptionStore } from "@/lib/ai-edition/store/transcriptionStore";
 import { buildSceneDescription } from "@/native/sceneDescription";
 
 const mocks = vi.hoisted(() => ({
 	nativePlaybackSync: vi.fn(),
 	previewPlay: vi.fn(async () => undefined),
+	ensureTranscript: vi.fn(async (_assetId: string) => undefined),
 }));
 
 vi.mock("@/contexts/ShortcutsContext", async () => {
@@ -78,7 +81,7 @@ vi.mock("./v4/AddAudioLayerDialog", () => ({
 		onRecordingStop,
 	}: {
 		open: boolean;
-		onComplete: (assetId: string, durationSec: number) => void;
+		onComplete: (assetId: string, durationSec: number, createCaptions: boolean) => void;
 		onRecordingStart: () => void | Promise<void>;
 		onRecordingStop: () => void;
 	}) =>
@@ -90,14 +93,22 @@ vi.mock("./v4/AddAudioLayerDialog", () => ({
 					createElement("button", { type: "button", onClick: onRecordingStop }, "stop-recording"),
 					createElement(
 						"button",
-						{ type: "button", onClick: () => onComplete("voice", 4) },
+						{ type: "button", onClick: () => onComplete("voice", 4, false) },
 						"complete-recording",
+					),
+					createElement(
+						"button",
+						{ type: "button", onClick: () => onComplete("voice", 4, true) },
+						"complete-with-captions",
 					),
 				)
 			: null,
 }));
 
 import { NewEditorShell } from "./NewEditorShell";
+
+const originalEnsureTranscript = useTranscriptionStore.getState().ensureTranscript;
+const originalAddAudioTrack = useProjectStore.getState().addAudioTrack;
 
 function makeDocument(): AxcutDocument {
 	const document = createEmptyDocument({ projectId: "project_voiceover", title: "Voiceover" });
@@ -159,6 +170,8 @@ describe("NewEditorShell voiceover placement", () => {
 	beforeEach(() => {
 		localStorage.clear();
 		vi.clearAllMocks();
+		useTranscriptionStore.setState({ ensureTranscript: mocks.ensureTranscript });
+		useProjectStore.setState({ addAudioTrack: originalAddAudioTrack });
 		(window as unknown as { electronAPI?: unknown }).electronAPI = {
 			onAiEditionChatEvent: () => () => undefined,
 			sendAiEditionChatPrompt: () => undefined,
@@ -206,6 +219,24 @@ describe("NewEditorShell voiceover placement", () => {
 		cleanup();
 		localStorage.clear();
 		useProjectStore.getState().clear();
+		useTranscriptionStore.getState().reset();
+		useTranscriptionStore.setState({ ensureTranscript: originalEnsureTranscript });
+		useProjectStore.setState({ addAudioTrack: originalAddAudioTrack });
+	});
+
+	it("adds a source flag with the configured hotkey, ignoring repeats and text fields", async () => {
+		renderShell();
+		fireEvent.keyDown(window, { key: "F", ctrlKey: true, shiftKey: true });
+		await waitFor(() =>
+			expect(useProjectStore.getState().document?.assets[0].recordingFlags).toHaveLength(1),
+		);
+		expect(useProjectStore.getState().document?.assets[0].recordingFlags?.[0].timeMs).toBe(2000);
+		fireEvent.keyDown(window, { key: "F", ctrlKey: true, shiftKey: true, repeat: true });
+		const input = window.document.createElement("input");
+		window.document.body.append(input);
+		fireEvent.keyDown(input, { key: "F", ctrlKey: true, shiftKey: true });
+		input.remove();
+		expect(useProjectStore.getState().document?.assets[0].recordingFlags).toHaveLength(1);
 	});
 
 	it("adds a full-duration plain track across a cut and lets the cut mute its middle", async () => {
@@ -243,9 +274,72 @@ describe("NewEditorShell voiceover placement", () => {
 			durationSec: 4,
 		});
 		expect(track).not.toHaveProperty("recordingPlaybackMap");
+		expect(getCaptionSettings(updatedDocument).enabled).toBe(false);
+		expect(mocks.ensureTranscript).not.toHaveBeenCalled();
 		expect(buildSceneDescription(updatedDocument).audioTracks).toMatchObject([
 			{ startSec: 2, trimStartSec: 0, trimEndSec: 1, kind: "voiceover" },
 			{ startSec: 3, trimStartSec: 3, trimEndSec: 4, kind: "voiceover" },
 		]);
+	});
+
+	it("enables editable narration captions and joins the Whisper queue after placement", async () => {
+		renderShell();
+		fireEvent.click(screen.getByRole("button", { name: "open-voiceover" }));
+		fireEvent.click(screen.getByRole("button", { name: "complete-with-captions" }));
+		await waitFor(() => expect(mocks.ensureTranscript).toHaveBeenCalledWith("voice"));
+		const doc = useProjectStore.getState().document;
+		expect(doc?.audioTracks[0]).toMatchObject({ assetId: "voice", startMs: 2000 });
+		expect(getCaptionSettings(doc)).toMatchObject({
+			enabled: true,
+			captionLane: "voiceover",
+			language: null,
+		});
+		// Captions remain a view over the editable transcript, never a flattened copy.
+		expect(doc?.annotations).toHaveLength(0);
+	});
+
+	it("does not enable captions when the narration cannot be placed", async () => {
+		useProjectStore.setState({ addAudioTrack: vi.fn(async () => null) });
+		renderShell();
+		fireEvent.click(screen.getByRole("button", { name: "open-voiceover" }));
+		fireEvent.click(screen.getByRole("button", { name: "complete-with-captions" }));
+		await waitFor(() => expect(useProjectStore.getState().addAudioTrack).toHaveBeenCalled());
+		expect(getCaptionSettings(useProjectStore.getState().document).enabled).toBe(false);
+		expect(mocks.ensureTranscript).not.toHaveBeenCalled();
+	});
+
+	it("keeps the portrait caption safe area when enabling narration captions", async () => {
+		const doc = makeDocument();
+		doc.legacyEditor = { aspectRatio: "9:16" };
+		useProjectStore.setState({ document: doc });
+		renderShell();
+		fireEvent.click(screen.getByRole("button", { name: "open-voiceover" }));
+		fireEvent.click(screen.getByRole("button", { name: "complete-with-captions" }));
+		await waitFor(() => expect(mocks.ensureTranscript).toHaveBeenCalledWith("voice"));
+		expect(getCaptionSettings(useProjectStore.getState().document).insetY).toBe(12.5);
+	});
+
+	it("does not caption another project if it changes while placement is saving", async () => {
+		let finishPlacement: (id: string) => void = () => undefined;
+		useProjectStore.setState({
+			addAudioTrack: vi.fn(
+				() =>
+					new Promise<string>((resolve) => {
+						finishPlacement = resolve;
+					}),
+			),
+		});
+		renderShell();
+		fireEvent.click(screen.getByRole("button", { name: "open-voiceover" }));
+		fireEvent.click(screen.getByRole("button", { name: "complete-with-captions" }));
+		await waitFor(() => expect(useProjectStore.getState().addAudioTrack).toHaveBeenCalled());
+		const other = makeDocument();
+		other.project.id = "other-project";
+		await act(async () => {
+			useProjectStore.setState({ projectId: other.project.id, document: other });
+			finishPlacement("track");
+		});
+		expect(getCaptionSettings(useProjectStore.getState().document).enabled).toBe(false);
+		expect(mocks.ensureTranscript).not.toHaveBeenCalled();
 	});
 });

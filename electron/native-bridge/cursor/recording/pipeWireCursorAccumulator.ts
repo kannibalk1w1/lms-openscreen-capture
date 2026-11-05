@@ -1,4 +1,8 @@
 import type {
+	InputCaptureStatus,
+	PointerButtonEvidence,
+} from "../../../../src/native/captureEvents";
+import type {
 	CursorRecordingData,
 	CursorRecordingSample,
 	NativeCursorAsset,
@@ -27,6 +31,8 @@ export interface PipeWireCursorAssetPayload {
 }
 
 export type PipeWireHelperEvent =
+	| PointerButtonEvidence
+	| InputCaptureStatus
 	| {
 			event: "ready";
 			timestampMs: number;
@@ -80,6 +86,8 @@ export type PipeWireHelperEvent =
 	| { event: "encoder-selection"; video: string; rejected?: string[] }
 	| {
 			event: "capture-started";
+			monotonicMs?: number;
+			mediaTimeMs?: number;
 			timestampMs: number;
 			path: string;
 			width: number;

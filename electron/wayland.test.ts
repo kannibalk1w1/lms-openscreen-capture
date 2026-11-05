@@ -31,7 +31,7 @@ describe("Wayland startup configuration", () => {
 		// Capture still goes through PipeWire under Xwayland: X11 cannot see Wayland windows.
 		expect(commandLine.appendSwitch).toHaveBeenCalledWith(
 			"enable-features",
-			"WaylandWindowDrag,WebRTCPipeWireCapturer",
+			"WaylandWindowDrag,WebRTCPipeWireCapturer,GlobalShortcutsPortal",
 		);
 	});
 
@@ -48,7 +48,7 @@ describe("Wayland startup configuration", () => {
 		};
 		configureWaylandSupport(commandLine, { XDG_SESSION_TYPE: "wayland" });
 		expect(switches.get("enable-features")).toBe(
-			"WebRtcPipeWireCamera,WaylandWindowDrag,WebRTCPipeWireCapturer",
+			"WebRtcPipeWireCamera,WaylandWindowDrag,WebRTCPipeWireCapturer,GlobalShortcutsPortal",
 		);
 		expect(switches.get("disable-features")).toBe("WebRtcPipeWireCamera,Vulkan");
 	});

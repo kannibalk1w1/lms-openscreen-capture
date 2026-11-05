@@ -427,7 +427,7 @@ pub struct Compositor {
     /// mega-octets ; s'en servir comme cle de HashMap la ferait hacher a chaque
     /// frame. La longueur de la source sert de temoin de changement, comme cote
     /// macOS.
-    ann_img_cache: RefCell<std::collections::HashMap<String, (wgpu::Texture, u32, u32, usize)>>,
+    ann_img_cache: RefCell<std::collections::HashMap<String, (wgpu::Texture, u32, u32, u64)>>,
 
     // --- Segmentation du sujet webcam (cf. `pump_segmentation`) ---
     /// Masque du sujet, R8 a la resolution du modele. Ecrit par
@@ -1584,6 +1584,10 @@ impl Compositor {
         *self.cursor.borrow_mut() = None;
     }
 
+    pub fn frozen_code_source(&self,time:f64)->Option<(crate::scene::SceneClip,f64)> {
+        self.scene.borrow().as_ref().and_then(|scene|crate::code_panel::frozen_source(scene,time))
+    }
+
     pub fn scene_snapshot(&self) -> Option<Scene> {
         self.scene.borrow().clone()
     }
@@ -1820,15 +1824,7 @@ impl Compositor {
     /// wgpu du `load_image_texture` macOS, memes chemins (`decode_data_uri`
     /// partage, crate `image`). Sert aux sprites de curseur (mode 7).
     fn load_image_texture(&self, path: &str) -> Result<(wgpu::Texture, u32, u32)> {
-        let img = if let Some(bytes) = crate::frame_geometry::decode_data_uri(path) {
-            image::load_from_memory(&bytes)
-                .map_err(|e| anyhow::anyhow!("data URI image ({} octets) : {e}", bytes.len()))?
-                .to_rgba8()
-        } else {
-            image::open(path)
-                .map_err(|e| anyhow::anyhow!("sprite {path} : {e}"))?
-                .to_rgba8()
-        };
+        let img = crate::svg_image::load(path, self.render_w.max(self.render_h))?;
         let (w, h) = (img.width(), img.height());
         let pixels = img.into_raw();
         let tex = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
@@ -3009,23 +3005,26 @@ impl Compositor {
                 match a.kind.as_str() {
                     "figure" => {
                         let Some(figure) = a.figure.as_ref() else { continue };
-                        let (segments, half_stroke) = crate::regions::arrow_local_geometry(
-                            &figure.direction,
-                            figure.stroke_width,
-                            quad_px,
-                        );
-                        let cb = LayerCB {
-                            dst,
-                            quad_px,
-                            mode: 9.0,
-                            color: parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]),
-                            fx: segments[0],
-                            src_prev: segments[1],
-                            dst_prev: segments[2],
-                            mb: [1.0, half_stroke, 0.0, 0.0],
-                            ..Default::default()
-                        };
-                        ann_draws.push(AnnDraw::plain(self.make_bind(&cb, None, &dummy)));
+                        let (batches, half_stroke) = crate::regions::figure_local_geometry(figure, quad_px, rh);
+                        for segments in batches {
+                            let cb = LayerCB {
+                                dst,
+                                quad_px,
+                                mode: 9.0,
+                                color: parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]),
+                                fx: segments[0],
+                                src_prev: segments[1],
+                                dst_prev: segments[2],
+                                mb: [1.0, half_stroke, 0.0, 0.0],
+                                ..Default::default()
+                            };
+                            ann_draws.push(AnnDraw::plain(self.make_bind(&cb, None, &dummy)));
+                        }
+                    }
+                    "code-blur" => {
+                        let cb=LayerCB {dst:[0.,0.,1.,1.],quad_px:[rw,rh],mode:10.,color:[1.,1.,1.,1.],fx:[1.,(24.*rh/1080.).max(1.),0.,0.],..Default::default()};
+                        let layer=self.make_bind(&cb,Some((&self.ann_copy_view,&self.ann_copy_view,&self.ann_copy_view)),&dummy);
+                        ann_draws.push(AnnDraw::plain(layer));
                     }
                     "blur" => {
                         let Some(blur) = a.blur.as_ref() else { continue };
@@ -3075,18 +3074,19 @@ impl Compositor {
                         );
                         privacy_draws.push(AnnDraw::plain(layer));
                     }
-                    "image" => {
-                        let Some(src) = a.image_path.as_ref().filter(|s| !s.is_empty()) else {
+                    "image" | "code" => {
+                        let generated = crate::code_panel::image_source(a, g.source_t, quad_px, rh);
+                        let Some(src) = generated.as_ref().or(a.image_path.as_ref()).filter(|s| !s.is_empty()) else {
                             continue;
                         };
                         let cached = {
                             let c = self.ann_img_cache.borrow();
-                            c.get(&a.id).filter(|(_, _, _, len)| *len == src.len()).cloned()
+                            c.get(&a.id).filter(|(_, _, _, len)| *len == crate::svg_image::source_key(src, self.render_w.max(self.render_h))).cloned()
                         };
                         let Some((tex, iw, ih, _)) = cached.or_else(|| {
                             match self.load_image_texture(src) {
                                 Ok((tex, w, h)) => {
-                                    let e = (tex, w, h, src.len());
+                                    let e = (tex, w, h, crate::svg_image::source_key(src, self.render_w.max(self.render_h)));
                                     self.ann_img_cache
                                         .borrow_mut()
                                         .insert(a.id.clone(), e.clone());
@@ -3852,6 +3852,7 @@ impl Compositor {
         // le calque pose sur l'image (« over » premultiplie). L'image dessous reste intacte.
         let text_effects = with_target(ShaderEffectTarget::Text);
         let text_layer = (!text_effects.is_empty()).then(|| self.text_layer());
+        if scene_ref.as_ref().is_some_and(|s|s.annotations.iter().any(|a|a.kind=="code-blur"&&visible(a))) { self.generate_ann_mips(&mut encoder); }
         // Passe 3 : les autres annotations, par-dessus tout le reste (les flous sont passes avant
         // le curseur). Elle existe meme sans annotation : deux passes consecutives sur la MEME
         // cible avec `LoadOp::Load` ne coutent rien de plus qu'une seule sur un GPU desktop, et un

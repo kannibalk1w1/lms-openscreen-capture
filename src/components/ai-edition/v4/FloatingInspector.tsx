@@ -1,11 +1,4 @@
 import {
-	ArrowDown,
-	ArrowDownLeft,
-	ArrowDownRight,
-	ArrowLeft,
-	ArrowRight,
-	ArrowUp,
-	ArrowUpLeft,
 	ArrowUpRight,
 	AudioLines,
 	Camera,
@@ -15,7 +8,6 @@ import {
 	FileText,
 	ImageIcon,
 	Layout as LayoutIcon,
-	type LucideIcon,
 	MousePointer2,
 	Pencil,
 	Scissors,
@@ -46,11 +38,13 @@ import {
 } from "@/components/video-editor/types";
 import { useScopedT } from "@/contexts/I18nContext";
 import { setTextPlate, type TextPlate, textPlateOf } from "@/lib/ai-edition/annotations/background";
+import { type Connector, changeConnectorShape } from "@/lib/ai-edition/annotations/connectors";
 import {
 	convertAnnotationKind,
 	fitTextBox,
 	toFrameSpace,
 } from "@/lib/ai-edition/annotations/placement";
+import { importSvg, svgDataUrl } from "@/lib/ai-edition/annotations/svgAssets";
 import {
 	type AnnotationTextAnimation,
 	TEXT_ANIMATION_VALUES,
@@ -74,6 +68,8 @@ import { zoomLevelFor } from "@/lib/ai-edition/timeline/zoom-scale";
 import { clampToBound } from "@/lib/projectDefaults";
 import { checkShaderEffectCode } from "@/native/compositorViewClient";
 import { annotationFootageRect, zoomScaleLimit } from "@/native/sceneDescription";
+import { ArrowStyleControls } from "../ArrowStyleControls";
+import { CodePresentationControls } from "../CodePresentationControls";
 import { ColorField } from "../ColorField";
 import shell from "../NewEditorShell.module.css";
 import {
@@ -405,23 +401,6 @@ const CAMERA_ICONS: Record<Rotation3DPreset | "off", React.ReactNode> = {
 };
 
 type AnnotationKind = AxcutAnnotationRegion["type"];
-type ArrowDirectionKind = NonNullable<AxcutAnnotationRegion["figureData"]>["arrowDirection"];
-
-/** Les huit directions de `ArrowSvgs.tsx`, dans l'ordre d'une boussole (du haut, dans le sens
- *  des aiguilles d'une montre), chacune avec la flèche qui la montre. Aucune langue n'a de
- *  libellé pour elles, et la valeur brute (« up-right ») s'affichait telle quelle : le caractère
- *  fléché sert de nom accessible. */
-const ARROW_DIRECTIONS: Array<{ value: ArrowDirectionKind; glyph: string; Icon: LucideIcon }> = [
-	{ value: "up", glyph: "↑", Icon: ArrowUp },
-	{ value: "up-right", glyph: "↗", Icon: ArrowUpRight },
-	{ value: "right", glyph: "→", Icon: ArrowRight },
-	{ value: "down-right", glyph: "↘", Icon: ArrowDownRight },
-	{ value: "down", glyph: "↓", Icon: ArrowDown },
-	{ value: "down-left", glyph: "↙", Icon: ArrowDownLeft },
-	{ value: "left", glyph: "←", Icon: ArrowLeft },
-	{ value: "up-left", glyph: "↖", Icon: ArrowUpLeft },
-];
-
 /** Défauts du schéma, pour compléter un `blurData` absent sans écraser ce qui existe. */
 const BLUR_DEFAULTS = {
 	type: "mosaic",
@@ -1003,38 +982,56 @@ function SelectionPane({ tl, onClose }: { tl: TimelineApi; onClose: () => void }
 					    blur were unreachable even though the compositor renders all four and every
 					    label here already shipped translated. Converting keeps the span and box, so
 					    a mistake costs one more click rather than redrawing the region. */}
-					{paneStack(
-						ts("annotation.type"),
-						<ChoiceRow<AnnotationKind>
-							label={ts("annotation.type")}
-							display="both"
-							tiles
-							options={[
-								{ value: "text", label: ts("annotation.typeText"), icon: <Type size={16} /> },
-								{
-									value: "image",
-									label: ts("annotation.typeImage"),
-									icon: <ImageIcon size={16} />,
-								},
-								{
-									value: "figure",
-									label: ts("annotation.typeArrow"),
-									icon: <ArrowUpRight size={16} />,
-								},
-								{ value: "blur", label: ts("annotation.typeBlur"), icon: <EyeOff size={16} /> },
-							]}
-							value={region.type}
-							onChange={(kind) => {
-								tl.updateAnnotationLive(
-									region.id,
-									convertAnnotationKind(region, kind, {
+					{region.codeData ? (
+						<CodePresentationControls
+							region={region}
+							onChange={(patch) => tl.updateAnnotationLive(region.id, patch)}
+							onCommit={commitAnnotation}
+						/>
+					) : (
+						paneStack(
+							ts("annotation.type"),
+							<ChoiceRow<AnnotationKind>
+								label={ts("annotation.type")}
+								display="both"
+								tiles
+								options={[
+									{ value: "text", label: ts("annotation.typeText"), icon: <Type size={16} /> },
+									{
+										value: "image",
+										label: ts("annotation.typeImage"),
+										icon: <ImageIcon size={16} />,
+									},
+									{
+										value: "figure",
+										label: ts("annotation.typeArrow"),
+										icon: <ArrowUpRight size={16} />,
+									},
+									{ value: "blur", label: ts("annotation.typeBlur"), icon: <EyeOff size={16} /> },
+								]}
+								value={region.type}
+								onChange={(kind) => {
+									const converted = convertAnnotationKind(region, kind, {
 										footage: footageOf(region.id),
 										frameAspect,
-									}),
-								);
-								void tl.commitAnnotationChange();
-							}}
-						/>,
+									});
+									tl.updateAnnotationLive(
+										region.id,
+										kind === "figure"
+											? {
+													...converted,
+													...changeConnectorShape(
+														{ ...region, ...converted },
+														"straight",
+														frameAspect,
+													),
+												}
+											: converted,
+									);
+									void tl.commitAnnotationChange();
+								}}
+							/>,
+						)
 					)}
 					{region.type === "text" ? (
 						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1053,7 +1050,7 @@ function SelectionPane({ tl, onClose }: { tl: TimelineApi; onClose: () => void }
 							/>
 						</div>
 					) : null}
-					{region.type === "image" ? (
+					{region.type === "image" && !region.codeData ? (
 						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
 							{/* Read as a data URL, which is what the renderer expects: `content` holds
 							    "Separate storage for image data URL" (types.ts) and both the preview
@@ -1061,14 +1058,45 @@ function SelectionPane({ tl, onClose }: { tl: TimelineApi; onClose: () => void }
 							<label className={PANE_BUTTON} htmlFor={`ann-img-${region.id}`}>
 								{ts("annotation.uploadImage")}
 							</label>
+							{(region.content || region.imageContent || "").startsWith("data:image/svg+xml") && (
+								<SliderCell
+									label={ts("annotation.svgRotation")}
+									value={region.imageRotation ?? 0}
+									min={-180}
+									max={180}
+									step={1}
+									suffix="°"
+									onChange={(imageRotation) =>
+										tl.updateAnnotationLive(region.id, { imageRotation })
+									}
+									onCommit={() => void tl.commitAnnotationChange()}
+								/>
+							)}
 							<input
 								id={`ann-img-${region.id}`}
 								type="file"
-								accept="image/jpeg,image/png,image/gif,image/webp"
+								accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,.svg"
 								style={{ display: "none" }}
-								onChange={(e) => {
+								onChange={async (e) => {
 									const file = e.target.files?.[0];
 									if (!file) return;
+									if (file.type === "image/svg+xml" || (!file.type && /\.svg$/i.test(file.name))) {
+										const original = useProjectStore.getState().document;
+										e.target.value = "";
+										try {
+											const asset = await importSvg(file);
+											if (useProjectStore.getState().document !== original)
+												throw new Error("project changed");
+											tl.updateAnnotationLive(region.id, {
+												content: svgDataUrl(asset.svg),
+												imageRotation: 0,
+											});
+											void tl.commitAnnotationChange();
+										} catch {
+											toast.error(ts("annotation.svgError"));
+										}
+										return;
+									}
 									if (!/^image\/(jpeg|png|gif|webp)$/.test(file.type)) {
 										toast.error(ts("annotation.imageFormatsOnly"));
 										return;
@@ -1087,26 +1115,39 @@ function SelectionPane({ tl, onClose }: { tl: TimelineApi; onClose: () => void }
 					{region.type === "figure" ? (
 						<>
 							{paneStack(
-								ts("annotation.arrowDirection"),
-								<ChoiceRow<ArrowDirectionKind>
-									label={ts("annotation.arrowDirection")}
-									options={ARROW_DIRECTIONS.map(({ value, glyph, Icon }) => ({
+								ts("annotation.connectorType"),
+								<ChoiceRow<Connector["shape"]>
+									label={ts("annotation.connectorType")}
+									options={(["straight", "curved", "elbow"] as const).map((value) => ({
 										value,
-										label: glyph,
-										icon: <Icon size={16} />,
+										label: ts(`annotation.connector${value[0].toUpperCase() + value.slice(1)}`),
 									}))}
-									value={region.figureData?.arrowDirection ?? "right"}
-									onChange={(arrowDirection) => {
-										tl.updateAnnotationLive(region.id, {
-											figureData: {
-												...(region.figureData ?? { color: "#34B27B", strokeWidth: 4 }),
-												arrowDirection,
-											},
-										});
+									value={region.figureData?.connector?.shape ?? "straight"}
+									onChange={(shape) => {
+										tl.updateAnnotationLive(
+											region.id,
+											changeConnectorShape(region, shape, frameAspect),
+										);
 										void tl.commitAnnotationChange();
 									}}
 								/>,
 							)}
+							{!region.figureData?.connector && (
+								<button
+									type="button"
+									className={PANE_BUTTON}
+									onClick={() => {
+										tl.updateAnnotationLive(
+											region.id,
+											changeConnectorShape(region, "straight", frameAspect),
+										);
+										void tl.commitAnnotationChange();
+									}}
+								>
+									{ts("annotation.editConnector")}
+								</button>
+							)}
+
 							{paneRow(
 								ts("annotation.arrowColor"),
 								<ColorField
@@ -1144,6 +1185,26 @@ function SelectionPane({ tl, onClose }: { tl: TimelineApi; onClose: () => void }
 								// Le libellé i18n interpole déjà « : 11px » ; sans ça on lisait « 11px11 ».
 								showValue={false}
 							/>
+							{region.figureData?.connector && (
+								<ArrowStyleControls
+									figure={region.figureData}
+									onChange={(patch) => {
+										tl.updateAnnotationLive(region.id, {
+											figureData: { ...region.figureData!, ...patch },
+										});
+										void tl.commitAnnotationChange();
+									}}
+									onGraphic={(asset) => {
+										tl.updateAnnotationLive(region.id, {
+											type: "image",
+											content: svgDataUrl(asset.svg),
+											figureData: undefined,
+											imageRotation: 0,
+										});
+										void tl.commitAnnotationChange();
+									}}
+								/>
+							)}
 						</>
 					) : null}
 					{region.type === "blur" ? (

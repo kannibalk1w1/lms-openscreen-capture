@@ -855,6 +855,17 @@ describe("resolveSceneAssetPaths", () => {
 		expect(Object.keys(sprites).sort()).toEqual(Object.keys(DEFAULT_CURSOR_SPRITES).sort());
 	});
 
+	it("uses embedded custom sprites and hotspots in both resolved render paths", () => {
+		const dataUrl = `data:image/png;base64,${fs.readFileSync("public/cursors/default/arrow.png").toString("base64")}`;
+		const custom = { arrow: { dataUrl, hotspotX: 0.1, hotspotY: 0.2 } };
+		const sprites = resolved({ cursor: { theme: "default", custom, asArrow: ["text"] } }).cursor
+			.cursorSprites;
+		expect(sprites.arrow).toEqual({ path: dataUrl, hotspotX: 0.1, hotspotY: 0.2 });
+		expect(sprites.text).toEqual(sprites.arrow);
+		expect(sprites.arrow.sculpt).toBeUndefined();
+		expect(sprites.pointer.path).toContain("pointer.png");
+	});
+
 	it("draws the kinds the scene names with the arrow, and only those", () => {
 		const sprites = resolved({ cursor: { theme: "default", asArrow: ["text", "resize"] } }).cursor
 			.cursorSprites;

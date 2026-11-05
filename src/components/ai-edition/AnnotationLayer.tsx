@@ -11,11 +11,13 @@
 // through the footage of the frame on screen (`MaskGimbal`, `FootageQuad`), and cannot leave it
 // (see `lib/ai-edition/annotations/placement.ts`).
 
+import { Fragment } from "react";
 import { rectQuad } from "@/lib/ai-edition/annotations/footageQuad";
 import { belongsInFrame, fitTextBox, toFrameSpace } from "@/lib/ai-edition/annotations/placement";
 import type { AxcutAnnotationRegion } from "@/lib/ai-edition/schema";
 import { useFootageQuad } from "@/native/footageQuadStore";
 import { AnnotationOverlay, type PxRect } from "./AnnotationOverlay";
+import { ConnectorHandles } from "./ConnectorHandles";
 import { MaskGimbal } from "./MaskGimbal";
 
 interface AnnotationLayerProps {
@@ -82,26 +84,37 @@ export function AnnotationLayer({
 	const fitText = (region: AxcutAnnotationRegion) => fitTextBox(region, frameWidth / frameHeight);
 
 	const overlay = (annotation: AxcutAnnotationRegion) => (
-		<AnnotationOverlay
-			// La clé ne porte plus les champs de `blurData` : ils forçaient un remontage à chaque
-			// réglage du flou, pour resynchroniser un canvas de mosaïque qui n'existe plus. La
-			// taille du conteneur y reste, elle, parce qu'elle change le rect en px.
-			key={`${annotation.id}-${frameWidth}-${frameHeight}`}
-			annotation={annotation}
-			isSelected={annotation.id === selectedAnnotationId}
-			containerWidth={frameWidth}
-			containerHeight={frameHeight}
-			// Still on the footage but moving in the frame: its stored rect reads from there
-			// until its first gesture moves it into the frame.
-			box={annotation.space === "frame" ? frameBox : footage}
-			toFrame={toFrameSpace(annotation, footageInFrame)}
-			fitText={annotation.type === "text" ? fitText : undefined}
-			onChange={onChange}
-			onCommit={onCommit}
-			onClick={handleClick}
-			zIndex={annotation.zIndex}
-			isSelectedBoost={annotation.id === selectedAnnotationId}
-		/>
+		<Fragment key={annotation.id}>
+			<AnnotationOverlay
+				// La clé ne porte plus les champs de `blurData` : ils forçaient un remontage à chaque
+				// réglage du flou, pour resynchroniser un canvas de mosaïque qui n'existe plus. La
+				// taille du conteneur y reste, elle, parce qu'elle change le rect en px.
+				key={`${annotation.id}-${frameWidth}-${frameHeight}`}
+				annotation={annotation}
+				isSelected={annotation.id === selectedAnnotationId}
+				containerWidth={frameWidth}
+				containerHeight={frameHeight}
+				// Still on the footage but moving in the frame: its stored rect reads from there
+				// until its first gesture moves it into the frame.
+				box={annotation.space === "frame" ? frameBox : footage}
+				toFrame={toFrameSpace(annotation, footageInFrame)}
+				fitText={annotation.type === "text" ? fitText : undefined}
+				onChange={onChange}
+				onCommit={onCommit}
+				onClick={handleClick}
+				zIndex={annotation.zIndex}
+				isSelectedBoost={annotation.id === selectedAnnotationId}
+			/>
+			{annotation.type === "figure" && annotation.figureData?.connector && (
+				<ConnectorHandles
+					region={annotation}
+					selected={annotation.id === selectedAnnotationId}
+					onSelect={onSelectAnnotation}
+					onChange={onChange}
+					onCommit={onCommit}
+				/>
+			)}
+		</Fragment>
 	);
 	const quad =
 		liveFootage ??

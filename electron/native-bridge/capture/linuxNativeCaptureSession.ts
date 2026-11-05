@@ -1,6 +1,8 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
+import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
+import { CaptureEventJournal } from "../../recording/captureEventJournal";
 import {
 	type CursorPauseRange,
 	compactCursorTelemetryPauseRanges,
@@ -55,6 +57,8 @@ const FIRST_FRAME_TIMEOUT_MS = 10_000;
 const HELPER_OUTPUT_MAX_BYTES = 64 * 1024;
 
 export interface LinuxCaptureConfig {
+	/** Persist physical button evidence separately from visual cursor samples. */
+	captureInputEvents?: boolean;
 	outputPath: string;
 	cursorMode: "metadata" | "embedded";
 	fps: number;
@@ -80,6 +84,7 @@ export interface LinuxCaptureConfig {
 export type LinuxCaptureSourceKind = "monitor" | "window" | "virtual";
 
 export interface LinuxCaptureResult {
+	inputEvents?: { path: string; status: InputCaptureHealth["state"] };
 	path: string;
 	durationMs: number;
 	frames: number;
@@ -92,6 +97,15 @@ export interface LinuxCaptureResult {
 
 export class LinuxNativeCaptureSession {
 	private readonly cursor: PipeWireCursorAccumulator;
+	private journal: CaptureEventJournal | null = null;
+	private inputStatus: InputCaptureStatus = {
+		event: "input-capture-status",
+		state: "unknown",
+		driver: "linux-evdev",
+		scope: "global-physical-buttons-no-taps",
+	};
+	private inputWarning: string | null = null;
+	private inputInterrupted = false;
 	private readonly lines = new NdjsonLineReader();
 	private process: ChildProcessByStdio<Writable, Readable, Readable> | null = null;
 
@@ -175,6 +189,7 @@ export class LinuxNativeCaptureSession {
 		});
 		child.once("exit", (code, signal) => {
 			this.process = null;
+			if (this.capturing && !this.stopped) this.inputInterrupted = true;
 			const reason =
 				this.lastError ??
 				`the Linux capture helper exited (code=${code ?? "null"}, signal=${signal ?? "null"})`;
@@ -340,6 +355,22 @@ export class LinuxNativeCaptureSession {
 		this.cursorPauseStartedAtMs = null;
 	}
 
+	get inputCaptureHealth(): InputCaptureHealth {
+		return {
+			state:
+				this.journal && !this.journal.available
+					? "failed"
+					: this.inputInterrupted
+						? "interrupted"
+						: !this.config.captureInputEvents
+							? "disabled"
+							: this.inputStatus.state,
+			driver: this.inputStatus.driver,
+			scope: this.inputStatus.scope,
+			warning: this.inputWarning,
+		};
+	}
+
 	get isPaused() {
 		return this.paused;
 	}
@@ -471,7 +502,7 @@ export class LinuxNativeCaptureSession {
 				console.error("Failed to parse Linux capture helper output:", error, line);
 				return;
 			}
-			if (payload.event !== "cursor-sample") {
+			if (payload.event !== "cursor-sample" && payload.event !== "pointer-button") {
 				this.appendHelperOutput(`${line}\n`);
 			}
 			this.handleEvent(payload);
@@ -480,6 +511,15 @@ export class LinuxNativeCaptureSession {
 
 	private handleEvent(payload: PipeWireHelperEvent) {
 		switch (payload.event) {
+			case "input-capture-status":
+				this.inputStatus = payload;
+				this.journal?.append(payload);
+				return;
+			case "pointer-button":
+				// Native driver supplies the encoder clock and suppresses paused
+				// events. Never derive clicks from cursor samples a second time.
+				if (this.capturing && !this.stopped) this.journal?.append(payload);
+				return;
 			case "ready":
 				if (payload.cursorMode === "metadata" || payload.cursorMode === "embedded") {
 					this.negotiatedCursorMode = payload.cursorMode;
@@ -556,6 +596,23 @@ export class LinuxNativeCaptureSession {
 				this.cursor.rebase(payload.timestampMs);
 				this.cursorRecordingStartMs = payload.timestampMs;
 				this.capturing = true;
+				if (this.config.captureInputEvents && !this.journal) {
+					this.journal = new CaptureEventJournal(this.config.outputPath, (error) => {
+						this.inputWarning = "Input event journal could not be saved. Video continues.";
+						console.error("[capture-linux] input event journal failed; video continues", error);
+					});
+					this.journal.append({
+						event: "session-start",
+						helperMonotonicMs: payload.monotonicMs ?? null,
+						mediaTimeMs: payload.mediaTimeMs ?? null,
+						timestampMs: payload.timestampMs,
+						videoPath: this.config.outputPath,
+						sourceKind: this.sourceKind ?? null,
+						application: null,
+						window: null,
+					});
+					this.journal.append(this.inputStatus);
+				}
 				console.info(
 					"[capture-linux] capture started",
 					JSON.stringify({ width: payload.width, height: payload.height, fps: payload.fps }),
@@ -570,7 +627,16 @@ export class LinuxNativeCaptureSession {
 				return;
 
 			case "capture-stopped":
+				this.journal?.append({ event: "session-end", durationMs: payload.durationMs });
 				this.stopped = {
+					...(this.journal
+						? {
+								inputEvents: {
+									path: this.journal.path,
+									status: this.inputCaptureHealth.state,
+								},
+							}
+						: {}),
 					path: payload.path,
 					durationMs: payload.durationMs,
 					frames: payload.frames,
@@ -596,6 +662,14 @@ export class LinuxNativeCaptureSession {
 				return;
 
 			case "warning":
+				if (payload.code.startsWith("click-capture-")) {
+					this.inputWarning = payload.message;
+					this.journal?.append({
+						event: "input-warning",
+						code: payload.code,
+						message: payload.message,
+					});
+				}
 				console.warn(`[capture-linux] ${payload.code}: ${payload.message}`);
 				return;
 

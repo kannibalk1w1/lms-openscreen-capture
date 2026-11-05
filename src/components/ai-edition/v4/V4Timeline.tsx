@@ -3,6 +3,7 @@ import {
 	Clock,
 	Crosshair,
 	Eraser,
+	Flag,
 	Loader2,
 	Maximize2,
 	MessageSquare,
@@ -50,6 +51,7 @@ import { setUiProbeScrubbing } from "@/lib/ai-edition/perf/uiFrameProbe";
 import type { AxcutAudioTrack, AxcutClip } from "@/lib/ai-edition/schema";
 import { audioGainScalar } from "@/lib/ai-edition/store/editorSettings";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { addFlagAtPlayhead } from "@/lib/ai-edition/store/teachingFlags";
 import { useTimelineTranscriptGate } from "@/lib/ai-edition/store/transcriptionStore";
 import { useChatPromptBus } from "@/lib/ai-edition/store/useChatPromptBus";
 import { useEditorSettings } from "@/lib/ai-edition/store/useEditorSettings";
@@ -89,6 +91,7 @@ import type { VideoSource } from "../VirtualPreview";
 import styles from "./EditorShellV4.module.css";
 import { LayoutLane } from "./LayoutLane";
 import { LayoutPicker } from "./LayoutPicker";
+import { TeachingFlagLane } from "./TeachingFlagLane";
 
 // The AI option's prompt — sent straight to the chat agent via the prompt-bus.
 //
@@ -794,7 +797,7 @@ export function V4Timeline({
 	// Trims obey the same rule with an empty property set, so they always merge.
 	const annPills: LanePill[] = useMemo(
 		() =>
-			annotationTrackPills(tl.annotationRegions).map((p) => ({
+			annotationTrackPills(tl.annotationRegions.filter((region) => !region.codeData)).map((p) => ({
 				id: p.id,
 				kind: "annotation" as const,
 				start: p.start,
@@ -808,6 +811,19 @@ export function V4Timeline({
 			})),
 		[tl.annotationRegions, t],
 	);
+	const codePills: LanePill[] = annotationTrackPills(
+		tl.annotationRegions.filter((region) => region.codeData),
+	).map((p) => ({
+		id: p.id,
+		kind: "annotation",
+		start: p.start,
+		end: p.end,
+		label: `${t("code.title")} · ${p.member.content || ""}`,
+		sourceIds: p.ids,
+		layer: p.layer,
+		stackOrder: p.stackOrder,
+	}));
+	const codeRows = packRegionRows(codePills);
 	const savedAnnotationRows = useMemo(() => packRegionRows(annPills), [annPills]);
 
 	const speedRuns = coalesceRegionsForRuler(tl.speedRegions);
@@ -1895,8 +1911,10 @@ export function V4Timeline({
 		activePillDrag?.id === id ? { ...p, start: activePillDrag.start, end: activePillDrag.end } : p;
 
 	const renderPills = (pills: LanePill[], emptyLabel: string) => {
-		const annotations = pills === annPills;
-		const effectivePills = annotations ? effectiveAnnotations : pills.map((p) => liveSpan(p.id, p));
+		const annotations = pills === annPills || pills === codePills;
+		const rows = pills === codePills ? codeRows : annotationRows;
+		const effectivePills =
+			pills === annPills ? effectiveAnnotations : pills.map((p) => liveSpan(p.id, p));
 		return (
 			<>
 				{effectivePills.length === 0 ? (
@@ -1938,7 +1956,7 @@ export function V4Timeline({
 									return [
 										renderOnePill({
 											pill: p,
-											row: annotations ? (annotationRows.rowOf.get(p.id) ?? 0) : 0,
+											row: annotations ? (rows.rowOf.get(p.id) ?? 0) : 0,
 											key: `${p.id}__f${i}`,
 											segStart: c.timelineStartSec + f.localStartSec,
 											segEnd: c.timelineStartSec + f.localEndSec,
@@ -1958,7 +1976,7 @@ export function V4Timeline({
 					return [
 						renderOnePill({
 							pill: p,
-							row: annotations ? (annotationRows.rowOf.get(p.id) ?? 0) : 0,
+							row: annotations ? (rows.rowOf.get(p.id) ?? 0) : 0,
 							key: p.id,
 							segStart: p.start,
 							segEnd: p.end,
@@ -2281,6 +2299,17 @@ export function V4Timeline({
 									<Crosshair size={16} />
 								</button>
 							</Tooltip>
+							<Tooltip content={t("flags.add")} shortcut={formatBinding(shortcuts.addFlag, isMac)}>
+								<button
+									type="button"
+									className={styles.tlToolBtn}
+									aria-label={t("flags.add")}
+									disabled={!clips.length}
+									onClick={() => void addFlagAtPlayhead()}
+								>
+									<Flag size={16} />
+								</button>
+							</Tooltip>
 							<Popover open={canChangeLayout && layoutOpen} onOpenChange={setLayoutOpen}>
 								<Tooltip
 									content={t("layouts.changeHere")}
@@ -2302,6 +2331,7 @@ export function V4Timeline({
 									<LayoutChangeMenu tl={tl} onClose={() => setLayoutOpen(false)} />
 								</PopoverContent>
 							</Popover>
+
 							{/* Last, behind a divider: every button before it adds a region, this one
 							    clears them. Absent with its divider, not greyed out, when there is
 							    nothing to clear. One write in the store, so one Ctrl+Z restores every
@@ -2309,6 +2339,7 @@ export function V4Timeline({
 							{tl.hasEditRegions ? (
 								<>
 									<span className={styles.tlToolSep} aria-hidden />
+
 									<Tooltip content={t("buttons.clearTimeline")}>
 										<button
 											type="button"
@@ -2402,6 +2433,18 @@ export function V4Timeline({
 
 						{showLanes ? (
 							<>
+								<TeachingFlagLane
+									total={total}
+									onSeek={setCurrentTime}
+									shortcut={formatBinding(shortcuts.addFlag, isMac)}
+								/>
+								<div
+									className={styles.tlLane}
+									data-track-kind="code"
+									style={{ height: regionLaneHeight(codeRows.rowCount) }}
+								>
+									{renderPills(codePills, t("code.empty"))}
+								</div>
 								{/* An empty lane advertises the shortcut that fills it ("Press A to add
 								    annotation") rather than restating that it is empty — the same hint
 								    strings the pre-v4 timeline used, so the keys stay translated. The key

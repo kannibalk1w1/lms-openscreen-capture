@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom";
+import { Blob as NodeBlob } from "node:buffer";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,6 +58,15 @@ beforeEach(() => {
 	addAudioAsset.mockReset();
 	vi.mocked(toast.error).mockClear();
 	vi.stubGlobal("MediaRecorder", FakeRecorder);
+	vi.stubGlobal("Blob", NodeBlob);
+	addAudioAsset.mockResolvedValue({ id: "voice" });
+	Object.defineProperty(window, "electronAPI", {
+		configurable: true,
+		value: {
+			openAudioFilePicker: vi.fn(async () => ({ success: true, path: "/narration.wav" })),
+			saveRecordedVoiceover: vi.fn(async () => ({ success: true, path: "/narration.webm" })),
+		},
+	});
 	Object.defineProperty(navigator, "mediaDevices", {
 		configurable: true,
 		value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })) },
@@ -82,6 +92,31 @@ function renderDialog(over: Partial<Parameters<typeof AddAudioLayerDialog>[0]> =
 }
 
 describe("AddAudioLayerDialog", () => {
+	it("opts imported narration into captions by default", async () => {
+		const { props } = renderDialog();
+		expect(screen.getByRole("checkbox", { name: "audio.createCaptions" })).toBeChecked();
+		fireEvent.click(screen.getByText("audio.importFile"));
+		await vi.waitFor(() => expect(props.onComplete).toHaveBeenCalledWith("voice", 3, true));
+	});
+
+	it("can import a voiceover without changing the caption source", async () => {
+		const { props } = renderDialog();
+		fireEvent.click(screen.getByRole("checkbox", { name: "audio.createCaptions" }));
+		fireEvent.click(screen.getByText("audio.importFile"));
+		await vi.waitFor(() => expect(props.onComplete).toHaveBeenCalledWith("voice", 3, false));
+	});
+
+	it("passes the caption choice through a saved microphone take", async () => {
+		const { props } = renderDialog();
+		fireEvent.click(screen.getByText("audio.record"));
+		await vi.waitFor(() => expect(FakeRecorder.instances[0]?.started).toBe(true));
+		fireEvent.click(screen.getByText("audio.stop"));
+		await vi.waitFor(() =>
+			expect(props.onComplete).toHaveBeenCalledWith("voice", expect.any(Number), true),
+		);
+		expect(window.electronAPI.saveRecordedVoiceover).toHaveBeenCalledOnce();
+	});
+
 	it("tells the shell when a take starts, so it can capture the playhead", async () => {
 		// The shell reads the playhead HERE, not when the take ends: recording
 		// plays the video, so by the end the live playhead has advanced by the

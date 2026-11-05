@@ -22,6 +22,7 @@ import {
 	type WebcamSizePreset,
 } from "@/components/video-editor/types";
 import { normalizeCursorThemeId, readCursorAsArrow } from "@/lib/cursor/cursorThemes";
+import { type CustomCursors, readCustomCursors } from "@/lib/cursor/customCursors";
 import {
 	DEFAULT_PROJECT_APPEARANCE,
 	type FrameTheme,
@@ -130,6 +131,8 @@ export interface EditorSettingsSnapshot {
 	cursorShow: boolean;
 	cursorAutoHide: boolean;
 	cursorTheme: string;
+	cursorCustom: CustomCursors;
+	cursorClickMarkers: boolean;
 	autoFocusAll: boolean;
 }
 
@@ -145,6 +148,8 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettingsSnapshot = {
 	webcamCropPan: DEFAULT_CROP_PAN,
 	audioGainDb: 0,
 	formatFollowCursor: null,
+	cursorCustom: {},
+	cursorClickMarkers: false,
 };
 
 interface LegacyShape {
@@ -194,6 +199,8 @@ interface LegacyShape {
 	cursorShow?: boolean;
 	cursorAutoHide?: boolean;
 	cursorTheme?: string;
+	cursorCustom?: CustomCursors;
+	cursorClickMarkers?: boolean;
 	autoFocusAll?: boolean;
 }
 function isShape(value: unknown): value is LegacyShape {
@@ -337,6 +344,8 @@ export function getEditorSettings(doc: AxcutDocument | null | undefined): Editor
 		// draws for it anyway. Left raw, the id would also switch off the modelled cursor: the
 		// compositor only builds it for the default theme.
 		cursorTheme: normalizeCursorThemeId(legacy?.cursorTheme),
+		cursorCustom: readCustomCursors(legacy?.cursorCustom),
+		cursorClickMarkers: bool(legacy?.cursorClickMarkers, false),
 		autoFocusAll: bool(legacy?.autoFocusAll, DEFAULT_EDITOR_SETTINGS.autoFocusAll),
 	};
 }
@@ -369,6 +378,8 @@ export interface EditorSettingsPatch {
 	webcamBlurIntensity?: number;
 	cursor?: Partial<CursorVisualSettings> & { theme?: string; show?: boolean; autoHide?: boolean };
 	cursorAutoHide?: boolean;
+	cursorCustom?: CustomCursors;
+	cursorClickMarkers?: boolean;
 	autoFocusAll?: boolean;
 }
 

@@ -2313,6 +2313,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		if (activeScreenRecorder.state === "paused") {
 			try {
 				activeScreenRecorder.resume();
+				void window.electronAPI?.setRecordingFlagsPaused?.(false);
 				if (activeWebcamRecorder?.state === "paused") {
 					activeWebcamRecorder.resume();
 				}
@@ -2333,6 +2334,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			segmentStartedAt.current = null;
 			setElapsedSeconds(Math.floor(accumulatedDurationMs.current / 1000));
 			activeScreenRecorder.pause();
+			void window.electronAPI?.setRecordingFlagsPaused?.(true);
 			if (activeWebcamRecorder?.state === "recording") {
 				activeWebcamRecorder.pause();
 			}

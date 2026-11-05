@@ -29,7 +29,11 @@ export function configureWaylandSupport(commandLine: CommandLine, env: Env): voi
 		commandLine.appendSwitch("ozone-platform", "wayland");
 	}
 	// Enable WebRTCPipeWireCapturer for screen capture on Wayland
-	appendFeatures(commandLine, "enable-features", "WaylandWindowDrag,WebRTCPipeWireCapturer");
+	appendFeatures(
+		commandLine,
+		"enable-features",
+		"WaylandWindowDrag,WebRTCPipeWireCapturer,GlobalShortcutsPortal",
+	);
 	// Chromium's Wayland Ozone backend can't use Vulkan. When it tries, the WebRTC
 	// PipeWire capturer fails to import DMA-BUF frames into EGL (EGL_BAD_MATCH), the
 	// stream renegotiates, and screen recording yields no usable frames. Force the

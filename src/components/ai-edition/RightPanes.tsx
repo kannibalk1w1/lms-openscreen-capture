@@ -1,3 +1,4 @@
+import { CustomCursorControls } from "./CustomCursorControls";
 // Six right-rail panes matching design/openscreen-editor.html. Each control
 // reads from + writes to the project document via `useEditorSettings`, so the
 // design's UI is the canonical surface (no more "more options" link to a
@@ -3862,6 +3863,19 @@ export function CursorPane() {
 					) : null}
 				</>
 			) : null}
+			<div className={styles.sectionLabel}>{ts("cursor.customTitle")}</div>
+			<CustomCursorControls />
+			<div className={styles.paneRow}>
+				<span className={styles.label}>{ts("cursor.clickMarkers")}</span>
+				<Toggle
+					ariaLabel={ts("cursor.clickMarkers")}
+					tooltip={ts("cursor.clickMarkersTip")}
+					checked={settings.cursorClickMarkers}
+					disabled={!hasDocument || !settings.cursorShow}
+					onChange={(value) => void set({ cursorClickMarkers: value })}
+				/>
+			</div>
+			{!clickSound.hasClicks && <p className={styles.label}>{ts("cursor.clickMarkersNoData")}</p>}
 			<div className={styles.sliderGrid}>
 				{/* A slider, not named steps: "a bit bigger" is a size between two of them.
 				    `SETTING_BOUNDS` keeps both ends sane. */}

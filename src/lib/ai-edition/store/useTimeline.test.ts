@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/contexts/I18nContext";
 import { DEFAULT_TEXT_PLATE } from "../annotations/background";
+import { connectorPatch } from "../annotations/connectors";
 import { layoutRuns } from "../document/layout";
 import { type RegionKind, readSpeedRegions } from "../document/timeline";
 import type { AxcutDocument } from "../schema";
@@ -857,6 +858,34 @@ describe("useTimeline.addAnnotation", () => {
 
 	afterEach(() => {
 		vi.clearAllMocks();
+	});
+
+	it("creates a drawn vector arrow without refitting its box as text", async () => {
+		const { result } = renderTimeline();
+		const patch = connectorPatch({ x: 15, y: 22 }, { x: 72, y: 66 }, { x: 45, y: 44 }, "straight");
+		await act(async () => {
+			await result.current.addAnnotation(3, { ...patch, type: "figure", content: "" });
+		});
+		const annotation = useProjectStore.getState().document!.annotations[0];
+		expect(annotation).toMatchObject({
+			...patch,
+			type: "figure",
+			content: "",
+			startMs: 1000,
+			endMs: 4000,
+		});
+		expect(result.current.selection).toEqual({ kind: "annotation", id: annotation.id });
+	});
+	it("creates a numbered step as an editable text box on a plate", async () => {
+		const { result } = renderTimeline();
+		await act(async () => {
+			await result.current.addAnnotation(3, { content: "1. Open settings" });
+		});
+		expect(useProjectStore.getState().document!.annotations[0]).toMatchObject({
+			type: "text",
+			content: "1. Open settings",
+			style: { backgroundColor: DEFAULT_TEXT_PLATE },
+		});
 	});
 
 	it("creates a text annotation carrying the localised default text", async () => {

@@ -4,11 +4,15 @@ import { toFileUrl } from "@/components/video-editor/projectPersistence";
 import { useEditorDialogActions } from "@/contexts/EditorDialogsContext";
 import { useScopedT } from "@/contexts/I18nContext";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
+import { lastArrowStyle } from "@/lib/ai-edition/annotations/arrowStyles";
+import { nextStepNumber } from "@/lib/ai-edition/annotations/connectors";
+import { patchCaptionSettings } from "@/lib/ai-edition/captions";
 import {
 	AUDIO_ROW_EXPANSION_PX,
 	computeAudioRowCount,
 } from "@/lib/ai-edition/document/audioTracks";
 import { createId } from "@/lib/ai-edition/document/ids";
+import { resolveAspectRatioValue } from "@/lib/ai-edition/document/outputFormat";
 import {
 	documentAfterProbedDuration,
 	PLACEHOLDER_DURATION_SEC,
@@ -27,8 +31,10 @@ import type {
 	AxcutShaderEffectRange,
 } from "@/lib/ai-edition/schema";
 import { withPastedShaderEffect } from "@/lib/ai-edition/shaderEffects";
+import { getEditorSettings } from "@/lib/ai-edition/store/editorSettings";
 import { useMcpDocumentHost } from "@/lib/ai-edition/store/mcpDocumentHost";
 import { saveWithDeadline, useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { addFlagAtPlayhead } from "@/lib/ai-edition/store/teachingFlags";
 import {
 	useAssetTranscriptions,
 	useAutoTranscription,
@@ -54,7 +60,7 @@ import {
 	totalVirtualDuration,
 } from "@/lib/ai-edition/timeline/virtual-preview";
 import { firstTimelineBusyView } from "@/lib/ai-edition/transcription/status";
-import { matchesShortcut } from "@/lib/shortcuts";
+import { isTextEditingTarget, matchesShortcut } from "@/lib/shortcuts";
 import { nativeBridgeClient } from "@/native";
 import type { AiEditionProjectSummary } from "@/native/contracts";
 import { resolveVisibleClips } from "@/native/sceneDescription";
@@ -71,6 +77,7 @@ import {
 	UnsavedChangesModal,
 	type UnsavedChoice,
 } from "./Modals";
+import styles from "./NewEditorShell.module.css";
 import { Preview } from "./Preview";
 import { importPendingRecording, maybeSaveFreshRecordingAutoZooms } from "./recordingImport";
 import { AddAudioLayerDialog } from "./v4/AddAudioLayerDialog";
@@ -79,6 +86,7 @@ import { type EditorMode, EditorTopBar } from "./v4/EditorTopBar";
 import { type Facet, FloatingInspector } from "./v4/FloatingInspector";
 import { MediaStage } from "./v4/MediaStage";
 import { RecStage } from "./v4/RecStage";
+import { TypingCaptureDialog } from "./v4/TypingCaptureDialog";
 import { V4Timeline } from "./v4/V4Timeline";
 
 interface SeekTarget {
@@ -205,6 +213,8 @@ export async function runLoadedMetadataWrite(
 
 export function NewEditorShell() {
 	const te = useScopedT("editor");
+	const ts = useScopedT("settings");
+	const tTimeline = useScopedT("timeline");
 	useMcpDocumentHost();
 	const document = useProjectStore((s) => s.document);
 	const projectId = useProjectStore((s) => s.projectId);
@@ -268,6 +278,11 @@ export function NewEditorShell() {
 	const hasEffects = (document?.shaderEffectRanges?.length ?? 0) > 0;
 	const extraAudioHeightPx = Math.max(0, audioRowCount - 1) * AUDIO_ROW_EXPANSION_PX;
 	// The rendered annotation layout reports its live row count, including a drag preview.
+	const [drawingArrow, setDrawingArrow] = useState(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: project changes cancel the drawing tool.
+	useEffect(() => {
+		setDrawingArrow(false);
+	}, [projectId]);
 	const [annotationRowCount, setAnnotationRowCount] = useState(1);
 	const extraAnnotationHeightPx = (annotationRowCount - 1) * REGION_ROW_STEP_PX;
 	const extraLaneHeightPx =
@@ -1030,6 +1045,7 @@ export function NewEditorShell() {
 
 	// Voiceover recording (the one audio gesture that is not a file import). The
 	// dialog owns the mic; the shell owns the transport and the placement.
+	const [typingOpen, setTypingOpen] = useState(false);
 	const [voiceoverFlow, setVoiceoverFlow] = useState<{ maxDurationSec: number } | null>(null);
 	// The playhead as it was when RECORDING STARTED. Recording plays the video so
 	// the user can narrate what they see, which means the live playhead has moved
@@ -1075,16 +1091,36 @@ export function NewEditorShell() {
 	}, [videoElement]);
 
 	const handleVoiceoverReady = useCallback(
-		async (assetId: string, durationSec: number) => {
+		async (assetId: string, durationSec: number, createCaptions: boolean) => {
 			setVoiceoverFlow(null);
+			const projectId = useProjectStore.getState().document?.project.id;
+			if (!projectId) return;
 			const startSec = voiceoverStartSecRef.current;
-			await tl.addAudioTrack(assetId, startSec, {
+			const trackId = await tl.addAudioTrack(assetId, startSec, {
 				kind: "voiceover",
 				durationSec,
 				spanSec: durationSec,
 			});
+			// A failed placement or a project switch must not change another project's captions.
+			const current = useProjectStore.getState().document;
+			if (!trackId || !createCaptions || current?.project.id !== projectId) return;
+			const saved = await saveDocument(
+				patchCaptionSettings(
+					current,
+					{ enabled: true, captionLane: "voiceover", language: null },
+					resolveAspectRatioValue(current, getEditorSettings(current).aspectRatio),
+				),
+				{ history: true },
+			);
+			if (!saved || useProjectStore.getState().document?.project.id !== projectId) return;
+			setMode("edit");
+			setFacet("transcript");
+			setInspectorOpen(true);
+			// Join the existing local Whisper queue. Reuse an imported transcript or an
+			// in-flight background job rather than starting a second inference pass.
+			void useTranscriptionStore.getState().ensureTranscript(assetId);
 		},
-		[tl],
+		[tl, saveDocument],
 	);
 
 	const pasteRegion = useCallback(async () => {
@@ -1315,6 +1351,14 @@ export function NewEditorShell() {
 		toast.success("Region copied");
 	}, [tl]);
 
+	useEffect(
+		() =>
+			window.electronAPI?.onTeachingFlagRequested?.(() => {
+				if (!isModalOpen() && !isTextEditingTarget(window.document.activeElement))
+					void addFlagAtPlayhead();
+			}),
+		[],
+	);
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
@@ -1474,6 +1518,11 @@ export function NewEditorShell() {
 			if (matchesShortcut(e, shortcuts.addAudio, isMac)) {
 				e.preventDefault();
 				void tl.addAudio();
+				return;
+			}
+			if (matchesShortcut(e, shortcuts.addFlag, isMac)) {
+				if (!e.repeat) void addFlagAtPlayhead();
+				e.preventDefault();
 				return;
 			}
 			if (matchesShortcut(e, shortcuts.addVoiceover, isMac)) {
@@ -1685,6 +1734,73 @@ export function NewEditorShell() {
 							<div
 								style={{
 									position: "absolute",
+									left: 16,
+									top: 12,
+									zIndex: 30,
+									display: "flex",
+									gap: 8,
+									flexWrap: "wrap",
+									maxWidth: "calc(100% - 360px)",
+									background: "var(--surface-1)",
+									border: "1px solid var(--border-soft)",
+									borderRadius: 10,
+									padding: 6,
+									boxShadow: "0 2px 8px #0002",
+								}}
+							>
+								<button
+									type="button"
+									className={styles.secondaryBtn}
+									style={{ margin: 0 }}
+									disabled={!clips.length}
+									aria-pressed={drawingArrow}
+									onClick={() => {
+										setPlaying(false);
+										setDrawingArrow((v) => !v);
+									}}
+								>
+									{ts("annotation.drawArrow")}
+								</button>
+								<button
+									type="button"
+									className={styles.secondaryBtn}
+									style={{ margin: 0 }}
+									disabled={!clips.length}
+									onClick={() => {
+										setPlaying(false);
+										setDrawingArrow(false);
+										void tl.addAnnotation(newRegionDurationSec(), {
+											content: `${nextStepNumber(tl.annotationRegions)}. ${ts("annotation.stepText")}`,
+										});
+									}}
+								>
+									{ts("annotation.addStep")}
+								</button>
+								<button
+									type="button"
+									className={styles.secondaryBtn}
+									disabled={!hasProject}
+									onClick={() => {
+										setPlaying(false);
+										setTypingOpen(true);
+									}}
+								>
+									{tTimeline("typing.title")}
+								</button>
+								{drawingArrow && (
+									<button
+										type="button"
+										className={styles.secondaryBtn}
+										onClick={() => setDrawingArrow(false)}
+									>
+										{ts("annotation.cancelDrawing")}
+									</button>
+								)}
+							</div>
+
+							<div
+								style={{
+									position: "absolute",
 									inset: 0,
 									// Right padding reserves just enough room for the floating
 									// inspector (facet rail ~74px, or the full panel ~320px when
@@ -1748,6 +1864,17 @@ export function NewEditorShell() {
 										tl.updateAnnotationLive(id, { blurData })
 									}
 									onAnnotationCommit={() => void tl.commitAnnotationChange()}
+									arrowDrawing={drawingArrow}
+									onCancelArrow={() => setDrawingArrow(false)}
+									onDrawArrow={(patch) => {
+										setDrawingArrow(false);
+										void tl.addAnnotation(newRegionDurationSec(), {
+											...patch,
+											figureData: patch.figureData
+												? { ...patch.figureData, ...lastArrowStyle() }
+												: undefined,
+										});
+									}}
 									seekTarget={seekTarget}
 									onTimeChange={handleTimeChange}
 									onSeek={handleSeek}
@@ -1869,6 +1996,11 @@ export function NewEditorShell() {
 				action={unsavedPrompt?.action ?? "new"}
 				onChoose={handleConfirmUnsaved}
 			/>
+			<TypingCaptureDialog
+				key={document?.project.id ?? "none"}
+				open={typingOpen && hasProject}
+				onClose={() => setTypingOpen(false)}
+			/>
 			<ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} document={document} />
 			<AddAudioLayerDialog
 				open={voiceoverFlow !== null}
@@ -1879,9 +2011,7 @@ export function NewEditorShell() {
 					setVoiceoverRecording(false);
 					setVoiceoverFlow(null);
 				}}
-				onComplete={(assetId, durationSec) => {
-					void handleVoiceoverReady(assetId, durationSec);
-				}}
+				onComplete={handleVoiceoverReady}
 				onRecordingStart={handleVoiceoverRecordingStart}
 				onRecordingStop={handleVoiceoverRecordingStop}
 			/>

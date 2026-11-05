@@ -757,6 +757,33 @@ pub fn arrow_local_geometry(
     )
 }
 
+/// Connecteurs vectoriels : même géométrie pour les trois moteurs, courbes subdivisées
+/// en segments à bouts ronds. Les anciennes flèches gardent leur géométrie inchangée.
+pub fn figure_local_geometry(figure: &crate::scene::SceneAnnotationFigure, size: [f32; 2], output_height: f32) -> (Vec<[[f32; 4]; 3]>, f32) {
+    let Some(c) = &figure.connector else {
+        let (segments, half) = arrow_local_geometry(&figure.direction, figure.stroke_width, size);
+        return (vec![segments], half);
+    };
+    let point = |p: &crate::scene::SceneArrowPoint| [p.x.clamp(0.0, 1.0) * size[0], p.y.clamp(0.0, 1.0) * size[1]];
+    let (a, b, q) = (point(&c.tail), point(&c.head), point(&c.bend));
+    let points: Vec<[f32; 2]> = match c.shape.as_str() {
+        "curved" => (0..=32).map(|i| { let t = i as f32 / 32.0; let u = 1.0-t;
+            [u*u*a[0]+2.0*u*t*q[0]+t*t*b[0], u*u*a[1]+2.0*u*t*q[1]+t*t*b[1]] }).collect(),
+        "elbow" => vec![a, [q[0], a[1]], [q[0], b[1]], b],
+        _ => vec![a,b],
+    };
+    let stroke = figure.stroke_width.max(0.0) * output_height / 1080.0;
+    let mut segments: Vec<[f32;4]> = points.windows(2).map(|p| [p[0][0],p[0][1],p[1][0],p[1][1]]).collect();
+    if let Some(previous) = points.iter().rev().find(|p| (p[0]-b[0]).hypot(p[1]-b[1]) > 0.001) {
+        let d = [b[0]-previous[0], b[1]-previous[1]];
+        let n = d[0].hypot(d[1]); let u = [d[0]/n,d[1]/n];
+        let length = (stroke*4.0).max(10.0*output_height/1080.0).min((b[0]-a[0]).hypot(b[1]-a[1])*0.4);
+        for side in [-1.0,1.0] { segments.push([b[0],b[1],b[0]-u[0]*length-side*u[1]*length*0.5,b[1]-u[1]*length+side*u[0]*length*0.5]); }
+    }
+    let batches = segments.chunks(3).map(|chunk| [chunk[0], *chunk.get(1).unwrap_or(&chunk[0]), *chunk.get(2).unwrap_or(&chunk[0])]).collect();
+    (batches, stroke*0.5)
+}
+
 /// Focus effectif d'une région à `t` : sa position fixe, sauf en mode "auto" où elle suit la
 /// télémétrie curseur (port de `getResolvedFocus`, sans le clamp — le crop-window de
 /// `compositor.rs` clampe déjà après coup, cf. `su0.clamp(...)`, donc redondant ici).
@@ -3714,5 +3741,32 @@ mod orbit_camera_tests {
         for i in (0..240).rev() {
             assert_eq!(at(i), forward[i], "frame {i}");
         }
+    }
+}
+
+#[cfg(test)]
+mod connector_tests {
+    use super::*;
+    fn figure(shape: &str) -> crate::scene::SceneAnnotationFigure {
+        serde_json::from_value(serde_json::json!({"direction":"right","color":"#00ff00","strokeWidth":4,"connector":{"shape":shape,"tail":{"x":0.1,"y":0.2},"head":{"x":0.9,"y":0.8},"bend":{"x":0.5,"y":0.1}}})).unwrap()
+    }
+    #[test]
+    fn vector_connectors_keep_their_endpoints_and_output_relative_stroke() {
+        for shape in ["straight", "curved", "elbow"] {
+            let (batches, half) = figure_local_geometry(&figure(shape), [300.0, 100.0], 1080.0);
+            assert_eq!(half, 2.0);
+            let first = batches[0][0];
+            assert_eq!(&first[..2], &[30.0, 20.0]);
+            assert!(batches.iter().flatten().any(|s| (s[2]-270.0).abs()<0.001 && (s[3]-80.0).abs()<0.001));
+            assert!(batches.iter().flatten().flatten().all(|v| v.is_finite()));
+            if shape == "curved" { assert!(batches.len() > 8); }
+        }
+    }
+    #[test]
+    fn existing_direction_arrows_keep_the_old_geometry() {
+        let mut f = figure("straight"); f.connector = None;
+        let (old, half) = arrow_local_geometry("right", 4.0, [300.0,100.0]);
+        let (new, new_half) = figure_local_geometry(&f, [300.0,100.0],1080.0);
+        assert_eq!(new, vec![old]); assert_eq!(new_half, half);
     }
 }

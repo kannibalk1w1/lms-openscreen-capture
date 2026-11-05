@@ -4087,15 +4087,22 @@ pub fn plan_cursor(g: &FrameGeometry, input: &CursorPlanInput) -> Option<CursorP
     };
 
     // L'impact : un anneau par clic récent, centré sur son point BRUT, là où la pointe se pose.
-    let strength = (lp.cursor_bounce_scale / MODEL_CLICK_BOUNCE_REF).clamp(0.0, 2.0);
-    let impacts = if model3d && strength > 0.0 {
-        let half_px = IMPACT_EXTENT * size_px * (0.75 + 0.25 * strength);
+    let markers = input.scene.is_some_and(|s| s.cursor.click_markers);
+    let strength = if markers { 1.0 } else { (lp.cursor_bounce_scale / MODEL_CLICK_BOUNCE_REF).clamp(0.0, 2.0) };
+    // Les marqueurs ont un plan même sur une image droite, sans imposer le modèle au sprite.
+    let marker_placer = CursorPlacer::new(g, input, true);
+    let impacts = if (markers || model3d) && strength > 0.0 {
+        let half_px = if markers { (0.055 * g.screen_unit_px * g.padding_scale)
+            .max(CURSOR_BASE_SIZE_FRAC * g.screen_unit_px * lp.cursor_size_scale * g.padding_scale) }
+            else { IMPACT_EXTENT * size_px * (0.75 + 0.25 * strength) };
         input
             .track
             .clicks_with_points(input.t - IMPACT_DELAY_S - IMPACT_S, input.t - IMPACT_DELAY_S)
             .filter_map(|(tc, p)| {
                 let impact = impact_at(input.t - tc, strength)?;
-                let mut cb = cursor_impact_cb(place(Some(p), g.s_dst)?, half_px, impact, alpha)?;
+                let placement = if markers { marker_placer.place(Some(p), g.s_dst)? } else { place(Some(p), g.s_dst)? };
+                let mut cb = cursor_impact_cb(placement, half_px, impact, alpha)?;
+                if markers { cb.color = [1.0, 0.65, 0.05, alpha]; }
                 if let Some(m) = g.screen_mask {
                     let dst = m.clip(cb.dst)?;
                     reframe_warped(&mut cb, dst, [rw, rh]);
@@ -9439,6 +9446,31 @@ mod tests {
             .len()
         };
         assert_eq!((plan(true, MODEL_CLICK_BOUNCE_REF), plan(false, MODEL_CLICK_BOUNCE_REF), plan(true, 0.0)), (1, 0, 0));
+    }
+
+    #[test]
+    fn explicit_click_markers_work_with_flat_cursors_and_no_bounce() {
+        let cfg = crate::config::all().pop().expect("cfg");
+        let mut scene = model_scene();
+        scene.cursor.click_markers = true;
+        let track = crate::cursor::CursorTrack::new(vec![(0.0, 0.25, 0.35), (2.0, 0.25, 0.35)], vec![1.0], vec![]);
+        let fg = full_frame_geometry();
+        let marker = |scene: &Scene, t| {
+            plan_cursor(&fg, &CursorPlanInput {
+                render_px: [1920.0, 1080.0], u_max: 1.0, v_max: 1.0, cfg: &cfg,
+                live: LiveParams { cursor_model3d: false, cursor_bounce_scale: 0.0, ..LiveParams::default() },
+                scene: Some(scene), track: &track, t,
+            }).expect("plan").impacts
+        };
+        assert!(marker(&scene, 0.9).is_empty());
+        assert!(marker(&scene, 1.6).is_empty());
+        let rings = marker(&scene, 1.1);
+        assert_eq!(rings.len(), 1);
+        let center = [rings[0].dst[0] + rings[0].dst[2] * 0.5, rings[0].dst[1] + rings[0].dst[3] * 0.5];
+        assert!((center[0] - 0.25).abs() < 1e-5 && (center[1] - 0.35).abs() < 1e-5);
+        assert_eq!(&rings[0].color[..3], &[1.0, 0.65, 0.05]);
+        scene.cursor.click_markers = false;
+        assert!(marker(&scene, 1.1).is_empty());
     }
 
     #[test]

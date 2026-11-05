@@ -50,6 +50,9 @@ interface PreviewProps {
 	onAnnotationChange?: (id: string, patch: Partial<AxcutAnnotationRegion>) => void;
 	onAnnotationBlurDataChange?: (id: string, blurData: BlurData) => void;
 	onAnnotationCommit?: () => void;
+	arrowDrawing?: boolean;
+	onDrawArrow?: (patch: Partial<AxcutAnnotationRegion>) => void;
+	onCancelArrow?: () => void;
 	seekTarget: { timeSec: number; requestId: number; preservePlayback?: boolean } | null;
 	onTimeChange: (sec: number) => void;
 	onSeek: (sec: number) => void;
@@ -86,6 +89,9 @@ export function Preview({
 	onAnnotationChange,
 	onAnnotationBlurDataChange,
 	onAnnotationCommit,
+	arrowDrawing,
+	onDrawArrow,
+	onCancelArrow,
 	seekTarget,
 	onTimeChange,
 	onSeek,
@@ -230,6 +236,9 @@ export function Preview({
 						onAnnotationChange={onAnnotationChange}
 						onAnnotationBlurDataChange={onAnnotationBlurDataChange}
 						onAnnotationCommit={onAnnotationCommit}
+						arrowDrawing={arrowDrawing}
+						onDrawArrow={onDrawArrow}
+						onCancelArrow={onCancelArrow}
 						seekTarget={seekTarget}
 						onTimeChange={onTimeChange}
 						onSeek={onSeek}

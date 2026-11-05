@@ -34,6 +34,7 @@ mod encoder;
 mod events;
 mod ffmpeg;
 mod input;
+mod kwin_input;
 mod portal;
 mod shim;
 
@@ -204,7 +205,11 @@ impl Request {
                 label: "microphone",
                 target: audio.microphone.device_name.clone(),
                 capture_sink: false,
-                gain: audio.microphone.gain.filter(|gain| *gain > 0.0).unwrap_or(1.0),
+                gain: audio
+                    .microphone
+                    .gain
+                    .filter(|gain| *gain > 0.0)
+                    .unwrap_or(1.0),
                 bitrate: DEFAULT_AUDIO_BITRATE,
             });
         }
@@ -223,16 +228,27 @@ struct AudioSourceConfig {
 enum Message {
     Portal(Box<Result<portal::PortalStream, portal::PortalError>>),
     Stream(StreamEvent),
-    /// A left mouse-button press observed on evdev, carrying the press time in
+    /// A physical mouse-button edge observed on evdev, carrying the edge time in
     /// milliseconds so the emitted click sample is stamped when it happened
     /// rather than at the next throttled sample. See [`input`] for why this is
-    /// the only way to see a button on Wayland, and for its permission and
+    /// the evdev fallback on Wayland, and for its permission and
     /// privacy model.
-    PointerButton(u64),
+    PointerButton {
+        timestamp_ms: u64,
+        monotonic_ms: u64,
+        code: u16,
+        pressed: bool,
+        device: String,
+    },
     /// A pointer reader thread stopped on a device error (typically an unplug);
     /// the string is the OS error. Surfaced as a warning so click capture going
     /// quiet mid-recording is not silent.
     PointerDeviceLost(String),
+    InputStatus {
+        state: &'static str,
+        driver: &'static str,
+        scope: &'static str,
+    },
     /// Arm a deferred session: connect to PipeWire and start encoding.
     Record,
     Pause,
@@ -313,24 +329,33 @@ fn main() {
     let (sender, receiver) = mpsc::channel::<Message>();
     spawn_stdin_reader(sender.clone());
     spawn_portal(sender.clone(), cursor_mode);
-    // Left-button telemetry from evdev. Gated on the cursor mode FIRST: a session
-    // that paints no cursor emits no samples to tag, so opening every pointer node
-    // and blocking a thread on each would buy nothing. Warn only when the devices
-    // are unreadable — never when the operator opted out through the env var,
-    // which would recommend the permission they just declined — so a "clicks do
-    // nothing on Linux" report is answerable from the log alone rather than
-    // looking like a capture bug.
-    if cursor_mode.reports_cursor()
-        && input::spawn_readers(&sender) == input::ClickCapture::NoDevice
-    {
-        let _ = emitter.emit(&Event::Warning {
-            code: "click-capture-unavailable".to_owned(),
-            message: "no readable /dev/input pointer device — grant this user access (a udev \
-                      uaccess rule for mice, or the 'input' group) to record click telemetry; \
-                      cursor samples will otherwise all be moves"
-                .to_owned(),
-        });
-    }
+    // Explicit opt-in: do not silently change a recording's authoritative driver.
+    let kwin = std::env::var("OPENSCREEN_INPUT_DRIVER").as_deref() == Ok("kwin");
+    let capture = if std::env::var_os("OPENSCREEN_DISABLE_CLICK_CAPTURE").is_some() {
+        input::ClickCapture::Disabled
+    } else if kwin {
+        kwin_input::spawn_reader(&sender)
+    } else {
+        input::spawn_readers(&sender)
+    };
+    let input_state = match capture {
+        input::ClickCapture::Disabled => "disabled",
+        input::ClickCapture::NoDevice => "unavailable",
+        input::ClickCapture::Active => "partial",
+    };
+    let _ = emitter.emit(&Event::InputCaptureStatus {
+        state: input_state,
+        driver: if kwin {
+            kwin_input::DRIVER
+        } else {
+            "linux-evdev"
+        },
+        scope: if kwin {
+            kwin_input::SCOPE
+        } else {
+            "global-physical-buttons-no-taps"
+        },
+    });
 
     let session = RunConfig {
         tick,
@@ -556,7 +581,14 @@ fn begin_stream<W: Write>(
     prefer_dmabuf: bool,
     shared_memory_fallback: &mut Option<SharedMemoryFallback>,
 ) -> Result<(), ()> {
-    let portal::PortalStream { fd, fallback_fd, node_id, position, size, source_kind } = stream;
+    let portal::PortalStream {
+        fd,
+        fallback_fd,
+        node_id,
+        position,
+        size,
+        source_kind,
+    } = stream;
     *shared_memory_fallback = if prefer_dmabuf {
         fallback_fd.map(|fd| SharedMemoryFallback {
             fd,
@@ -581,7 +613,11 @@ fn begin_stream<W: Write>(
         Ok(started) => {
             *session = Some(started);
             *granted_kind = source_kind;
-            *portal_stream = Some(StreamInfo { node_id, position, source_kind });
+            *portal_stream = Some(StreamInfo {
+                node_id,
+                position,
+                source_kind,
+            });
             Ok(())
         }
         Err(message) => {
@@ -638,7 +674,11 @@ fn stream_error_is_fatal(
     recording_started: bool,
     stream_was_live: bool,
 ) -> bool {
-    let started = if video { recording_started } else { stream_was_live };
+    let started = if video {
+        recording_started
+    } else {
+        stream_was_live
+    };
     state == "error" && !started
 }
 
@@ -717,6 +757,7 @@ fn run<W: Write>(
     // Buffered until the format is negotiated: the encoder cannot be opened
     // before the frame size is known, and `pause` can arrive first.
     let mut paused = false;
+    let mut recording_started_monotonic = None;
     // Backdated so the very first sample is not held back by the throttle.
     // `checked_sub` because a bare `Instant - Duration` panics on underflow, and
     // this runs milliseconds after process start.
@@ -777,30 +818,70 @@ fn run<W: Write>(
         match receiver.recv_timeout(config.tick) {
             Ok(Message::Stop) => break,
 
-            // Emit a click sample straight away at the current cursor position,
-            // stamped with the press time the reader captured: immediate so it is
-            // not backdated to the next throttled sample, and one sample per press
-            // so a rapid double-click reads as two clicks rather than collapsing
-            // into one. Counted only if the press happened at or after streaming
-            // began (see `streaming_since`): a press while the picker is still up —
-            // the click on its "Share" button — is older, so it is dropped even if
-            // its message is delivered after the stream-state one.
-            Ok(Message::PointerButton(press_ms)) => {
-                if streaming_since.is_some_and(|since| press_ms >= since) {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, Some(press_ms));
+            // Button evidence is independent of cursor effects. Journal events use
+            // a monotonic start boundary; picker input cannot become lesson input.
+            Ok(Message::PointerButton {
+                timestamp_ms: press_ms,
+                monotonic_ms,
+                code,
+                pressed,
+                device,
+            }) => {
+                if !paused {
+                    let content = content_rect(&capture, size);
+                    if pressed
+                        && code == 0x110
+                        && streaming_since.is_some_and(|since| press_ms >= since)
+                    {
+                        emit_sample(
+                            emitter,
+                            &cursor,
+                            content,
+                            &mut pending_asset,
+                            Some(press_ms),
+                        );
+                    }
+                    if recording_started_monotonic.is_some_and(|start| monotonic_ms >= start) {
+                        if let Some(elapsed) = capture.as_ref().and_then(|c| c.elapsed_active()) {
+                            let position = cursor.as_ref().zip(content).map(|(state, rect)| {
+                                serde_json::json!({
+                                    "x": state.x - rect.x, "y": state.y - rect.y,
+                                    "width": rect.width, "height": rect.height,
+                                    "space": "source-pixels", "observation": "latest-frame"
+                                })
+                            });
+                            let _ = emitter.emit(&Event::PointerButton {
+                                timestamp_ms: press_ms,
+                                monotonic_ms,
+                                media_time_ms: elapsed.as_millis() as u64,
+                                code,
+                                pressed,
+                                device,
+                                position,
+                            });
+                        }
+                    }
                 }
             }
 
             // A reader lost its device (typically an unplug). Report it — if it
             // was the only pointer, clicks stop until one is (re)connected, which
             // the input watcher will pick up.
+            Ok(Message::InputStatus {
+                state,
+                driver,
+                scope,
+            }) => {
+                let _ = emitter.emit(&Event::InputCaptureStatus {
+                    state,
+                    driver,
+                    scope,
+                });
+            }
             Ok(Message::PointerDeviceLost(reason)) => {
                 let _ = emitter.emit(&Event::Warning {
                     code: "click-capture-device-lost".to_owned(),
-                    message: format!(
-                        "a pointer device stopped delivering clicks ({reason}); if it was the \
-                         only one, clicks are not captured until a device is reconnected"
-                    ),
+                    message: format!("input capture source stopped delivering clicks: {reason}"),
                 });
             }
 
@@ -1014,8 +1095,14 @@ fn run<W: Write>(
                     // Only once a frame has actually staged — a first frame that
                     // dropped leaves capture unstarted, so this waits for a real one.
                     if first && capture.started() {
+                        recording_started_monotonic = Some(events::monotonic_ms());
                         let _ = emitter.emit(&Event::CaptureStarted {
                             timestamp_ms: timestamp_ms(),
+                            monotonic_ms: recording_started_monotonic.unwrap(),
+                            media_time_ms: capture
+                                .elapsed_active()
+                                .map(|d| d.as_millis() as u64)
+                                .unwrap_or(0),
                             path: config
                                 .output_path
                                 .as_ref()
@@ -1151,9 +1238,7 @@ fn run<W: Write>(
                         height: format.height,
                         position_x: stream.position.map(|(x, _)| x),
                         position_y: stream.position.map(|(_, y)| y),
-                        source_kind: stream
-                            .source_kind
-                            .map(|kind| kind.as_str().to_owned()),
+                        source_kind: stream.source_kind.map(|kind| kind.as_str().to_owned()),
                     });
                 }
 
@@ -1320,7 +1405,9 @@ fn run<W: Write>(
                     }
                     let _ = emitter.emit(&Event::Warning {
                         code: "stream-error".to_owned(),
-                        message: format!("PipeWire stream reported an error in state {state}: {error}"),
+                        message: format!(
+                            "PipeWire stream reported an error in state {state}: {error}"
+                        ),
                     });
                 }
                 if state == "unconnected" && session.is_some() {
@@ -1404,14 +1491,26 @@ fn run<W: Write>(
                 // A new sprite ships immediately; positions respect the sample
                 // interval so a 120fps compositor cannot flood stdout.
                 if asset_is_new || last_emit.elapsed() >= config.sample_interval {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, None);
+                    emit_sample(
+                        emitter,
+                        &cursor,
+                        content_rect(&capture, size),
+                        &mut pending_asset,
+                        None,
+                    );
                     last_emit = Instant::now();
                 }
             }
 
             Err(RecvTimeoutError::Timeout) => {
                 if cursor.is_some() && last_emit.elapsed() >= config.sample_interval {
-                    emit_sample(emitter, &cursor, content_rect(&capture, size), &mut pending_asset, None);
+                    emit_sample(
+                        emitter,
+                        &cursor,
+                        content_rect(&capture, size),
+                        &mut pending_asset,
+                        None,
+                    );
                     last_emit = Instant::now();
                 }
                 // No advance here: a timeout means a tick has passed, so the
@@ -1482,7 +1581,9 @@ fn finish_capture<W: Write>(
                         "the recorded video timeline is {} ms but the recording ran {} ms of \
                          wall-clock time (off by {} ms); the screen track may be out of sync \
                          with audio, webcam and the cursor overlay. See issue #511.",
-                        summary.duration_ms, summary.wall_clock_ms, skew.abs()
+                        summary.duration_ms,
+                        summary.wall_clock_ms,
+                        skew.abs()
                     ),
                 });
             }
@@ -1521,7 +1622,12 @@ fn heartbeat_due(last_advance: Instant, now: Instant, tick: Duration) -> bool {
 fn content_rect(capture: &Option<Capture>, size: Option<(i32, i32)>) -> Option<shim::CropRect> {
     match capture {
         Some(capture) if capture.started() => Some(capture.content_rect()),
-        _ => size.map(|(width, height)| shim::CropRect { x: 0, y: 0, width, height }),
+        _ => size.map(|(width, height)| shim::CropRect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }),
     }
 }
 
@@ -1596,7 +1702,6 @@ fn json_map<const N: usize>(
         .collect()
 }
 
-
 /// Resolves the microphone the user picked in the app to a PipeWire `node.name`.
 ///
 /// WHY A MATCH AND NOT A LOOKUP. The picker lists Chromium `MediaDeviceInfo`,
@@ -1620,7 +1725,10 @@ fn resolve_microphone_node(label: &str, sources: &[shim::AudioSourceInfo]) -> Op
         return Some(exact.name.clone());
     }
     let folded = wanted.to_lowercase();
-    if let Some(exact) = sources.iter().find(|s| s.description.to_lowercase() == folded) {
+    if let Some(exact) = sources
+        .iter()
+        .find(|s| s.description.to_lowercase() == folded)
+    {
         return Some(exact.name.clone());
     }
     // Chromium decorates labels ("Digital Microphone (Family 17h/19h ...)"),
@@ -1648,7 +1756,11 @@ mod cursor_sample_tests {
         let mut emitter = Emitter::new(&mut buffer, false);
         emit_sample(
             &mut emitter,
-            &Some(CursorState { x: cursor.0, y: cursor.1, asset_id: None }),
+            &Some(CursorState {
+                x: cursor.0,
+                y: cursor.1,
+                asset_id: None,
+            }),
             content,
             &mut None,
             None,
@@ -1663,7 +1775,12 @@ mod cursor_sample_tests {
     fn a_full_screen_capture_reports_stream_coordinates() {
         let value = sample_json(
             (960, 540),
-            Some(shim::CropRect { x: 0, y: 0, width: 1920, height: 1080 }),
+            Some(shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+            }),
         );
         assert_eq!(value["x"], 960);
         assert_eq!(value["y"], 540);
@@ -1685,11 +1802,22 @@ mod cursor_sample_tests {
         // one quarter into the window.
         let value = sample_json(
             (260, 170),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
-        assert_eq!(value["x"], 160, "the crop origin has to come off the position");
+        assert_eq!(
+            value["x"], 160,
+            "the crop origin has to come off the position"
+        );
         assert_eq!(value["y"], 120);
-        assert_eq!(value["width"], 640, "the consumer normalises against what it is told");
+        assert_eq!(
+            value["width"], 640,
+            "the consumer normalises against what it is told"
+        );
         assert_eq!(value["height"], 480);
         assert_eq!(value["visible"], true);
     }
@@ -1702,7 +1830,12 @@ mod cursor_sample_tests {
     fn a_pointer_outside_the_window_is_reported_invisible() {
         let outside = sample_json(
             (1500, 900),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
         assert_eq!(outside["visible"], false);
 
@@ -1710,7 +1843,12 @@ mod cursor_sample_tests {
         // past the far edge.
         let before = sample_json(
             (10, 10),
-            Some(shim::CropRect { x: 100, y: 50, width: 640, height: 480 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 640,
+                height: 480,
+            }),
         );
         assert_eq!(before["visible"], false);
     }
@@ -1724,12 +1862,20 @@ mod cursor_sample_tests {
         let mut emitter = Emitter::new(&mut buffer, false);
         emit_sample(
             &mut emitter,
-            &Some(CursorState { x: 10, y: 10, asset_id: None }),
+            &Some(CursorState {
+                x: 10,
+                y: 10,
+                asset_id: None,
+            }),
             None,
             &mut None,
             None,
         );
-        assert!(buffer.is_empty(), "emitted {}", String::from_utf8_lossy(&buffer));
+        assert!(
+            buffer.is_empty(),
+            "emitted {}",
+            String::from_utf8_lossy(&buffer)
+        );
     }
 
     /// #936: messages arriving faster than the tick must not hold the heartbeat
@@ -1750,8 +1896,15 @@ mod cursor_sample_tests {
             }
         }
         // Every 21 ms at worst (three 7 ms passes): about 47 a second, never zero.
-        assert!(advances >= 1000 / 21, "{advances} advances in a second of cursor traffic");
-        assert!(!heartbeat_due(start, start + Duration::from_millis(15), tick));
+        assert!(
+            advances >= 1000 / 21,
+            "{advances} advances in a second of cursor traffic"
+        );
+        assert!(!heartbeat_due(
+            start,
+            start + Duration::from_millis(15),
+            tick
+        ));
     }
 
     /// A cursor-only session opens no encoder, so it falls back to the whole
@@ -1762,7 +1915,12 @@ mod cursor_sample_tests {
         // negotiated stream, or nothing when the format is still unknown.
         assert_eq!(
             content_rect(&None, Some((1920, 1080))),
-            Some(shim::CropRect { x: 0, y: 0, width: 1920, height: 1080 })
+            Some(shim::CropRect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080
+            })
         );
         assert_eq!(content_rect(&None, None), None);
 
@@ -1791,14 +1949,24 @@ mod cursor_sample_tests {
                 height: 1080,
                 video_format: shim::constants().video_format_bgrx,
                 pts_ns: -1,
-                crop: shim::CropRect { x: 100, y: 50, width: 320, height: 240 },
+                crop: shim::CropRect {
+                    x: 100,
+                    y: 50,
+                    width: 320,
+                    height: 240,
+                },
                 has_crop: true,
                 dmabuf: None,
             })
             .expect("stage");
         assert_eq!(
             content_rect(&Some(capture), Some((1920, 1080))),
-            Some(shim::CropRect { x: 100, y: 50, width: 320, height: 240 }),
+            Some(shim::CropRect {
+                x: 100,
+                y: 50,
+                width: 320,
+                height: 240
+            }),
             "a started encoder reports the window it read, not the monitor stream"
         );
         let _ = std::fs::remove_file(&output);
@@ -1833,7 +2001,10 @@ mod microphone_resolution_tests {
             "Family 17h/19h HD Audio Controller Digital Microphone",
             &sources(),
         );
-        assert_eq!(node.as_deref(), Some("alsa_input.pci-0000_03_00.6.HiFi__hw_acp6x__source"));
+        assert_eq!(
+            node.as_deref(),
+            Some("alsa_input.pci-0000_03_00.6.HiFi__hw_acp6x__source")
+        );
     }
 
     #[test]
@@ -1848,7 +2019,10 @@ mod microphone_resolution_tests {
     #[test]
     fn a_node_name_passes_straight_through() {
         let name = "alsa_input.pci-0000_03_00.6.HiFi__hw_Generic_1__source";
-        assert_eq!(resolve_microphone_node(name, &sources()).as_deref(), Some(name));
+        assert_eq!(
+            resolve_microphone_node(name, &sources()).as_deref(),
+            Some(name)
+        );
     }
 
     #[test]
@@ -1874,9 +2048,7 @@ mod microphone_resolution_tests {
 
 #[cfg(test)]
 mod capture_fallback_tests {
-    use super::{
-        holds_for_crop, should_retry_shared_memory, stream_error_is_fatal, MAX_CROP_WAIT,
-    };
+    use super::{holds_for_crop, should_retry_shared_memory, stream_error_is_fatal, MAX_CROP_WAIT};
     use std::time::Duration;
 
     #[test]

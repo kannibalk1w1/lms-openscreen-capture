@@ -301,6 +301,7 @@ unsafe fn swap_clip_pooled(
 /// Lit deux sources en lockstep et compose la frame courante dans le RT du compositeur.
 /// Partagé avec la GUI standalone (`app.rs`).
 pub struct Player {
+    code_background: std::cell::RefCell<crate::code_panel::FrozenBackground>,
     sdec: Decoder,
     wdec: Decoder,
     gpu: Gpu,
@@ -319,9 +320,16 @@ pub struct Player {
 }
 
 impl Player {
+    unsafe fn compose_frame(&self, comp:&Compositor, sf:*mut crate::ffi::AVFrame, wf:*mut crate::ffi::AVFrame, frame:f32, cfg:&Cfg)->Result<()> {
+        let request=comp.frozen_code_source(self.composed_time_sec.get());
+        let frozen=self.code_background.borrow_mut().frames_for_source(request,&self.gpu)?;
+        if let Some((screen,webcam,time))=frozen {comp.set_cursor_time(Some(time as f32));comp.compose_frame(screen,webcam,frame,cfg)}else{comp.compose_frame(sf,wf,frame,cfg)}
+    }
+
     pub unsafe fn open(screen: &str, webcam: &str, gpu: &Gpu) -> Result<Player> {
         let (wdec, webcam_decoder_is_real) = open_webcam_or_stand_in(screen, webcam, gpu)?;
         Ok(Player {
+            code_background: std::cell::RefCell::new(Default::default()),
             sdec: Decoder::open(screen, gpu)?,
             wdec,
             gpu: Gpu {
@@ -609,7 +617,7 @@ impl Player {
         } else {
             self.sync_time(comp);
         }
-        comp.compose_frame(sf, wf, self.idx as f32, cfg)?;
+        self.compose_frame(comp, sf, wf, self.idx as f32, cfg)?;
         self.idx = self.idx.wrapping_add(1);
         Ok(true)
     }
@@ -718,7 +726,7 @@ impl Player {
         }
         self.sync_time_at(comp, clock_sec);
         let f = self.idx.saturating_sub(1);
-        comp.compose_frame(sf, wf, f as f32, cfg)?;
+        self.compose_frame(comp, sf, wf, f as f32, cfg)?;
         Ok(true)
     }
 
@@ -749,7 +757,7 @@ impl Player {
         // "idx" ne sert plus qu'au fallback fixture (jamais lu si une scène est posée) — dérivé
         // du temps réel pour rester cohérent si jamais consulté.
         self.idx = (target_sec * self.sdec.fps()).round().max(0.0) as u32;
-        comp.compose_frame(sf, wf, self.idx as f32, cfg)?;
+        self.compose_frame(comp, sf, wf, self.idx as f32, cfg)?;
         Ok(true)
     }
 }

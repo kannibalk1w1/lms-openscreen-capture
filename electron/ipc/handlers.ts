@@ -12,6 +12,7 @@ import {
 	clipboard,
 	desktopCapturer,
 	dialog,
+	globalShortcut,
 	ipcMain,
 	safeStorage,
 	screen,
@@ -146,6 +147,7 @@ import {
 	terminateNativeWindowsCapture,
 	waitForNativeWindowsCaptureStop,
 } from "../recording/nativeWindowsCaptureStop";
+import { RecordingFlags } from "../recording/recordingFlags";
 import { removeEmptyCaptureOutput } from "../recording/removeEmptyCaptureOutput";
 import { patchWebmDurationOnDisk } from "../recording/webm-duration";
 import { reindexRecordingOnDisk } from "../recording/webm-seek-index";
@@ -161,6 +163,7 @@ import {
 	shouldPersistSelectedSource,
 } from "../recording-source-settings";
 import { getSttManager } from "../stt";
+import { usesWaylandBackend } from "../wayland";
 import { createRunnerWindow } from "../windows";
 import {
 	assertWindowsUpdateIdle,
@@ -175,6 +178,14 @@ import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./reco
 import { type SelectSourceContext, selectSourceWithOwnership } from "./selectSourceOwnership";
 
 const PROJECT_FILE_EXTENSION = "openscreen";
+const recordingFlags = new RecordingFlags({
+	register: (key, callback) => globalShortcut.register(key, callback),
+	unregister: (key) => globalShortcut.unregister(key),
+	requiresApproval: () => usesWaylandBackend(process.platform, app.commandLine, process.env),
+	onIdleTrigger: () =>
+		BrowserWindow.getFocusedWindow()?.webContents.send("teaching-flags:requested"),
+});
+
 export const SHORTCUTS_FILE = path.join(app.getPath("userData"), "shortcuts.json");
 const RECORDING_FILE_PREFIX = "recording-";
 const RECORDING_SESSION_SUFFIX = ".session.json";
@@ -1407,6 +1418,14 @@ async function registerRecordingMediaLinks(
 	},
 ) {
 	try {
+		await recordingFlags.persist(screenVideoPath);
+	} catch (error) {
+		console.error("[recording-flags] could not save flags", error);
+		for (const window of BrowserWindow.getAllWindows()) {
+			if (!window.isDestroyed()) window.webContents.send("recording-flags:save-error");
+		}
+	}
+	try {
 		const cursorTelemetryPath = `${screenVideoPath}.cursor.json`;
 		const hasCursorTelemetry = await fs
 			.access(cursorTelemetryPath, fsConstants.F_OK)
@@ -1998,9 +2017,27 @@ export function registerIpcHandlers(
 	 */
 	const setAppRecording = (recording: boolean, sourceName: string, preparing = false) => {
 		appRecording = recording;
+		if (recording && !preparing) recordingFlags.start();
+		if (!recording) recordingFlags.stop();
 		if (!preparing) mcpAppRecorder.recordingChanged(recording);
 		onRecordingStateChange?.(recording, sourceName, preparing);
 	};
+	void fs
+		.readFile(SHORTCUTS_FILE, "utf8")
+		.then((data) => {
+			recordingFlags.configure(JSON.parse(data)?.addFlag);
+		})
+		.catch(() => {
+			/* Missing or invalid settings keep the default flag shortcut. */
+		});
+	ipcMain.handle("recording-flags:status", () => recordingFlags.status());
+	ipcMain.handle("recording-flags:add", () => ({
+		success: recordingFlags.add() !== null,
+		...recordingFlags.status(),
+	}));
+	ipcMain.handle("recording-flags:paused", (_, paused: boolean) => {
+		if (typeof paused === "boolean") recordingFlags.pause(paused);
+	});
 	const appSettings = new AppSettingsStore(app.getPath("userData"));
 	const broadcastSelectedSource = (source: SelectedSource | null) => {
 		for (const window of BrowserWindow.getAllWindows()) {
@@ -2610,6 +2647,11 @@ export function registerIpcHandlers(
 			: { success: true, available: false, reason: "missing-helper" };
 	});
 
+	ipcMain.handle(
+		"get-input-capture-health",
+		() => linuxNativeCaptureSession?.inputCaptureHealth ?? null,
+	);
+
 	ipcMain.handle("is-native-linux-capture-available", async () => {
 		if (process.platform !== "linux") {
 			return { success: true, available: false, reason: "unsupported-platform" };
@@ -2657,6 +2699,7 @@ export function registerIpcHandlers(
 				await fs.mkdir(RECORDINGS_DIR, { recursive: true });
 
 				const session = new LinuxNativeCaptureSession({
+					captureInputEvents: true,
 					outputPath,
 					cursorMode: portalCursorMode(cursorCaptureMode),
 					fps: request.video.fps,
@@ -2743,6 +2786,7 @@ export function registerIpcHandlers(
 				const session =
 					prepared ??
 					new LinuxNativeCaptureSession({
+						captureInputEvents: true,
 						outputPath,
 						cursorMode: portalCursorMode(cursorCaptureMode),
 						fps: request.video.fps,
@@ -2814,6 +2858,7 @@ export function registerIpcHandlers(
 			return { success: false, error: "Native Linux capture is not running." };
 		}
 		linuxNativeCaptureSession.pause();
+		recordingFlags.pause(true);
 		return { success: true };
 	});
 
@@ -2822,10 +2867,12 @@ export function registerIpcHandlers(
 			return { success: false, error: "Native Linux capture is not running." };
 		}
 		linuxNativeCaptureSession.resume();
+		recordingFlags.pause(false);
 		return { success: true };
 	});
 
 	ipcMain.handle("stop-native-linux-recording", async (_, discard?: boolean) => {
+		recordingFlags.stop(Boolean(discard));
 		const session = linuxNativeCaptureSession;
 		const recordingId = linuxNativeCaptureRecordingId ?? Date.now();
 		const cursorCaptureMode = linuxNativeCaptureCursorMode;
@@ -2841,6 +2888,7 @@ export function registerIpcHandlers(
 				await Promise.all([
 					fs.rm(discarded, { force: true }),
 					fs.rm(`${discarded}.cursor.json`, { force: true }),
+					fs.rm(`${discarded}.events.ndjson`, { force: true }),
 				]);
 				return { success: true, discarded: true };
 			}
@@ -3425,6 +3473,7 @@ export function registerIpcHandlers(
 		try {
 			proc.stdin.write("pause\n");
 			nativeMacIsPaused = true;
+			recordingFlags.pause(true);
 			nativeMacPauseStartedAtMs = Date.now();
 			return { success: true };
 		} catch (error) {
@@ -3452,6 +3501,7 @@ export function registerIpcHandlers(
 			proc.stdin.write("resume\n");
 			completeNativeMacCursorPauseRange();
 			nativeMacIsPaused = false;
+			recordingFlags.pause(false);
 			return { success: true };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -3473,6 +3523,7 @@ export function registerIpcHandlers(
 		try {
 			proc.stdin.write("pause\n");
 			nativeWindowsIsPaused = true;
+			recordingFlags.pause(true);
 			nativeWindowsPauseStartedAtMs = Date.now();
 			return { success: true };
 		} catch (error) {
@@ -3496,6 +3547,7 @@ export function registerIpcHandlers(
 			proc.stdin.write("resume\n");
 			completeNativeWindowsCursorPauseRange();
 			nativeWindowsIsPaused = false;
+			recordingFlags.pause(false);
 			return { success: true };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -3503,6 +3555,7 @@ export function registerIpcHandlers(
 	});
 
 	ipcMain.handle("stop-native-windows-recording", async (_, discard?: boolean) => {
+		recordingFlags.stop(Boolean(discard));
 		const proc = nativeWindowsCaptureProcess;
 		const preferredPath = nativeWindowsCaptureTargetPath;
 		const preferredWebcamPath = nativeWindowsCaptureWebcamTargetPath;
@@ -3700,6 +3753,7 @@ export function registerIpcHandlers(
 	});
 
 	ipcMain.handle("stop-native-mac-recording", async (_, discard?: boolean) => {
+		recordingFlags.stop(Boolean(discard));
 		if (process.platform !== "darwin") {
 			return { success: false, error: "Native macOS capture requires macOS." };
 		}
@@ -4182,7 +4236,10 @@ export function registerIpcHandlers(
 				// Claim the take synchronously, before cursor setup yields to an updater.
 				setAppRecording(recording, source.name, true);
 				if (reserveOnly) return { success: true };
+				// The browser encoder is already running; cursor setup must not delay its flag clock.
+				recordingFlags.start();
 			}
+			if (!recording) recordingFlags.stop();
 			const normalizedCursorCaptureMode =
 				normalizeCursorCaptureMode(cursorCaptureMode) ?? "editable-overlay";
 			if (recording && normalizedCursorCaptureMode === "editable-overlay") {
@@ -5051,6 +5108,7 @@ export function registerIpcHandlers(
 	ipcMain.handle("save-shortcuts", async (_, shortcuts: unknown) => {
 		try {
 			await fs.writeFile(SHORTCUTS_FILE, JSON.stringify(shortcuts, null, 2), "utf-8");
+			recordingFlags.configure((shortcuts as { addFlag?: unknown } | null)?.addFlag);
 			return { success: true };
 		} catch (error) {
 			console.error("Failed to save shortcuts:", error);

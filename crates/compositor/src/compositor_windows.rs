@@ -9,7 +9,7 @@ use crate::config::Cfg;
 pub use crate::frame_geometry::{live_params_from_scene, webcam_shape_code, LayerCB,
     LiveParams, FIXTURE_FRAMES, HALF_H, HALF_W, OUT_H, OUT_W};
 use crate::frame_geometry::{
-    cover_crop_uv, cover_uv_rect, decode_data_uri, ease_in_out_cubic, lerp,
+    cover_crop_uv, cover_uv_rect, ease_in_out_cubic, lerp,
     lerp4, parse_hex, preset_placements, remap_box, screen_source_rect, timeline, CursorPlacement,
     FrameParams, Placement, ShadowCaster, SpriteShape, CURSOR_BASE_SIZE_FRAC, FPS,
     SCREEN_SHADOW_SPREAD_FRAC, SHADOW_TUNING_REF_PX, WEBCAM_SHADOW_OFFSET_FRAC,
@@ -217,7 +217,7 @@ pub struct Compositor {
     /// Cache des textures d'annotation image, indexé sur l'ID d'annotation (SRV, w, h, longueur
     /// de la source). Séparé de `img_cache` : les wallpapers sont des chemins disque, ces images
     /// des data URL de plusieurs Mo qu'on ne veut pas utiliser comme clés de hachage.
-    ann_img_cache: RefCell<HashMap<String, (ID3D11ShaderResourceView, u32, u32, usize)>>,
+    ann_img_cache: RefCell<HashMap<String, (ID3D11ShaderResourceView, u32, u32, u64)>>,
     /// Cache des textures wallpaper image (clé = chemin absolu) : décodé et uploadé une fois,
     /// puis réutilisé par frame. (SRV, largeur, hauteur, tick d'usage).
     ///
@@ -1687,15 +1687,7 @@ impl Compositor {
         // Les annotations image stockent une data URL (cf. `types.ts` : « Separate storage for
         // image data URL »), pas un chemin : on décode alors depuis la mémoire. Les wallpapers
         // continuent de passer par le disque.
-        let img = if let Some(bytes) = decode_data_uri(path) {
-            image::load_from_memory(&bytes)
-                .map_err(|e| anyhow::anyhow!("data URI image ({} octets): {}", bytes.len(), e))?
-                .to_rgba8()
-        } else {
-            image::open(path)
-                .map_err(|e| anyhow::anyhow!("wallpaper {}: {}", path, e))?
-                .to_rgba8()
-        };
+        let img = crate::svg_image::load(path, self.rw().max(self.rh()) as u32)?;
         let (w, h) = (img.width(), img.height());
         let pixels = img.into_raw();
         let td = D3D11_TEXTURE2D_DESC {
@@ -2123,6 +2115,10 @@ impl Compositor {
 
     /// Copie de la scène courante (si présente) — utilisé par l'export multiclip pour lire les
     /// réglages curseur (thème/lissage/show) sans dupliquer le contrat de scène côté pipeline.
+    pub fn frozen_code_source(&self,time:f64)->Option<(crate::scene::SceneClip,f64)> {
+        self.scene.borrow().as_ref().and_then(|scene|crate::code_panel::frozen_source(scene,time))
+    }
+
     pub fn scene_snapshot(&self) -> Option<Scene> {
         self.scene.borrow().clone()
     }
@@ -2991,7 +2987,7 @@ impl Compositor {
         let needs_copy = scene
             .annotations
             .iter()
-            .any(|a| visible(a) && a.kind == "blur" && a.blur.is_some());
+            .any(|a| visible(a) && (a.kind == "blur" && a.blur.is_some() || a.kind == "code-blur"));
         if needs_copy {
             // `CopySubresourceRegion` et non `CopyResource` : les deux textures n'ont pas le même
             // nombre de niveaux, on ne remplit que le mip 0 puis on laisse le GPU dériver le reste.
@@ -3021,24 +3017,23 @@ impl Compositor {
             match annotation.kind.as_str() {
                 "figure" => {
                     let Some(figure) = annotation.figure.as_ref() else { continue };
-                    let (segments, half_stroke) = crate::regions::arrow_local_geometry(
-                        &figure.direction,
-                        figure.stroke_width,
-                        quad_px,
-                    );
-                    let rgba = parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]);
-                    self.draw_solid(&LayerCB {
-                        dst,
-                        quad_px,
-                        mode: 9.0,
-                        color: rgba,
-                        fx: segments[0],
-                        src_prev: segments[1],
-                        dst_prev: segments[2],
-                        mb: [1.0, half_stroke, 0.0, 0.0],
-                        ..Default::default()
-                    });
+                    let (batches, half_stroke) = crate::regions::figure_local_geometry(figure, quad_px, self.rh());
+                    for segments in batches {
+                        let rgba = parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]);
+                        self.draw_solid(&LayerCB {
+                            dst,
+                            quad_px,
+                            mode: 9.0,
+                            color: rgba,
+                            fx: segments[0],
+                            src_prev: segments[1],
+                            dst_prev: segments[2],
+                            mb: [1.0, half_stroke, 0.0, 0.0],
+                            ..Default::default()
+                        });
+                    }
                 }
+                "code-blur" => { self.ctx.PSSetShaderResources(2,Some(&[Some(self.ann_copy_srv.clone())])); self.draw_solid(&LayerCB{dst:[0.,0.,1.,1.],quad_px:[self.rw(),self.rh()],mode:10.,color:[1.,1.,1.,1.],fx:[1.,(24.*self.rh()/1080.).max(1.),0.,0.],..Default::default()}); }
                 "blur" => {
                     let Some(blur) = annotation.blur.as_ref() else { continue };
                     let Some(mask) = g.privacy_mask(annotation, [self.rw(), self.rh()]) else {
@@ -3085,8 +3080,9 @@ impl Compositor {
                         ..Default::default()
                     });
                 }
-                "image" => {
-                    let Some(src) = annotation.image_path.as_ref() else { continue };
+                "image" | "code" => {
+                        let generated = crate::code_panel::image_source(annotation, t, quad_px, self.rh());
+                    let Some(src) = generated.as_ref().or(annotation.image_path.as_ref()) else { continue };
                     if src.is_empty() {
                         continue;
                     }
@@ -3098,12 +3094,12 @@ impl Compositor {
                     let key = annotation.id.clone();
                     let cached = {
                         let cache = self.ann_img_cache.borrow();
-                        cache.get(&key).filter(|(_, _, _, len)| *len == src.len()).cloned()
+                        cache.get(&key).filter(|(_, _, _, len)| *len == crate::svg_image::source_key(src, self.rw().max(self.rh()) as u32)).cloned()
                     };
                     let Some((srv, iw, ih, _)) = cached.or_else(|| {
                         match self.load_image_srv(src) {
                             Ok((srv, w, h)) => {
-                                let entry = (srv, w, h, src.len());
+                                let entry = (srv, w, h, crate::svg_image::source_key(src, self.rw().max(self.rh()) as u32));
                                 self.ann_img_cache.borrow_mut().insert(key, entry.clone());
                                 Some(entry)
                             }

@@ -77,7 +77,7 @@ export function AnnotationOverlay({
 }: AnnotationOverlayProps) {
 	const isText = annotation.type === "text";
 	const arrow =
-		annotation.type === "figure"
+		annotation.type === "figure" && !annotation.figureData?.connector
 			? {
 					direction: annotation.figureData?.arrowDirection ?? "right",
 					stroke: annotation.figureData?.strokeWidth ?? 4,

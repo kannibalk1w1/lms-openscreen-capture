@@ -1,3 +1,5 @@
+import { wholePillOf } from "../lib/ai-edition/timeline/timelineMap";
+import { codePanelForRegion } from "../lib/typing/presentation";
 /**
  * Scene contract — the flat description the app hands the native D3D compositor so it can
  * compute the composed frame itself (preview AND export) with **no POC-fixture logic**.
@@ -65,6 +67,7 @@ import {
 	webcamSizeToFraction,
 } from "@/lib/compositeLayout";
 import type { CursorKind } from "@/lib/cursor/cursorThemes";
+import type { CustomCursors } from "@/lib/cursor/customCursors";
 import { parseCssGradient, resolveLinearGradientAngle } from "@/lib/exporter/gradientParser";
 import { LAYOUT_TRANSITION_SECONDS, type LayoutPreset } from "@/lib/layoutTypes";
 import type { FrameTheme, RecordingFrame, WebcamAnchor } from "@/lib/projectDefaults";
@@ -209,7 +212,7 @@ export interface SceneAnnotation {
 	/** See `SceneZoomRegion.underTrim`. Annotations need no extra gate — they are already
 	 *  drawn only while `startSec <= t < endSec` — so this only carries the intent. */
 	underTrim?: boolean;
-	kind: "text" | "image" | "figure" | "blur";
+	kind: "text" | "image" | "figure" | "blur" | "code";
 	/** Which box `x`/`y`/`w`/`h` — and `text.fontSizeRel` — are fractions of. Absent means
 	 *  `"screen"`: a blur, or an annotation saved before frame placement. */
 	space?: "frame";
@@ -247,8 +250,16 @@ export interface SceneAnnotation {
 	};
 	/** Present for `kind: "image"` — the authored `imageContent` (path or data URI). */
 	imagePath?: string;
+	imageRotation?: number;
+	codePanel?: import("@/lib/typing/presentation").SceneCodePanel;
 	/** Present for `kind: "figure"`. */
 	figure?: {
+		linePattern?: "solid" | "dashed";
+		headEnds?: "end" | "both" | "none";
+		headStyle?: "open" | "triangle" | "custom";
+		headSvg?: import("@/lib/ai-edition/annotations/svgAssets").SvgAsset;
+		headScale?: number;
+		connector?: import("@/lib/ai-edition/annotations/connectors").Connector;
 		direction:
 			| "up"
 			| "down"
@@ -501,6 +512,8 @@ export interface SceneCursor {
 	/** Each click gives the screen an impact, under every camera (`scene.rs`
 	 *  `SceneCursor::click_impact`). Omitted (not `false`) when off. */
 	clickImpact?: true;
+	clickMarkers?: true;
+	custom?: CustomCursors;
 	clipToBounds: boolean;
 	/** Cursor theme id (sprite set). */
 	theme: string;
@@ -1521,6 +1534,8 @@ export function buildSceneDescription(
 			// background. The field stays because the compositor's scene requires it.
 			clipToBounds: false,
 			theme: settings.cursorTheme,
+			...(settings.cursorClickMarkers ? { clickMarkers: true as const } : {}),
+			...(Object.keys(settings.cursorCustom).length ? { custom: settings.cursorCustom } : {}),
 		},
 		audio: {
 			gainDb: settings.audioGainDb,
@@ -1595,6 +1610,33 @@ export function buildSceneDescription(
 					h: region.size.height / 100,
 					zIndex: region.zIndex,
 				} as const;
+				if (region.codeData) {
+					const original =
+						document.annotations.find((a) => a.id === region.id) ??
+						document.annotations.find(
+							(a) =>
+								a.clipId === region.clipId &&
+								a.sourceStartSec === region.sourceStartSec &&
+								a.codeData?.takeId === region.codeData?.takeId &&
+								a.codeData?.sectionId === region.codeData?.sectionId,
+						);
+					const pill = original ? wholePillOf(document.annotations, original.id) : undefined;
+					const origin =
+						(region.sourceStartSec ?? region.startMs / 1000) -
+						(original && pill ? (original.startMs - pill.startMs) / 1000 : 0);
+					const duration = pill
+						? (pill.endMs - pill.startMs) / 1000
+						: region.sourceEndSec !== undefined
+							? region.sourceEndSec - (region.sourceStartSec ?? 0)
+							: (region.endMs - region.startMs) / 1000;
+					let codePanel = null;
+					try {
+						codePanel = codePanelForRegion(document, region.codeData, origin, duration);
+					} catch {
+						/* Invalid imported excerpts stay editable without crashing preview. */
+					}
+					return { ...base, kind: "code" as const, ...(codePanel ? { codePanel } : {}) };
+				}
 				if (region.type === "text") {
 					return {
 						...base,
@@ -1627,14 +1669,24 @@ export function buildSceneDescription(
 					// `content.startsWith("data:image")`), `imageContent` being the parallel slot
 					// older documents used. Reading them the other way round would render an image
 					// the preview isn't showing.
-					return { ...base, imagePath: region.content || region.imageContent || "" };
+					return {
+						...base,
+						imagePath: region.content || region.imageContent || "",
+						...(region.imageRotation ? { imageRotation: region.imageRotation } : {}),
+					};
 				}
 				if (region.type === "figure") {
 					const figure = region.figureData;
 					return {
 						...base,
 						figure: {
+							...(figure?.linePattern ? { linePattern: figure.linePattern } : {}),
+							...(figure?.headEnds ? { headEnds: figure.headEnds } : {}),
+							...(figure?.headStyle ? { headStyle: figure.headStyle } : {}),
+							...(figure?.headSvg ? { headSvg: figure.headSvg } : {}),
+							...(figure?.headScale ? { headScale: figure.headScale } : {}),
 							direction: figure?.arrowDirection ?? "right",
+							...(figure?.connector ? { connector: figure.connector } : {}),
 							color: figure?.color ?? "#34B27B",
 							strokeWidth: figure?.strokeWidth ?? 4,
 						},

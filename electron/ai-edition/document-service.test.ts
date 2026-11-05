@@ -14,6 +14,7 @@ import {
 	factoryStylePresetAppearance,
 	stylePresetAppearanceFromSettings,
 } from "../../src/lib/ai-edition/stylePresetsEditor";
+import { TypingCapture } from "../../src/lib/typing/capture";
 import { registerMediaLinks } from "../media/mediaLinksRegistry";
 import {
 	DocumentNotFoundError,
@@ -45,6 +46,17 @@ describe("DocumentService", () => {
 	});
 
 	describe("createProject", () => {
+		it("saves typing evidence and section pacing through an actual disk reopen", async () => {
+			const doc = await service.createProject("Typing proof");
+			const capture = new TypingCapture("start", () => 10, "disk-take");
+			capture.observe("start 😀", [], "insertFromPaste");
+			const take = capture.finish();
+			take.sections[0].label = "Teach this";
+			take.sections[0].speed = 0.5;
+			await service.saveProject({ ...doc, typingTakes: [take] });
+			const reopened = await new DocumentService(tempDir, mediaDir).getProject(doc.project.id);
+			expect(reopened.typingTakes).toEqual([take]);
+		});
 		it("creates a v8 doc with the given title and writes it to disk", async () => {
 			const doc = await service.createProject("Demo Project");
 			expect(doc.schemaVersion).toBe(9);
@@ -356,6 +368,17 @@ describe("DocumentService", () => {
 	});
 
 	describe("addAsset", () => {
+		it("imports recording flags into the project and retains them on reopen without the sidecar", async () => {
+			const doc = await service.createProject("Flagged take");
+			const videoPath = path.join(mediaDir, "take.mp4");
+			await fs.writeFile(videoPath, "fixture");
+			const flags = [{ id: "flag-1", timeMs: 1234, label: "Retry here" }];
+			await fs.writeFile(`${videoPath}.flags.json`, JSON.stringify({ version: 1, flags }));
+			const result = await service.addAsset(doc.project.id, { path: videoPath });
+			expect(result.assets[0].recordingFlags).toEqual(flags);
+			await fs.rm(`${videoPath}.flags.json`);
+			expect((await service.getProject(doc.project.id)).assets[0].recordingFlags).toEqual(flags);
+		});
 		it("appends a video asset and sets primaryAssetId on the first add", async () => {
 			const doc = await service.createProject("P");
 			const updated = await service.addAsset(doc.project.id, {

@@ -111,6 +111,11 @@ const WRITER_NAMES = {
 // ---------------------------------------------------------------------------
 
 const DECLARED: WritePath[] = [
+	w("src/lib/ai-edition/store/typingTakes.ts", "addCodePresentation", "save", "gesture"),
+	// Explicitly saving a captured/imported typing take or its section labels/speeds.
+	w("src/lib/ai-edition/store/typingTakes.ts", "saveTypingTake", "save", "gesture"),
+	// A flag hotkey/button, rename or removal is an explicit, undoable user edit.
+	w("src/lib/ai-edition/store/teachingFlags.ts", "run", "save", "gesture"),
 	// Dropping the legacy auto-caption annotations is a button in the captions pane.
 	w(
 		"src/components/ai-edition/CaptionsPane.tsx",
@@ -144,6 +149,8 @@ const DECLARED: WritePath[] = [
 	w("src/components/ai-edition/NewEditorShell.tsx", "handleRenameProject", "save", "gesture"),
 	// Ctrl+S / File > Save.
 	w("src/components/ai-edition/NewEditorShell.tsx", "handleSave", "save", "gesture"),
+	// The voiceover bar's explicit caption choice enables the narration caption lane.
+	w("src/components/ai-edition/NewEditorShell.tsx", "handleVoiceoverReady", "save", "gesture"),
 	// A word typed into the transcript pane, and the deletion of one. Both are the user's
 	// own edits to the transcript; neither touches the timeline.
 	w("src/components/ai-edition/NewEditorShell.tsx", "handleInsertWord", "save", "gesture"),

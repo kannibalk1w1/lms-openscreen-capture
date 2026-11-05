@@ -1,0 +1,150 @@
+# Lesson Capture roadmap
+
+Updated 5 November 2026. The next priority is complete input evidence and reusable
+typing sequences. The initial Linux physical-button journal is implemented;
+complete input capture and typing exports remain roadmap items.
+
+## Build reports and current next step
+
+After every build, report what changed, exact validation coverage and the next
+concrete item on this roadmap. This is the user's standing preference.
+
+Recording/editor flags are now implemented as a dedicated timeline row, with a
+configurable recording hotkey and source-time persistence; see
+[LESSON_CAPTURE_FLAGS.md](LESSON_CAPTURE_FLAGS.md). The annotation/cursor slices
+are described in LESSON_CAPTURE_ANNOTATIONS.md, LESSON_CAPTURE_SVG_ARROWS.md and
+LESSON_CAPTURE_CURSORS.md.
+
+**Next implementation:** an in-video GDScript presentation from captured Godot
+edits. Add a typing/code timeline layer: blur the underlying footage, show a styled
+syntax-coloured code panel, animate the code/caret at a teaching pace, and render
+it consistently in edited preview and video export. Preserve original edits and
+offer a cleaned teaching version. Background freeze/play and faithful/clean replay
+are presentation choices being clarified with the user. JSON/text/playback-file
+exports are secondary to this visible video result.
+
+The scoped pad and optional Godot unsaved-buffer adapter are the capture/review
+foundation; see [LESSON_CAPTURE_TYPING.md](LESSON_CAPTURE_TYPING.md). Their clocks
+are not yet aligned to video. Broader application/IME/Windows acceptance and physical
+tap/recovery checks remain open before promoting capture drivers.
+
+## Completed first slice
+
+Recorded/imported narration can opt into editable Whisper captions. Source,
+run instructions and validation limits are in [LESSON_CAPTURE.md](LESSON_CAPTURE.md).
+
+## 1. Event journal and complete mouse capture
+
+Build a versioned, append-only session event journal separate from cursor samples.
+Give each event an ID, monotonic capture time, media-time mapping, producer,
+application/window context and source coordinates with scale/geometry metadata.
+Humans and agents write the same event contract. Record raw events independently
+of visual click effects or automatic zoom.
+
+Capture all button down/up edges, left/right/middle and supported extra buttons,
+double-clicks and drag boundaries. Include trackpad tap-to-click and relevant
+dialogs/menus belonging to the demonstrated application. Scrolling is a separate
+event type. Pauses and source transitions must not detach events from footage.
+
+Reuse platform integration where practical. The upstream v2.2.2 Linux helper
+only forwarded physical left-button presses from evdev. Our first slice adds
+physical mouse button edges; keyboard events and touchpad taps are still absent. Evaluate
+Panoptix's KWin integration at the compositor event level before expanding this
+raw-device path; a compositor event can reflect a tap that raw BTN_LEFT cannot.
+Use an appropriate Windows driver behind the same event contract.
+
+Progress: [first input-event slice](LESSON_CAPTURE_INPUT_EVENTS.md) now saves
+versioned journals and eight physical button down/up types, independently of
+cursor effects. The counted KDE smoke test passed, including pause/resume and
+device loss. Tap-to-click, application scoping, complete geometry/context,
+capability UI and Windows remain pending. Panoptix's KWin effect was inspected;
+its current left-only, in-flight-dropping sender needs a different delivery path.
+
+Acceptance: run a counted sequence of button clicks, taps, double-clicks and
+drags; each physical down/up is represented exactly once with the correct button
+and position. Double-click classification must not create duplicate raw clicks.
+Repeat through capture pause/resume, dialogs, display scaling, and device changes.
+Expose unavailable or interrupted event capture visibly; do not silently claim
+that every click was captured.
+
+## 2. Typing capture
+
+Record both physical key/shortcut events and the text/edit operations they cause.
+They answer different questions: a shortcut is not a character, a paste is not
+individual keypresses, and a code editor can insert indentation or brackets itself.
+
+Typing sessions group nearby edits to the same field/document into editable
+sections. Preserve text commits, pauses, backspace/delete, selections and
+replacement, cursor movement, paste, undo/redo, Unicode and input-method
+composition. Keep unsaved code where the application exposes it. Retain relevant
+document state/diffs to reconcile editor-generated changes without pretending
+that saved-file diffs alone record all typing.
+
+The default scope is an explicitly started capture session and its selected
+application/workspace. Capturing and typing-export playback remain separate
+operations; an exported sequence does not type into another app until invoked.
+
+Acceptance: reconstruct the final text and edit sequence from a scripted test
+exercise in ordinary text fields and Godot. Cover tabs, indentation, auto-pairs,
+selection replacement, multi-line paste, undo/redo, Unicode, keyboard layouts and
+focus changes. Establish Windows/KDE coverage and identify which cases need
+application adapters. A raw keystroke log alone does not satisfy this milestone.
+
+## 3. ScriptWriter-style typing exports
+
+Allow selection of one or more captured typing sections and export:
+
+- A portable, editable sequence of text/edit operations and timing, with source
+  lesson/step links and schema version.
+- A clean text/code file showing the resulting content.
+- A playback recipe that can re-demonstrate text entry at a teaching pace, keeping
+  original timing or using adjustable speed, pauses and corrections.
+- MP4/GIF excerpts, with editable key/text overlays retained in the project.
+
+Offer original demonstration and cleaned teaching versions without discarding
+the original. Playback should support an engine-agnostic controlled text target
+first and application adapters when editor behaviour requires them. Direct
+compatibility with the Godot ScriptWriter plugin needs a separately tested
+format adapter; it is not assumed from the phrase “ScriptWriter-style”.
+
+Acceptance: record a short code edit, adjust its pacing, replay it into a known
+starting document, and obtain the expected final text. Account for target focus,
+auto-indentation and bracket completion. Reopen and edit the exported sequence
+without relying on the original video.
+
+## 4. Event timeline and lesson selection
+
+Show click, typing, shortcut, teaching-marker and narration tracks against the
+footage. An event seeks to its source moment; a typing section selects a range.
+Let the reviewer split, label, reorder or exclude sections and create a still,
+clip, GIF or typing export. Edits retain the mapping between source events and
+edited playback. Never make per-click dialogs part of capture.
+
+## 5. Agent and cross-platform production pass
+
+Expose recording, event queries, typing-section export and controlled playback
+through CLI/MCP. Use the real RPG Enemy lesson to prove human capture, an agent
+first pass, replacement of one failed step, and handoff in both directions.
+Complete edited-project packaging, Windows/Linux transfer, audio/device testing
+and the sustained recording acceptance checks before claiming launch readiness.
+
+## Immediate next implementation
+
+Delivered locally: the in-video [GDScript code-presentation layer](LESSON_CAPTURE_CODE_PRESENTATION.md).
+A captured section becomes a source-anchored Code region with clean type-out or
+captured edits, syntax colour, independent pause-picture and blur controls,
+drag/resize geometry, light/dark theme, font size, excerpt and line numbers. Native
+preview and MP4 export share rendering. Original source/edit evidence is retained.
+Pause picture holds screen/camera frames while timeline and original audio continue.
+
+Next useful slice: **synchronize Godot typing capture with recording media time**.
+Introduce an explicit recording/session association and clock anchor, preserve
+pause/resume boundaries, import sections onto the correct source clip and verify
+placement after a trim/split. Keep manual placement for independent takes; never
+infer exact alignment from the existing independent typing clock. Then add portable
+section JSON/text/playback-file exports with re-import validation.
+
+The opt-in KWin driver has passed its nested-compositor counted test. Physical
+libinput taps, OS/global hotkey delivery, visual HUD and recovery/device checks,
+Windows runtime and full typing/IME acceptance remain open. No raw-key-only or
+saved-file-diff-only result satisfies those capture checks.

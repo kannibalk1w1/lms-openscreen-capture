@@ -345,6 +345,12 @@ export type ArrowDirection =
 	| "down-left";
 
 export interface FigureData {
+	linePattern?: "solid" | "dashed";
+	headEnds?: "end" | "both" | "none";
+	headStyle?: "open" | "triangle" | "custom";
+	headSvg?: import("@/lib/ai-edition/annotations/svgAssets").SvgAsset;
+	headScale?: number;
+	connector?: import("@/lib/ai-edition/annotations/connectors").Connector;
 	arrowDirection: ArrowDirection;
 	color: string;
 	strokeWidth: number;
@@ -407,8 +413,10 @@ export interface AnnotationRegion {
 	startMs: number;
 	endMs: number;
 	type: AnnotationType;
+	codeData?: import("@/lib/typing/presentationSchema").CodePresentation;
 	content: string; // Legacy - still used for current type
 	textContent?: string; // Separate storage for text
+	imageRotation?: number;
 	imageContent?: string; // Separate storage for image data URL
 	/** `"frame"`: placed on the output frame. Absent: on the footage (see annotations/placement.ts). */
 	space?: "frame";

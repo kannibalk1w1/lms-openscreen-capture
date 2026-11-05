@@ -351,6 +351,7 @@ unsafe fn walk_timeline(
     let mut cursor_tracks: HashMap<String, CursorTrack> = HashMap::new();
     let mut cursor_active_path: Option<String> = None;
 
+    let mut code_background=crate::code_panel::FrozenBackground::default();
     let mut frames: u64 = 0;
     // Temps programme continu où commence le prochain clip : toute la timeline partage une
     // seule grille de frames (cf. `speed_segments_for_window`).
@@ -469,7 +470,7 @@ unsafe fn walk_timeline(
             out_fps as f64,
         );
         if clip_scene.is_some() {
-            comp.set_scene(clip_scene);
+            comp.set_scene(clip_scene.clone());
         }
 
         // un seul seek keyframe, puis chaque décodeur avance selon son propre pts jusqu'aux
@@ -568,7 +569,9 @@ unsafe fn walk_timeline(
                 }
                 {
                     let _p = crate::export_probe::scope(crate::export_probe::Stage::Compose);
-                    comp.compose_frame(sf, wf, frames as f32, cfg)?;
+                    if let Some((screen,webcam,time))=code_background.frames(clip_scene.as_ref(),target_source_time,gpu)? {
+                        comp.set_cursor_time(Some(time as f32));comp.compose_frame(screen,webcam,frames as f32,cfg)?;
+                    } else {comp.compose_frame(sf, wf, frames as f32, cfg)?;}
                 }
 
                 on_frame(frames)?;

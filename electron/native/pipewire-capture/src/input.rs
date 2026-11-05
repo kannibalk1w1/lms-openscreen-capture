@@ -1,24 +1,7 @@
-//! Left mouse-button telemetry on Wayland, read from evdev.
-//!
-//! WHY THIS EXISTS. Wayland deliberately denies an unprivileged process any view
-//! of global input: the ScreenCast portal reports cursor POSITION as frame
-//! metadata but never button state, and the only portal that streams input
-//! (`InputCapture`) *grabs* it, redirecting clicks away from the app being
-//! recorded — useless while the user is demoing. The one remaining source is the
-//! kernel's evdev interface (`/dev/input/event*`). Reading it needs membership in
-//! the `input` group (the nodes are `root:input`), which is the user's own,
-//! out-of-band act of consent — the Wayland equivalent of the button state the
-//! macOS and Windows helpers already read from their native APIs.
-//!
-//! SCOPE AND PRIVACY. A pointer node can also deliver keystrokes on a combined
-//! keyboard+mouse device. This reader inspects ONLY `EV_KEY` events whose code is
-//! `BTN_LEFT`, and only their press edge; it never reads, stores, or forwards any
-//! other key code. Enumerating the devices does briefly open each readable
-//! `/dev/input/event*` node to inspect its capability bits, but any node that
-//! does not advertise `BTN_LEFT` is dropped immediately, without a single event
-//! ever being read from it — only `BTN_LEFT` devices get a reader. Set
-//! `OPENSCREEN_DISABLE_CLICK_CAPTURE=1` to turn it off entirely even where the
-//! permission exists.
+//! Physical mouse button edges from evdev. Never forwards keyboard keys.
+//! Only readable devices advertising BTN_LEFT are opened. Trackpad taps synthesized
+//! by libinput are not visible here; this is explicitly a partial input driver.
+//! OPENSCREEN_DISABLE_CLICK_CAPTURE disables all device readers.
 
 use std::collections::HashSet;
 use std::io::ErrorKind;
@@ -40,13 +23,10 @@ const DISABLE_ENV: &str = "OPENSCREEN_DISABLE_CLICK_CAPTURE";
 /// just plugged in and costs a cheap directory walk.
 const RESCAN_INTERVAL: Duration = Duration::from_secs(3);
 
-/// True when this evdev event is the press edge of the left mouse button.
-///
-/// Extracted as a pure function so the decision is unit-testable without a real
-/// device: a release (`value == 0`), an autorepeat (`value == 2`), and every
-/// non-`BTN_LEFT` code — including every keyboard key — must NOT count.
-pub fn is_left_button_press(event_type: EventType, code: u16, value: i32) -> bool {
-    event_type == EventType::KEY && code == KeyCode::BTN_LEFT.0 && value == 1
+/// Linux mouse button range: left, right, middle, side, extra, forward,
+/// back and task. Keyboard keys, touch contact and repeat events are excluded.
+pub fn is_pointer_edge(event_type: EventType, code: u16, value: i32) -> bool {
+    event_type == EventType::KEY && (0x110..=0x117).contains(&code) && (value == 0 || value == 1)
 }
 
 /// What [`spawn_readers`] settled on — the caller uses it to tell the log why
@@ -107,6 +87,7 @@ pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
 /// each newly opened node's path. Shared by the initial scan and the watcher; the
 /// check-and-insert is one locked step so two scans cannot both adopt one path.
 fn scan_once(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
+    let before = opened.lock().unwrap().len();
     for (path, device) in evdev::enumerate() {
         if !device_reports_left_button(&device) {
             continue;
@@ -118,6 +99,21 @@ fn scan_once(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
         let owned = Arc::clone(opened);
         thread::spawn(move || read_device(device, path, forward, owned));
     }
+    if before != opened.lock().unwrap().len() {
+        report_status(sender, opened);
+    }
+}
+
+fn report_status(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
+    let _ = sender.send(Message::InputStatus {
+        state: if opened.lock().unwrap().is_empty() {
+            "unavailable"
+        } else {
+            "partial"
+        },
+        driver: "linux-evdev",
+        scope: "global-physical-buttons-no-taps",
+    });
 }
 
 /// A touchpad advertises `BTN_LEFT` for a physical clickpad press, so it passes
@@ -133,8 +129,8 @@ fn device_reports_left_button(device: &Device) -> bool {
         .is_some_and(|keys| keys.contains(KeyCode::BTN_LEFT))
 }
 
-/// Blocks reading `device`, forwarding one `PointerButton` message per left-button
-/// press, each stamped with the press time so a click is not backdated to the
+/// Blocks reading `device`, forwarding one `PointerButton` message per physical mouse-button
+/// edge, each stamped with the press time so a click is not backdated to the
 /// next cursor sample. Returns when the device fails terminally (e.g. unplugged)
 /// or the loop's channel has closed, so the thread cannot outlive the recording
 /// it serves. A transient `EINTR` is retried, not mistaken for an unplug.
@@ -149,6 +145,7 @@ fn read_device(
 ) {
     let release = || {
         opened.lock().unwrap().remove(&path);
+        report_status(&sender, &opened);
     };
     loop {
         let events = match device.fetch_events() {
@@ -160,16 +157,23 @@ fn read_device(
             // is answerable from the log; the watcher re-adopts it on a replug.
             Err(err) => {
                 release();
-                let _ = sender.send(Message::PointerDeviceLost(err.to_string()));
+                let _ = sender.send(Message::PointerDeviceLost(format!("{err}; remaining devices continue; reconnect a device to restore lost coverage")));
                 return;
             }
         };
         for event in events {
-            if is_left_button_press(event.event_type(), event.code(), event.value())
-                && sender.send(Message::PointerButton(timestamp_ms())).is_err()
-            {
-                release();
-                return;
+            if is_pointer_edge(event.event_type(), event.code(), event.value()) {
+                let message = Message::PointerButton {
+                    timestamp_ms: timestamp_ms(),
+                    monotonic_ms: crate::events::monotonic_ms(),
+                    code: event.code(),
+                    pressed: event.value() == 1,
+                    device: path.display().to_string(),
+                };
+                if sender.send(message).is_err() {
+                    release();
+                    return;
+                }
             }
         }
     }
@@ -179,33 +183,23 @@ fn read_device(
 mod tests {
     use super::*;
 
-    const BTN_LEFT: u16 = KeyCode::BTN_LEFT.0;
-    const BTN_RIGHT: u16 = KeyCode::BTN_RIGHT.0;
-
     #[test]
-    fn a_left_button_press_is_a_click() {
-        assert!(is_left_button_press(EventType::KEY, BTN_LEFT, 1));
+    fn counted_buttons_have_exactly_one_down_and_one_up() {
+        let mut count = 0;
+        for code in 0x110..=0x117 {
+            for value in [1, 2, 0] {
+                count += usize::from(is_pointer_edge(EventType::KEY, code, value));
+            }
+        }
+        assert_eq!(count, 16);
     }
 
     #[test]
-    fn a_left_button_release_is_not() {
-        assert!(!is_left_button_press(EventType::KEY, BTN_LEFT, 0));
-    }
-
-    #[test]
-    fn a_left_button_autorepeat_is_not() {
-        // A held button emits value 2; only the 0->1 edge is a click.
-        assert!(!is_left_button_press(EventType::KEY, BTN_LEFT, 2));
-    }
-
-    #[test]
-    fn a_right_button_press_is_not_a_left_click() {
-        assert!(!is_left_button_press(EventType::KEY, BTN_RIGHT, 1));
-    }
-
-    #[test]
-    fn a_key_matching_btn_lefts_code_on_another_axis_is_not_a_click() {
-        // Same numeric code but a relative-motion event, not a key — must miss.
-        assert!(!is_left_button_press(EventType::RELATIVE, BTN_LEFT, 1));
+    fn rejects_keyboard_touch_motion_and_invalid_values() {
+        for code in [KeyCode::KEY_A.0, KeyCode::BTN_TOUCH.0, 0x118] {
+            assert!(!is_pointer_edge(EventType::KEY, code, 1));
+        }
+        assert!(!is_pointer_edge(EventType::RELATIVE, 0x110, 1));
+        assert!(!is_pointer_edge(EventType::KEY, 0x110, -1));
     }
 }

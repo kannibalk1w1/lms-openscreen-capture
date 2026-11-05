@@ -1,0 +1,9 @@
+{
+	"KPlugin": {
+		"Id": "openscreen_input",
+		"Name": "OpenScreen input evidence",
+		"Description": "Session-only mouse button evidence for OpenScreen",
+		"License": "GPL-2.0-or-later",
+		"EnabledByDefault": false
+	}
+}

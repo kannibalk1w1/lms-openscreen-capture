@@ -30,6 +30,7 @@ import {
 import { renameSyncWithFallback, renameWithRetry } from "../atomic-rename";
 import { ensureDocumentExtensions } from "../media/extensionClip";
 import { relinkProjectMedia } from "../media/projectMediaRelinker";
+import { readRecordingFlags } from "../recording/recordingFlags";
 
 const PROJECT_FILE_EXTENSION = ".openscreen";
 // Older builds stored these same v3/v4 AxcutDocuments under `.axcut`. We read
@@ -598,6 +599,10 @@ export class DocumentService {
 			sizeBytes,
 			cameraTrack: null,
 		};
+		if (asset.kind === "video") {
+			const flags = await readRecordingFlags(absolutePath);
+			if (flags.length) asset.recordingFlags = flags;
+		}
 		return this.saveProject(documentWithAsset(doc, asset));
 	}
 

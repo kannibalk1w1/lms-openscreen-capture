@@ -257,6 +257,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	isNativeMacCaptureAvailable: () => {
 		return ipcRenderer.invoke("is-native-mac-capture-available");
 	},
+	onTeachingFlagRequested: (callback: () => void) => {
+		const listener = () => callback();
+		ipcRenderer.on("teaching-flags:requested", listener);
+		return () => ipcRenderer.removeListener("teaching-flags:requested", listener);
+	},
+	onRecordingFlagsSaveError: (callback: () => void) => {
+		const listener = () => callback();
+		ipcRenderer.on("recording-flags:save-error", listener);
+		return () => ipcRenderer.removeListener("recording-flags:save-error", listener);
+	},
+	getRecordingFlagsStatus: () => ipcRenderer.invoke("recording-flags:status"),
+	addRecordingFlag: () => ipcRenderer.invoke("recording-flags:add"),
+	setRecordingFlagsPaused: (paused: boolean) =>
+		ipcRenderer.invoke("recording-flags:paused", paused),
+	getInputCaptureHealth: () => ipcRenderer.invoke("get-input-capture-health"),
 	isNativeLinuxCaptureAvailable: () => {
 		return ipcRenderer.invoke("is-native-linux-capture-available");
 	},

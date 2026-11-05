@@ -151,3 +151,6 @@ pub use pipeline_linux as pipeline;
 // helpers `run_standalone`/`host_proc`/`wide`/`client_size` (harnais Win32 du POC)
 // sont cfg-gatées à l'intérieur du fichier.
 pub mod live;
+
+mod svg_image;
+pub mod code_panel;

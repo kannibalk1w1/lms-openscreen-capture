@@ -1,0 +1,26 @@
+{
+	"format": "concatenated gzip tar, 32 MiB parts",
+	"archiveSha256": "d096342a8fd62b20f53c4f19879d9fdfeef6e2116e93e5882d27b61821d33613",
+	"parts": [
+		{
+			"file": "evaluation.tar.gz.part-000",
+			"bytes": 33554432,
+			"sha256": "059bbb2be076558c0549dc2193695c31183c67c6b1b24ca3d212a01ac7fdcee1"
+		},
+		{
+			"file": "evaluation.tar.gz.part-001",
+			"bytes": 33554432,
+			"sha256": "0cb36dba2a8a7cb0b0de037c19a5fbb7485868491b9692d094d77757e5674d2b"
+		},
+		{
+			"file": "evaluation.tar.gz.part-002",
+			"bytes": 33554432,
+			"sha256": "3640a30d79461c65afba22d7c306b3ff0d6a31cde734256bd91a9053c44af167"
+		},
+		{
+			"file": "evaluation.tar.gz.part-003",
+			"bytes": 15570621,
+			"sha256": "be1be02e74d347b2366a4dd157f3767d75a44095fc1e1828093f03e6f84d5d4d"
+		}
+	]
+}

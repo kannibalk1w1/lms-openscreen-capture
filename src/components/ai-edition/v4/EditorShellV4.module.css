@@ -2196,6 +2196,20 @@
 	color: var(--muted);
 }
 
+.voiceoverCaptionOption {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+	color: var(--fg);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.voiceoverCaptionOption input {
+	accent-color: var(--accent);
+}
+
 .voiceoverBarBtn {
 	display: inline-flex;
 	align-items: center;

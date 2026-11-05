@@ -227,6 +227,16 @@ interface Window {
 			message?: string;
 			error?: string;
 		}>;
+		onTeachingFlagRequested: (callback: () => void) => () => void;
+		onRecordingFlagsSaveError: (callback: () => void) => () => void;
+		getRecordingFlagsStatus: () => Promise<import("../src/lib/recordingFlags").RecordingFlagStatus>;
+		addRecordingFlag: () => Promise<
+			import("../src/lib/recordingFlags").RecordingFlagStatus & { success: boolean }
+		>;
+		setRecordingFlagsPaused: (paused: boolean) => Promise<void>;
+		getInputCaptureHealth: () => Promise<
+			import("../src/native/captureEvents").InputCaptureHealth | null
+		>;
 		isNativeLinuxCaptureAvailable: () => Promise<{
 			success: boolean;
 			available: boolean;

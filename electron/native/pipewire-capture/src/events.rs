@@ -42,6 +42,23 @@ pub struct CursorAsset {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
+    PointerButton {
+        timestamp_ms: u64,
+        monotonic_ms: u64,
+        media_time_ms: u64,
+        code: u16,
+        pressed: bool,
+        device: String,
+        /// Latest PipeWire position, not a synchronous button-position observation.
+        position: Option<serde_json::Value>,
+    },
+    #[serde(rename_all = "camelCase")]
+    InputCaptureStatus {
+        state: &'static str,
+        driver: &'static str,
+        scope: &'static str,
+    },
+    #[serde(rename_all = "camelCase")]
     Ready {
         timestamp_ms: u64,
         /// Runtime libpipewire version, not the vendored header version.
@@ -141,6 +158,8 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     CaptureStarted {
         timestamp_ms: u64,
+        monotonic_ms: u64,
+        media_time_ms: u64,
         path: String,
         width: i32,
         height: i32,
@@ -262,6 +281,25 @@ mod tests {
         );
         assert!(text.ends_with('\n'));
         assert_eq!(text.matches('\n').count(), 1);
+    }
+
+    #[test]
+    fn pointer_protocol_keeps_button_edges_and_two_clocks() {
+        let value = parse_one(&Event::PointerButton {
+            timestamp_ms: 9000,
+            monotonic_ms: 1500,
+            media_time_ms: 200,
+            code: 0x111,
+            pressed: false,
+            device: "/dev/input/event1".into(),
+            position: None,
+        });
+        assert_eq!(value["event"], "pointer-button");
+        assert_eq!(value["monotonicMs"], 1500);
+        assert_eq!(value["mediaTimeMs"], 200);
+        assert_eq!(value["code"], 0x111);
+        assert_eq!(value["pressed"], false);
+        assert!(value["position"].is_null());
     }
 
     #[test]
@@ -395,7 +433,10 @@ mod tests {
             asset: None,
             interaction_type: None,
         });
-        assert_eq!(value["timestampMs"], 1234, "a sample's capture time must not be overwritten");
+        assert_eq!(
+            value["timestampMs"], 1234,
+            "a sample's capture time must not be overwritten"
+        );
     }
 
     #[test]
@@ -420,4 +461,13 @@ mod tests {
         assert_eq!(value["code"], "buffer-info");
         assert_eq!(value["dataType"], "MemFd");
     }
+}
+
+/// Process-relative monotonic clock; unaffected by wall-clock adjustments.
+pub fn monotonic_ms() -> u64 {
+    static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    EPOCH
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis() as u64
 }

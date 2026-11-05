@@ -413,7 +413,7 @@ pub struct Compositor {
     /// Images d'annotation, indexées par ID d'annotation (pas par data-URL : celle-ci pèse
     /// souvent des mégaoctets et la hacher à chaque frame coûterait plus que le décodage).
     /// La longueur sert de garde-fou quand l'utilisateur change l'image.
-    ann_img_cache: RefCell<std::collections::HashMap<String, (metal::Texture, u32, u32, usize)>>,
+    ann_img_cache: RefCell<std::collections::HashMap<String, (metal::Texture, u32, u32, u64)>>,
     /// Textes rastérisés, indexés par ID, avec la `cache_key` du spec pour invalider.
     text_cache: RefCell<std::collections::HashMap<String, (metal::Texture, u64)>>,
     text_raster: Option<crate::text::TextRasterizer>,
@@ -1162,6 +1162,10 @@ impl Compositor {
         *self.cursor.borrow_mut() = None;
     }
 
+    pub fn frozen_code_source(&self,time:f64)->Option<(crate::scene::SceneClip,f64)> {
+        self.scene.borrow().as_ref().and_then(|scene|crate::code_panel::frozen_source(scene,time))
+    }
+
     pub fn scene_snapshot(&self) -> Option<Scene> {
         self.scene.borrow().clone()
     }
@@ -1343,15 +1347,7 @@ impl Compositor {
     /// Miroir de `compositor_windows::load_image_srv`. Les annotations image stockent une
     /// data URL plutôt qu'un chemin (cf. `types.ts`), d'où les deux entrées.
     fn load_image_texture(&self, path: &str) -> Result<(metal::Texture, u32, u32)> {
-        let img = if let Some(bytes) = crate::frame_geometry::decode_data_uri(path) {
-            image::load_from_memory(&bytes)
-                .map_err(|e| anyhow!("data URI image ({} octets) : {e}", bytes.len()))?
-                .to_rgba8()
-        } else {
-            image::open(path)
-                .map_err(|e| anyhow!("wallpaper {path} : {e}"))?
-                .to_rgba8()
-        };
+        let img = crate::svg_image::load(path, self.rw().max(self.rh()) as u32)?;
         let (w, h) = (img.width(), img.height());
         let pixels = img.into_raw();
         let tex = make_texture(
@@ -1924,7 +1920,7 @@ impl Compositor {
         // UNE seule recopie pour toutes les annotations flou de la frame : leur lecture doit
         // voir l'image composée SANS les flous eux-mêmes, sinon deux zones qui se recouvrent
         // s'échantillonneraient l'une l'autre selon l'ordre de dessin.
-        if privacy {
+        if privacy || scene.annotations.iter().any(|a|visible(a)&&a.kind=="code-blur") {
             self.snapshot_rt(cmd, true);
         }
 
@@ -1946,23 +1942,22 @@ impl Compositor {
             match a.kind.as_str() {
                 "figure" => {
                     let Some(figure) = a.figure.as_ref() else { continue };
-                    let (segments, half_stroke) = crate::regions::arrow_local_geometry(
-                        &figure.direction,
-                        figure.stroke_width,
-                        quad_px,
-                    );
-                    self.draw_solid(enc, &LayerCB {
-                        dst,
-                        quad_px,
-                        mode: 9.0,
-                        color: parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]),
-                        fx: segments[0],
-                        src_prev: segments[1],
-                        dst_prev: segments[2],
-                        mb: [1.0, half_stroke, 0.0, 0.0],
-                        ..Default::default()
-                    });
+                    let (batches, half_stroke) = crate::regions::figure_local_geometry(figure, quad_px, rh);
+                    for segments in batches {
+                        self.draw_solid(enc, &LayerCB {
+                            dst,
+                            quad_px,
+                            mode: 9.0,
+                            color: parse_hex(&figure.color).unwrap_or([1.0, 1.0, 1.0, 1.0]),
+                            fx: segments[0],
+                            src_prev: segments[1],
+                            dst_prev: segments[2],
+                            mb: [1.0, half_stroke, 0.0, 0.0],
+                            ..Default::default()
+                        });
+                    }
                 }
+                "code-blur" => { enc.set_fragment_texture(2,Some(&self.ann_copy)); self.draw_solid(enc,&LayerCB{dst:[0.,0.,1.,1.],quad_px:[rw,rh],mode:10.,color:[1.,1.,1.,1.],fx:[1.,(24.*rh/1080.).max(1.),0.,0.],..Default::default()}); }
                 "blur" => {
                     let Some(blur) = a.blur.as_ref() else { continue };
                     let Some(mask) = g.privacy_mask(a, [rw, rh]) else { continue };
@@ -2000,18 +1995,19 @@ impl Compositor {
                         ..Default::default()
                     });
                 }
-                "image" => {
-                    let Some(src) = a.image_path.as_ref().filter(|s| !s.is_empty()) else {
+                "image" | "code" => {
+                        let generated = crate::code_panel::image_source(a, t, quad_px, rh);
+                    let Some(src) = generated.as_ref().or(a.image_path.as_ref()).filter(|s| !s.is_empty()) else {
                         continue;
                     };
                     let cached = {
                         let c = self.ann_img_cache.borrow();
-                        c.get(&a.id).filter(|(_, _, _, len)| *len == src.len()).cloned()
+                        c.get(&a.id).filter(|(_, _, _, len)| *len == crate::svg_image::source_key(src, self.rw().max(self.rh()) as u32)).cloned()
                     };
                     let Some((tex, iw, ih, _)) = cached.or_else(|| {
                         match self.load_image_texture(src) {
                             Ok((tex, w, h)) => {
-                                let e = (tex, w, h, src.len());
+                                let e = (tex, w, h, crate::svg_image::source_key(src, self.rw().max(self.rh()) as u32));
                                 self.ann_img_cache.borrow_mut().insert(a.id.clone(), e.clone());
                                 Some(e)
                             }

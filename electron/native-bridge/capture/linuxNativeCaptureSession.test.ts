@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,10 +63,11 @@ class FakeHelper extends EventEmitter {
 const spawnMock = vi.mocked(spawn);
 let helper: FakeHelper;
 
-function newSession(deferStart = false) {
+function newSession(deferStart = false, inputOutputPath?: string) {
 	return new LinuxNativeCaptureSession({
 		...(deferStart ? { deferStart: true } : {}),
-		outputPath: "/tmp/recording.mp4",
+		outputPath: inputOutputPath ?? "/tmp/recording.mp4",
+		captureInputEvents: Boolean(inputOutputPath),
 		cursorMode: "metadata",
 		fps: 30,
 		audio: {
@@ -763,4 +767,123 @@ describe("LinuxNativeCaptureSession", () => {
 			expect(session.helperOutput).toBe("€".repeat(21_845));
 		});
 	});
+});
+
+it("journals native button edges once independently of click samples", async () => {
+	const root = mkdtempSync(join(tmpdir(), "native-input-"));
+	try {
+		const video = join(root, "recording.mp4");
+		const session = newSession(false, video);
+		await startReady(session);
+		helper.emitEvent({
+			event: "input-capture-status",
+			state: "partial",
+			driver: "linux-evdev",
+			scope: "global-physical-buttons-no-taps",
+		});
+		const edge = {
+			event: "pointer-button",
+			timestampMs: 1100,
+			monotonicMs: 100,
+			mediaTimeMs: 90,
+			code: 0x111,
+			pressed: true,
+			device: "/dev/input/event1",
+			position: null,
+		};
+		helper.emitEvent(edge); // Picker input is not evidence.
+		emitCaptureStarted(1050);
+		helper.emitEvent(edge);
+		emitCursorSample(1100); // Visual telemetry must not duplicate evidence.
+		helper.emitEvent({ ...edge, pressed: false, mediaTimeMs: 95 });
+		await flushStdout();
+		const result = await finishCapture(session, 2000);
+		expect(result.inputEvents).toEqual({ path: `${video}.events.ndjson`, status: "partial" });
+		const records = readFileSync(`${video}.events.ndjson`, "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		expect(records.map((record) => record.event)).toEqual([
+			"session-start",
+			"input-capture-status",
+			"pointer-button",
+			"pointer-button",
+			"session-end",
+		]);
+		expect(records[2]).toMatchObject({
+			code: 0x111,
+			pressed: true,
+			mediaTimeMs: 90,
+			position: null,
+		});
+		expect(records[3]).toMatchObject({ pressed: false, mediaTimeMs: 95 });
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+it("exposes live driver changes, warnings and unexpected exit", async () => {
+	const session = newSession(false, "/tmp/health-test-unused.mp4");
+	await startReady(session);
+	expect(session.inputCaptureHealth.state).toBe("unknown");
+	helper.emitEvent({
+		event: "input-capture-status",
+		state: "partial",
+		driver: "linux-kwin",
+		scope: "global-compositor-buttons",
+	});
+	await flushStdout();
+	expect(session.inputCaptureHealth).toMatchObject({ state: "partial", driver: "linux-kwin" });
+	helper.emitEvent({
+		event: "warning",
+		code: "click-capture-device-lost",
+		message: "Compositor disconnected",
+	});
+	helper.emitEvent({
+		event: "input-capture-status",
+		state: "unavailable",
+		driver: "linux-kwin",
+		scope: "global-compositor-buttons",
+	});
+	await flushStdout();
+	expect(session.inputCaptureHealth).toMatchObject({
+		state: "unavailable",
+		warning: "Compositor disconnected",
+	});
+	// No capture-started, so no journal is created or recording interrupted.
+	helper.emit("exit", 1, null);
+	expect(session.inputCaptureHealth.state).toBe("unavailable");
+});
+
+it("reports journal failure without failing video start", async () => {
+	const root = mkdtempSync(join(tmpdir(), "input-health-"));
+	try {
+		const video = join(root, "recording.mp4");
+		const { writeFileSync } = await import("node:fs");
+		writeFileSync(`${video}.events.ndjson`, "existing evidence");
+		const session = newSession(false, video);
+		await startReady(session);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		expect(session.inputCaptureHealth.state).toBe("failed");
+		const result = await finishCapture(session, 2000);
+		expect(result.inputEvents?.status).toBe("failed");
+		expect(readFileSync(`${video}.events.ndjson`, "utf8")).toBe("existing evidence");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+it("reports interrupted evidence after an unexpected helper exit", async () => {
+	const root = mkdtempSync(join(tmpdir(), "input-interruption-"));
+	try {
+		const session = newSession(false, join(root, "recording.mp4"));
+		await startReady(session);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		helper.emit("exit", 1, null);
+		expect(session.inputCaptureHealth.state).toBe("interrupted");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });

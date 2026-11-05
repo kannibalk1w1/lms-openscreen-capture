@@ -472,6 +472,8 @@ pub struct SceneAnnotation {
     #[serde(default)]
     pub image_path: Option<String>,
     #[serde(default)]
+    pub code_panel: Option<crate::code_panel::CodePanel>,
+    #[serde(default)]
     pub figure: Option<SceneAnnotationFigure>,
     #[serde(default)]
     pub blur: Option<SceneAnnotationBlur>,
@@ -532,10 +534,22 @@ pub struct SceneAnnotationText {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SceneAnnotationFigure {
+    #[serde(default)]
+    pub connector: Option<SceneConnector>,
     /// "up" | "down" | "left" | "right" | "up-right" | "up-left" | "down-right" | "down-left".
     pub direction: String,
     pub color: String,
     pub stroke_width: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SceneArrowPoint { pub x: f32, pub y: f32 }
+#[derive(Debug, Clone, Deserialize)]
+pub struct SceneConnector {
+    pub shape: String,
+    pub tail: SceneArrowPoint,
+    pub head: SceneArrowPoint,
+    pub bend: SceneArrowPoint,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -727,6 +741,9 @@ pub struct SceneCursor {
     /// `#[serde(default)]` : l'app omet la clé quand elle est fausse.
     #[serde(default)]
     pub click_impact: bool,
+    /// Anneaux de clic explicites, indépendants du modèle 3D et du rebond.
+    #[serde(default)]
+    pub click_markers: bool,
     pub clip_to_bounds: bool,
     /// id du thème (jeu de sprites) — informatif ici : le natif consomme `cursor_sprites`.
     pub theme: String,
@@ -972,7 +989,9 @@ impl Scene {
     }
     /// Parse le JSON produit par `buildSceneDescription` (TS).
     pub fn from_json(json: &str) -> anyhow::Result<Scene> {
-        Ok(serde_json::from_str(json)?)
+        let mut scene: Scene = serde_json::from_str(json)?;
+        crate::code_panel::add_backdrops(&mut scene);
+        Ok(scene)
     }
 
     /// Copie de scène limitée aux régions du clip actif. `clipIndex` est l'identité fiable

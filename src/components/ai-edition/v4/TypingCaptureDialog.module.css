@@ -1,0 +1,16 @@
+.dialog { width: min(960px, 95vw); max-width: 960px; max-height: 90vh; overflow: hidden; background: var(--surface-1); }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar button, .section button { padding: 7px 11px; border: 1px solid var(--border-soft); border-radius: 7px; background: var(--surface-2); font-size: 12px; }
+.toolbar button:disabled { opacity: .4; }
+.field { display: grid; gap: 5px; font-size: 12px; color: var(--fg-2); }
+.field input, .section input, .section select, .toolbar select { min-width: 0; padding: 6px; border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface-2); color: var(--fg); }
+.pad { width: 100%; min-height: 190px; resize: vertical; padding: 12px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--surface-2); color: var(--fg); font: 13px/1.6 monospace; tab-size: 4; }
+.sections { display: grid; gap: 8px; }
+.section { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px; }
+.section input { flex: 1; min-width: 120px; }
+.section select { width: 90px; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.status { color: var(--accent); font-size: 12px; }
+.error { color: var(--destructive, #d95050); font-size: 12px; }
+
+.body { display: grid; gap: 16px; min-height: 0; overflow-y: auto; max-height: calc(90vh - 160px); padding-right: 4px; }

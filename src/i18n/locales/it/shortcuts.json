@@ -27,7 +27,8 @@
 		"deleteSelected": "Elimina selezionato",
 		"playPause": "Riproduci / Pausa",
 		"copySelected": "Copia selezione",
-		"paste": "Incolla"
+		"paste": "Incolla",
+		"addFlag": "Add Flag"
 	},
 	"fixedActions": {
 		"undo": "Annulla",
