@@ -519,8 +519,8 @@ export class LinuxNativeCaptureSession {
 				if (this.capturing && !this.stopped) this.journal?.append(payload);
 				return;
 			case "pointer-button":
-				// Native driver supplies the encoder clock and suppresses paused
-				// events. Never derive clicks from cursor samples a second time.
+				// Native driver projects reader observations through the encoder
+				// pause history, including late delivery from closed intervals. Never derive clicks from cursor samples a second time.
 				if (this.capturing && !this.stopped) this.journal?.append(payload);
 				return;
 			case "ready":

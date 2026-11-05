@@ -37,8 +37,8 @@ catalog, direct editing links and exports.
 **Native boundary stage started:** explicit journal boundaries, interval IDs and
 dispatch-time continuity markers are local; see [coverage/limits](LESSON_CAPTURE_INPUT_BOUNDARIES.md).
 
-**Next implementation:** observation-time media projection across pause history
-and counted capture-boundary input tests.
+**Reader-time projection delivered:** [shared encoder clock and historical intervals](LESSON_CAPTURE_INPUT_TIMING.md).
+**Next implementation:** stop-queue drain/device-loss continuity and counted capture-boundary input tests.
 Broader application/IME/Windows acceptance and physical tap/recovery checks remain
 open before promoting capture drivers.
 

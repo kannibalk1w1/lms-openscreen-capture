@@ -957,3 +957,63 @@ it("persists native control boundaries, interval identity and unmatched releases
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+it("retains late historical reader projections in journal arrival order without retiming them", async () => {
+	const root = mkdtempSync(join(tmpdir(), "native-projection-"));
+	try {
+		const video = join(root, "take.mp4");
+		const session = newSession(false, video);
+		await startReady(session);
+		emitCaptureStarted(1050);
+		const boundary = {
+			event: "capture-boundary",
+			timestampMs: 2000,
+			monotonicMs: 1000,
+			mediaTimeMs: 500,
+			reason: "pause",
+			intervalId: 0,
+			buttonStateObservation: "dispatch",
+			buttonsDown: [],
+		};
+		helper.emitEvent(boundary);
+		helper.emitEvent({ ...boundary, reason: "resume", monotonicMs: 3000, intervalId: 1 });
+		const late = {
+			event: "pointer-button",
+			timestampMs: 1400,
+			monotonicMs: 400,
+			mediaTimeMs: 350,
+			code: 0x110,
+			pressed: true,
+			device: "mouse",
+			position: null,
+			intervalId: 0,
+			mediaTimeObservation: "reader",
+			dispatchDelayMs: 2600,
+			late: true,
+		};
+		helper.emitEvent(late);
+		helper.emitEvent({
+			...late,
+			timestampMs: 1410,
+			monotonicMs: 410,
+			mediaTimeMs: 360,
+			pressed: false,
+		});
+		await flushStdout();
+		await finishCapture(session, 600);
+		const records = readFileSync(`${video}.events.ndjson`, "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		const edges = records.filter((record) => record.event === "pointer-button");
+		expect(edges).toHaveLength(2);
+		expect(edges[0]).toMatchObject(late);
+		expect(edges[1]).toMatchObject({ intervalId: 0, mediaTimeMs: 360, pressed: false, late: true });
+		expect(edges[0].sequence).toBeGreaterThan(
+			records.find((record) => record.reason === "resume").sequence,
+		);
+		expect(records.at(-1).event).toBe("session-end");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});

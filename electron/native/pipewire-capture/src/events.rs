@@ -60,6 +60,9 @@ pub enum Event {
         pressed: bool,
         device: String,
         interval_id: u64,
+        media_time_observation: &'static str,
+        dispatch_delay_ms: u64,
+        late: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         continuity: Option<&'static str>,
         /// Latest PipeWire position, not a synchronous button-position observation.
@@ -306,6 +309,9 @@ mod tests {
             pressed: false,
             device: "/dev/input/event1".into(),
             interval_id: 0,
+            media_time_observation: "reader",
+            dispatch_delay_ms: 0,
+            late: false,
             continuity: None,
             position: None,
         });
@@ -479,10 +485,8 @@ mod tests {
 }
 
 /// Process-relative monotonic clock; unaffected by wall-clock adjustments.
-pub fn monotonic_ms() -> u64 {
+pub fn monotonic_ms_at(at: std::time::Instant) -> u64 {
     static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    EPOCH
-        .get_or_init(std::time::Instant::now)
-        .elapsed()
-        .as_millis() as u64
+    let epoch = EPOCH.get_or_init(|| at);
+    at.saturating_duration_since(*epoch).as_millis() as u64
 }

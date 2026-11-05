@@ -163,9 +163,11 @@ fn read_device(
         };
         for event in events {
             if is_pointer_edge(event.event_type(), event.code(), event.value()) {
+                let observed_at = std::time::Instant::now();
                 let message = Message::PointerButton {
                     timestamp_ms: timestamp_ms(),
-                    monotonic_ms: crate::events::monotonic_ms(),
+                    monotonic_ms: crate::events::monotonic_ms_at(observed_at),
+                    observed_at,
                     code: event.code(),
                     pressed: event.value() == 1,
                     device: path.display().to_string(),

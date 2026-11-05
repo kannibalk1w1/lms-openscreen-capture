@@ -70,3 +70,18 @@ Scheduled checkpoints are cooperative prompts, not forced process termination.
 The coordinator arranges 07:30 and 08:00 Orca checkpoints in this existing
 workspace. The scheduled agents must remain read-only coordinators, send deadline
 guidance to the implementation dispatch, and avoid competing code changes.
+
+## Verified checkpoint receipts
+
+Coordinator terminal `term_65bf9b9c-3237-41c8-8289-fea95907510a` confirmed
+these enabled, exact-date, read-only Orca checkpoints in message
+`msg_63f9684ea0f6`:
+
+- 07:30 London 2026-11-06: automation `e55b174b-a644-4e7d-8ac4-665dd5ec3cdd`.
+- 08:00 London 2026-11-06: automation `224fdd07-887f-4e9b-8347-c4c7e4c407bc`.
+
+Implementation task `task_1d6e4edae942`, dispatch `ctx_a1b1e3ccf552`, terminal
+`term_4e8c9e13-a4c9-43bb-b661-15f4401edd8d` owns the run and nested Claude reviews.
+The coordinator verified private feature HEAD `5efc9742` and private main
+`fd2775e2` before yielding. The reminders supplement the implementation worker's
+own clock checks; no checkpoint agent may edit implementation files.

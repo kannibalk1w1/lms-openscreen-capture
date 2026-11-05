@@ -228,16 +228,7 @@ pub struct Capture {
     muxer: Option<Muxer>,
     path: PathBuf,
     fps: i32,
-    /// Monotonic instant of output frame 0. Set when the FIRST frame is staged,
-    /// not at construction: the gap between opening the encoder and the
-    /// compositor's first frame is portal and negotiation latency, and starting
-    /// the timeline before it would put that latency at the head of every
-    /// recording.
-    epoch: Option<Instant>,
-    /// Time spent paused, subtracted from the elapsed clock so a resumed
-    /// recording continues where it left off instead of leaving a gap.
-    paused_total: Duration,
-    paused_at: Option<Instant>,
+    clock: crate::capture_clock::CaptureClock,
     /// The next output frame index to write.
     next_index: i64,
     frames_written: u64,
@@ -402,9 +393,7 @@ impl Capture {
                 muxer: Some(muxer),
                 path: path.to_path_buf(),
                 fps,
-                epoch: None,
-                paused_total: Duration::ZERO,
-                paused_at: None,
+                clock: crate::capture_clock::CaptureClock::default(),
                 next_index: 0,
                 frames_written: 0,
                 committed_width: width,
@@ -470,7 +459,7 @@ impl Capture {
         // Ahead of the dmabuf path so the freeze covers the zero-copy route as
         // well, and so `mark_started` stays untouched: a pause that arrives
         // before the first frame must leave the capture unstarted.
-        if self.paused_at.is_some() {
+        if self.clock.is_paused() {
             return Ok(StageOutcome::Frozen);
         }
         // The rectangle this frame is read from, recorded BEFORE the paths diverge.
@@ -556,10 +545,10 @@ impl Capture {
     /// the backlog would shift the whole track earlier by however long the user
     /// took to click.
     fn mark_started(&mut self) {
-        if self.epoch.is_some() {
+        if self.clock.started() {
             return;
         }
-        self.epoch = Some(Instant::now());
+        self.clock.start(Instant::now());
         if let Some(mix) = &mut self.audio {
             for input in &mut mix.inputs {
                 input.ring.clear();
@@ -571,7 +560,7 @@ impl Capture {
     /// Whether a picture has been staged, which is also whether the timeline has
     /// started.
     pub fn started(&self) -> bool {
-        self.epoch.is_some()
+        self.clock.started()
     }
 
     /// The source rectangle the file is showing. See [`Self::content`].
@@ -592,7 +581,7 @@ impl Capture {
     /// burst to block `stop` (issue #511). Several arrivals inside one 1/fps slot
     /// collapse to one write, which is the correct quantisation.
     pub fn advance(&mut self) -> Result<u32, String> {
-        if self.paused_at.is_some() || !self.encoder.has_staged_frame() {
+        if self.clock.is_paused() || !self.encoder.has_staged_frame() {
             return Ok(0);
         }
         let target = self.current_index();
@@ -620,8 +609,8 @@ impl Capture {
     }
 
     pub fn pause(&mut self) {
-        if self.paused_at.is_none() {
-            self.paused_at = Some(Instant::now());
+        if !self.clock.is_paused() {
+            self.clock.pause(Instant::now());
             // The rings stop taking samples for the duration. What they already
             // hold is audio from before the pause: it is part of the take and
             // stays, and the first drain after resume places it. See
@@ -646,8 +635,8 @@ impl Capture {
     }
 
     pub fn resume(&mut self) {
-        if let Some(since) = self.paused_at.take() {
-            self.paused_total += since.elapsed();
+        if self.clock.is_paused() {
+            self.clock.resume(Instant::now());
             // Nothing was captured while paused, so there is nothing here to
             // throw away — the rings only have to start taking samples again.
             // `pending` is left alone for the same reason the rings are: it
@@ -670,7 +659,7 @@ impl Capture {
     }
 
     pub fn is_paused(&self) -> bool {
-        self.paused_at.is_some()
+        self.clock.is_paused()
     }
 
     /// Flushes the encoder, writes the trailer, and closes the file.
@@ -749,17 +738,29 @@ impl Capture {
         }
     }
 
+    /// Project a reader observation through the encoder's historical active intervals.
+    pub(crate) fn input_projection(&self, at: Instant) -> Option<crate::capture_clock::Projection> {
+        self.clock.project(at)
+    }
+
+    pub(crate) fn input_boundary_elapsed(&self) -> Option<Duration> {
+        self.clock.elapsed_at(self.clock.transition()?)
+    }
+
+    pub(crate) fn input_boundary_instant(&self) -> Option<Instant> {
+        self.clock.transition()
+    }
+
+    pub(crate) fn stop_clock(&mut self, at: Instant) {
+        self.clock.stop(at);
+    }
+
     /// Wall-clock time since the first staged frame, with paused spans removed.
     /// `None` until the timeline has started. The single source of both the PTS
     /// clock (`current_index`) and the divergence telemetry (`wall_clock_ms`), so
     /// the two cannot drift apart by construction.
     pub(crate) fn elapsed_active(&self) -> Option<Duration> {
-        let epoch = self.epoch?;
-        let mut elapsed = epoch.elapsed().saturating_sub(self.paused_total);
-        if let Some(since) = self.paused_at {
-            elapsed = elapsed.saturating_sub(since.elapsed());
-        }
-        Some(elapsed)
+        self.clock.elapsed_at(Instant::now())
     }
 }
 
@@ -1232,6 +1233,55 @@ mod tests {
 
         assert!(!capture.crop_diverged(&frame(320, 240, shim::constants().video_format_bgrx)));
         let _ = capture.finish();
+        let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn reader_projection_uses_the_actual_encoder_epoch_and_pause_transitions() {
+        let output = std::env::temp_dir().join("openscreen-capture-reader-projection.mp4");
+        let (mut capture, _) = Capture::start(
+            &output,
+            320,
+            240,
+            30,
+            Some(1_000_000),
+            Some(Backend::Software),
+            Vec::new(),
+            None,
+        )
+        .expect("start");
+        assert!(capture.input_projection(Instant::now()).is_none());
+        capture
+            .stage(&frame(320, 240, shim::constants().video_format_bgrx))
+            .expect("stage");
+        let start = capture.input_boundary_instant().unwrap();
+        assert_eq!(
+            capture.input_projection(start).unwrap().media_time,
+            Duration::ZERO
+        );
+        assert!(capture
+            .input_projection(start - Duration::from_nanos(1))
+            .is_none());
+        let observed = Instant::now();
+        let expected = observed.duration_since(start);
+        capture.pause();
+        let pause = capture.input_boundary_instant().unwrap();
+        let frozen = capture.input_boundary_elapsed().unwrap();
+        assert_eq!(capture.elapsed_active(), Some(frozen));
+        assert!(capture.input_projection(pause).is_none());
+        capture.resume();
+        let resume = capture.input_boundary_instant().unwrap();
+        let current = capture.input_projection(resume).unwrap();
+        assert_eq!(current.interval_id, 1);
+        assert_eq!(current.media_time, frozen);
+        let historical = capture.input_projection(observed).unwrap();
+        assert_eq!(historical.interval_id, 0);
+        assert_eq!(historical.media_time, expected);
+        let stop = Instant::now();
+        capture.stop_clock(stop);
+        assert!(capture.input_projection(stop).is_none());
+        assert_eq!(capture.elapsed_active(), capture.input_boundary_elapsed());
+        capture.finish().expect("finish");
         let _ = std::fs::remove_file(&output);
     }
 

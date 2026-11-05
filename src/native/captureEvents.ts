@@ -24,7 +24,7 @@ export interface PointerButtonEvidence {
 	timestampMs: number;
 	/** Monotonic milliseconds since the helper clock's first observation. */
 	monotonicMs: number;
-	/** Encoder's active clock at dispatch; excludes pauses. */
+	/** Pause-compacted encoder time. Older helpers used dispatch time; see mediaTimeObservation. */
 	mediaTimeMs: number;
 	/** Linux BTN_* code, 0x110 (left) through 0x117 (task). */
 	code: number;
@@ -34,7 +34,12 @@ export interface PointerButtonEvidence {
 	position: CaptureEventPosition | null;
 	/** Optional for journals written by older helpers. Intervals separate pause boundaries. */
 	intervalId?: number;
-	continuity?: "unmatched-release" | "repeated-press";
+	continuity?: "unmatched-release" | "repeated-press" | "out-of-order";
+	/** Reader receipt time projected through the encoder clock; not physical event time. */
+	mediaTimeObservation?: "reader";
+	dispatchDelayMs?: number;
+	/** Delivered after its interval closed or while recording was paused. */
+	late?: boolean;
 }
 
 export interface InputCaptureStatus {

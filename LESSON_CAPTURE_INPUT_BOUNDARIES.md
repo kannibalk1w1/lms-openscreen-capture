@@ -1,3 +1,8 @@
+> Historical baseline slice below. The feature branch is now authorized for private
+> pushes by [the overnight plan](lesson-capture/OVERNIGHT_PLAN.md). Subsequent
+> [reader-time projection](LESSON_CAPTURE_INPUT_TIMING.md) supersedes its timing
+> limitations; its original validation evidence is retained unchanged.
+
 # Native input capture boundaries — first local slice
 
 The completed typing/association/export/review work is committed and merged into

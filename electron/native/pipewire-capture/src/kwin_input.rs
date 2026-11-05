@@ -1,10 +1,7 @@
 //! Optional compositor input source. Never runs alongside evdev. A disconnected
 //! or invalid stream becomes unavailable; switching sources mid-take could double
 //! count held buttons, so recovery requires a new recording.
-use crate::{
-    events::{monotonic_ms, timestamp_ms},
-    Message,
-};
+use crate::{events::timestamp_ms, Message};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::UnixStream;
@@ -70,10 +67,12 @@ fn forward_edges(reader: &mut impl BufRead, sender: &Sender<Message>) -> Result<
         read_line(reader, &mut line)?;
         let edge = parse_edge(&line, sequence)?;
         sequence += 1;
+        let observed_at = std::time::Instant::now();
         sender
             .send(Message::PointerButton {
                 timestamp_ms: timestamp_ms(),
-                monotonic_ms: monotonic_ms(),
+                monotonic_ms: crate::events::monotonic_ms_at(observed_at),
+                observed_at,
                 code: edge.code,
                 pressed: edge.pressed,
                 device: DRIVER.into(),
