@@ -129,7 +129,17 @@ export async function runPackCommand(
 		...data,
 		capturePrivacy: evidenceAllowed
 			? capturePrivacy
-			: { status: capturePrivacy.status, journalPresent: false },
+			: {
+					status: capturePrivacy.status,
+					journalPresent: false,
+					recoveredFrom: capturePrivacy.status as
+						| "invalid"
+						| "pending"
+						| "interrupted"
+						| "mismatch"
+						| "conflict"
+						| "unavailable",
+				},
 		media: {
 			...media,
 			screenVideoPath: newScreenPath,

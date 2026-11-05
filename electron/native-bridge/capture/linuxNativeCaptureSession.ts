@@ -270,9 +270,12 @@ export class LinuxNativeCaptureSession {
 			this.stoppedResolve = null;
 			this.stoppedReject = null;
 		});
-		child.once("error", (error) => {
-			this.releaseDestination?.();
-			this.process = null;
+		child.on("error", (error) => {
+			// A failed signal is not proof a spawned process exited.
+			if (!child.pid) {
+				this.releaseDestination?.();
+				this.process = null;
+			}
 			this.rejectReady(error);
 		});
 
@@ -572,21 +575,24 @@ export class LinuxNativeCaptureSession {
 		const exited = new Promise<void>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				child.removeListener("exit", done);
-				child.removeListener("error", done);
+				child.removeListener("error", failedSpawn);
 				reject(
 					new Error(
 						"Previous Linux capture helper did not exit; its destination remains reserved.",
 					),
 				);
 			}, 5000);
+			const failedSpawn = () => {
+				if (!child.pid) done();
+			};
 			const done = () => {
 				clearTimeout(timer);
 				child.removeListener("exit", done);
-				child.removeListener("error", done);
+				child.removeListener("error", failedSpawn);
 				resolve();
 			};
 			child.once("exit", done);
-			child.once("error", done);
+			child.on("error", failedSpawn);
 		});
 		this.discard();
 		await exited;

@@ -249,7 +249,11 @@ export async function inspectCapturePrivacy(
 		else if (embedded?.receipt) receipt = capturePrivacyReceiptSchema.parse(embedded.receipt);
 		if (receipt) receipt = minimizeCapturePrivacyReceipt(receipt);
 		if (!receipt)
-			return { status: embedded?.status === "invalid" ? "invalid" : "missing", journalPresent };
+			return {
+				status: embedded?.recoveredFrom ?? (embedded?.status === "invalid" ? "invalid" : "missing"),
+				...(embedded?.recoveredFrom ? { recoveredFrom: embedded.recoveredFrom } : {}),
+				journalPresent,
+			};
 		if (receipt.version === 1 || !receipt.captureId)
 			return { status: "legacy", journalPresent, receipt };
 		if (

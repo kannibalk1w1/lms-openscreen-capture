@@ -7,6 +7,7 @@ import {
 	PROJECT_VERSION,
 } from "../../src/components/video-editor/projectPersistence";
 import { migrateProjectDataToAxcutDocument } from "../../src/lib/ai-edition/document/migrate";
+import { DocumentService } from "../ai-edition/document-service";
 import { type PackedProjectData, runInfoCommand, runPackCommand } from "./projectCommands";
 
 let root = "";
@@ -317,4 +318,38 @@ it("minimizes old receipt identifiers in packed metadata and sidecars while pres
 	for (const file of await fs.readdir(output))
 		expect(await fs.readFile(path.join(output, file), "utf8")).not.toContain("PRIVATE_APP_CANARY");
 	expect(await fs.readFile(`${screen}.capture-policy.json`, "utf8")).toBe(receipt);
+});
+
+it("preserves recovery provenance through real pack, migration and document disk reopen", async () => {
+	const screen = await make("rec/clip.mp4", "unverified media");
+	await make("rec/clip.mp4.capture-policy.lock", "unknown prior owner");
+	const project = await writeProject("demo.openscreen", {
+		version: 1,
+		media: { screenVideoPath: screen },
+	});
+	const output = path.join(root, "recovered");
+	await runPackCommand(project, output, true, recorder().write);
+	const packed = await readProject(path.join(output, "demo.openscreen"));
+	expect(packed.capturePrivacy).toMatchObject({
+		status: "pending",
+		recoveredFrom: "pending",
+		journalPresent: false,
+	});
+	if (!packed.media?.screenVideoPath) throw new Error("Packed screen path missing");
+	const migrated = migrateProjectDataToAxcutDocument({
+		version: PROJECT_VERSION,
+		media: { screenVideoPath: packed.media.screenVideoPath },
+		editor: normalizeProjectEditor({}),
+		capturePrivacy: packed.capturePrivacy,
+	});
+	const service = new DocumentService(path.join(root, "projects"), path.join(root, "links"));
+	await service.saveProject(migrated);
+	const reopened = await service.getProject(migrated.project.id);
+	expect(reopened.assets[0].capturePrivacy).toMatchObject({
+		status: "pending",
+		recoveredFrom: "pending",
+		journalPresent: false,
+	});
+	expect(reopened.assets[0].capturePrivacy?.receipt).toBeUndefined();
+	expect(await fs.readFile(`${screen}.capture-policy.lock`, "utf8")).toBe("unknown prior owner");
 });

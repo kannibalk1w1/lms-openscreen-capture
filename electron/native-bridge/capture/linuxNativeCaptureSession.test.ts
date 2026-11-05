@@ -204,6 +204,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 });
 
 describe("LinuxNativeCaptureSession", () => {
@@ -1427,7 +1428,8 @@ it("keeps revocation effective while the safe capability probe is still pending"
 it.each([
 	"microphone",
 	"revoke",
-])("renegotiates the same recording identity after a %s change only after actual child exit", async (change) => {
+	"late-exit",
+])("handles %s replacement only after actual child exit", async (change) => {
 	const root = mkdtempSync(join(tmpdir(), "countdown-lock-"));
 	try {
 		const children: FakeHelper[] = [];
@@ -1478,6 +1480,7 @@ it.each([
 		expect(await preparing).toMatchObject({ success: true });
 		const next = {
 			...request,
+			...(change === "late-exit" ? { recordingId: 8 } : {}),
 			audio: { ...request.audio, microphone: { enabled: change === "microphone", gain: 1 } },
 		};
 		if (change === "revoke") {
@@ -1485,29 +1488,71 @@ it.each([
 			manager.requestPolicy(policy);
 			manager.confirmPolicy(policy);
 		}
+		if (change === "late-exit") {
+			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+			const kill = vi.spyOn(children[0], "kill");
+			const cancel = handlers.get("cancel-native-linux-prepare")!(null, request);
+			expect(children[0].killed).toBe(true);
+			await vi.advanceTimersByTimeAsync(500);
+			expect(kill).toHaveBeenCalledWith("SIGKILL");
+			await vi.advanceTimersByTimeAsync(4500);
+			expect(await cancel).toMatchObject({ success: false });
+			expect(existsSync(join(root, "recording-7.mp4.capture-policy.lock"))).toBe(true);
+			children[0].emit("exit", null, "SIGKILL");
+			vi.useRealTimers();
+		}
 		const starting = handlers.get("start-native-linux-recording")!(null, next);
 		await vi.waitFor(() => expect(children[0].killed).toBe(true));
-		expect(children).toHaveLength(1);
-		expect(existsSync(join(root, "recording-7.mp4.capture-policy.lock"))).toBe(true);
-		children[0].emit("exit", null, "SIGTERM");
+		if (change !== "late-exit") expect(children).toHaveLength(1);
+		if (change !== "late-exit") {
+			expect(existsSync(join(root, "recording-7.mp4.capture-policy.lock"))).toBe(true);
+			children[0].emit("exit", null, "SIGTERM");
+		}
 		await vi.waitFor(() => expect(children).toHaveLength(2));
 		children[1].emitEvent({ event: "ready", timestampMs: 1100 });
 		children[1].emitEvent({ event: "source-selected", timestampMs: 1110, sourceKind: "window" });
 		children[1].emitEvent({
 			event: "capture-started",
 			timestampMs: 1120,
-			path: join(root, "recording-7.mp4"),
+			path: join(root, `recording-${next.recordingId}.mp4`),
 			width: 800,
 			height: 600,
 			fps: 30,
 		});
-		expect(await starting).toMatchObject({ success: true, recordingId: 7 });
+		expect(await starting).toMatchObject({
+			success: true,
+			recordingId: change === "late-exit" ? 8 : 7,
+		});
 		const args = JSON.parse((spawnMock.mock.calls[1][1] as string[])[0]);
 		expect(args.capturePointerButtons).toBe(change !== "revoke");
 		expect(args.audio.microphone.enabled).toBe(change === "microphone");
 		expect(started).toHaveBeenCalledTimes(1);
 		sessions[1].discard();
 		children[1].emit("exit", null, "SIGTERM");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+it("keeps a spawned helper reservation after a signal error until proven exit", async () => {
+	const root = mkdtempSync(join(tmpdir(), "capture-signal-error-"));
+	try {
+		Object.defineProperty(helper, "pid", { value: process.pid });
+		const video = join(root, "take.mp4");
+		const session = newSession(true, video);
+		await startReady(session);
+		helper.emit("error", Object.assign(new Error("signal failed"), { code: "EPERM" }));
+		expect(existsSync(`${video}.capture-policy.lock`)).toBe(true);
+		const waited = session.discardAndWait();
+		let finished = false;
+		void waited.then(() => {
+			finished = true;
+		});
+		await flushStdout();
+		expect(finished).toBe(false);
+		helper.emit("exit", null, "SIGTERM");
+		await waited;
+		expect(existsSync(`${video}.capture-policy.lock`)).toBe(false);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

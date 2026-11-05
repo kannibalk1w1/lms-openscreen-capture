@@ -42,6 +42,7 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 import { spawn } from "node:child_process";
+import { PipeWireCursorAccumulator } from "./pipeWireCursorAccumulator";
 import { PipeWireCursorRecordingSession } from "./pipeWireCursorRecordingSession";
 
 /** Minimal stand-in for the helper process: stdio pipes plus kill bookkeeping. */
@@ -402,4 +403,27 @@ it("ignores malformed private envelopes without logging raw data or breaking the
 	);
 	expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain("PRIVATE_CURSOR_CANARY");
 	expect(helper.killed).toBe(false);
+});
+
+it("distinguishes a handler fault from malformed input without leaking exception or payload", async () => {
+	await startReady(newSession());
+	vi.spyOn(PipeWireCursorAccumulator.prototype, "addSample").mockImplementationOnce(() => {
+		throw new Error("PRIVATE_EXCEPTION_CANARY");
+	});
+	helper.emitEvent({
+		event: "cursor-sample",
+		timestampMs: 1001,
+		x: 1,
+		y: 1,
+		width: 20,
+		height: 20,
+		visible: true,
+		private: "PRIVATE_PAYLOAD_CANARY",
+	});
+	helper.stdout.write("PRIVATE_MALFORMED_CANARY\n");
+	await flushStdout();
+	const errors = vi.mocked(console.error).mock.calls;
+	expect(errors).toContainEqual(["[cursor-linux] helper handler failed; record omitted"]);
+	expect(errors).toContainEqual(["[cursor-linux] malformed helper record omitted"]);
+	expect(JSON.stringify(errors)).not.toContain("PRIVATE_");
 });

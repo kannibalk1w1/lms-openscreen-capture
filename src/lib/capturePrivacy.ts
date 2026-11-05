@@ -120,6 +120,9 @@ export const capturePrivacyInspectionSchema = z
 			"conflict",
 		]),
 		journalPresent: z.boolean(),
+		recoveredFrom: z
+			.enum(["invalid", "pending", "interrupted", "mismatch", "conflict", "unavailable"])
+			.optional(),
 		receipt: capturePrivacyReceiptSchema.optional(),
 		binding: capturePrivacyBindingSchema.optional(),
 	})

@@ -52,7 +52,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 	} | null = null;
 	private preparing: { token: symbol; session: T | null } | null = null;
 	private last: T | null = null;
-	private retiring: Promise<void> = Promise.resolve();
+	private readonly retiring = new Set<T>();
 	private starting = false;
 	private revoked = false;
 	constructor(private readonly context: Context<T>) {}
@@ -61,8 +61,15 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 		this.context.handle("prepare-native-linux-recording", (_, request) => this.prepare(request));
 		this.context.handle("start-native-linux-recording", (_, request) => this.start(request));
 		this.context.handle("cancel-native-linux-prepare", async () => {
-			await this.cancel();
-			return { success: true };
+			try {
+				await this.cancel();
+				return { success: true };
+			} catch {
+				return {
+					success: false,
+					error: "Previous capture helper has not exited; its destination remains protected.",
+				};
+			}
 		});
 	}
 
@@ -85,19 +92,23 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			session?.suppressButtonEvidence();
 	}
 	cancel(): Promise<void> {
-		const sessions = new Set([this.preparing?.session, this.prepared?.session]);
+		for (const session of [this.preparing?.session, this.prepared?.session])
+			if (session) this.retiring.add(session);
 		this.preparing = null;
 		this.prepared = null;
-		// Start teardown immediately; retain a barrier for subsequent prepare/start calls.
-		const retiring = [...sessions]
-			.filter((session): session is T => !!session)
-			.map((session) => session.discardAndWait());
-		this.retiring = Promise.all([this.retiring.catch(() => undefined), ...retiring]).then(
-			() => undefined,
+		const pending = this.waitForRetiring();
+		// Some cancellation callers only invalidate an in-flight prepare.
+		void pending.catch(() => undefined);
+		return pending;
+	}
+	private async waitForRetiring(): Promise<void> {
+		await Promise.all(
+			[...this.retiring].map(async (session) => {
+				// A timeout retains this session. A later call rechecks actual process exit.
+				await session.discardAndWait();
+				this.retiring.delete(session);
+			}),
 		);
-		// Callers that only invalidate still must not cause an unhandled rejection.
-		void this.retiring.catch(() => undefined);
-		return this.retiring;
 	}
 
 	private canonical(request: NativeLinuxRecordingRequest): NativeLinuxRecordingRequest {
@@ -167,7 +178,8 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			prepared.outputPath !== outputPath ||
 			this.settings(prepared.request) !== this.settings(request)
 		) {
-			await prepared.session.discardAndWait();
+			this.retiring.add(prepared.session);
+			await this.waitForRetiring();
 			return null;
 		}
 		return prepared.session;
@@ -222,7 +234,7 @@ export class LinuxCaptureStartup<T extends LinuxStartupSession> {
 			outputPath = identity.outputPath;
 			await this.context.mkdir();
 			const request = this.canonical(input);
-			await this.retiring;
+			await this.waitForRetiring();
 			const prepared = await this.takePrepared(outputPath, request);
 			if (this.preparing) await this.cancel();
 			const session =

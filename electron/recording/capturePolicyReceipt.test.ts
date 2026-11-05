@@ -174,6 +174,32 @@ it("distinguishes dead owners from active or unknown reservations without cleari
 		expect((await inspectCapturePrivacy(video)).status).toBe("pending");
 		writeFileSync(
 			lock,
+			JSON.stringify({
+				...owner,
+				ownerPid: deadPid,
+				ownerBirth: undefined,
+				phase: "helper",
+				helperPid: deadPid,
+			}),
+		);
+		expect((await inspectCapturePrivacy(video)).status).toBe("interrupted");
+		writeFileSync(
+			lock,
+			JSON.stringify({
+				...owner,
+				ownerPid: deadPid,
+				ownerBirth: undefined,
+				phase: "helper",
+				helperPid: process.pid,
+				helperBirth: "different-verified-birth",
+			}),
+		);
+		// /proc birth proof is available on Linux; other hosts conservatively retain pending.
+		expect((await inspectCapturePrivacy(video)).status).toBe(
+			process.platform === "linux" ? "interrupted" : "pending",
+		);
+		writeFileSync(
+			lock,
 			JSON.stringify({ ...owner, ownerPid: deadPid, ownerBirth: undefined, phase: "launching" }),
 		);
 		expect((await inspectCapturePrivacy(video)).status).toBe("pending");

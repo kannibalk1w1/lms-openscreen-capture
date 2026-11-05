@@ -129,6 +129,7 @@ export interface ProjectEditorState {
 }
 
 export interface EditorProjectData {
+	capturePrivacy?: import("@/lib/capturePrivacy").CapturePrivacyInspection;
 	version: number;
 	media?: ProjectMedia;
 	editor: ProjectEditorState;

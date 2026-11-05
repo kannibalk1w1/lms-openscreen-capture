@@ -1,5 +1,9 @@
 # Countdown replacement and privacy recovery — overnight slice 7
 
+Historical slice-7 validation. [Slice 8 disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_7.md)
+preserves recovery provenance across legacy migration/reopen and reconciles a timed-out
+teardown only on proven exit, with requested diagnostic/ownership regressions.
+
 Actual [Claude review 6](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_6.md) independently
 confirmed all review-5 fixes at `d6fd5302`, but reproduced a High countdown lock
 regression and Medium optional metadata load failure. This slice fixes those and

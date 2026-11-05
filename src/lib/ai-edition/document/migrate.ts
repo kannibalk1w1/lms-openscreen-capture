@@ -130,6 +130,7 @@ export function migrateProjectDataToAxcutDocument(
 					kind: "video" as const,
 					label: screenPath.split(/[\\/]/).pop() || "Recording",
 					originalPath: screenPath,
+					...(input.capturePrivacy ? { capturePrivacy: input.capturePrivacy } : {}),
 					cameraTrack: webcamVideoPath
 						? { sourcePath: webcamVideoPath, startMs: 0, offsetMs: webcamOffsetMs, visible: true }
 						: null,
@@ -394,5 +395,6 @@ export function migrateAxcutDocumentToProjectData(input: AxcutDocument): EditorP
 		...(media ? { media } : {}),
 		editor,
 		...(primary ? { videoPath: primary.originalPath } : {}),
+		...(primary?.capturePrivacy ? { capturePrivacy: primary.capturePrivacy } : {}),
 	};
 }
