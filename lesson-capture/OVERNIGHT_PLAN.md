@@ -1,0 +1,72 @@
+# Overnight implementation — 5–6 November 2026
+
+User authorization: start now, finish at **08:00 Europe/London on 6 November**
+(08:00 UTC). Machine remains awake, powered and online with Orca open. Use the
+current signed-in Codex/Claude plans, never paid API credentials. Codex implements;
+Claude reviews completed commits. Commit each validated slice and push only the
+private feature branch `lesson-capture/input-boundaries`. Leave local and private
+main at `fd2775e2dbc540306b46085eb0301fa06a6a3aaa`.
+
+## Scope and working rules
+
+Work only in this existing nested openscreen checkout. Read AGENTS.md and the
+current LESSON_CAPTURE_ROADMAP.md before implementation; NEXT_CONTEXT_IMPLEMENTATION.md
+is historical context, superseded by the newer roadmap and this authorization.
+Do not create checkouts, reset/stash, discard prior work, force push, publish,
+enable repository Actions, push upstream, change credentials or modify real lesson
+projects. Optional Godot adapters remain opt-in. Use disposable fixtures/copies.
+Preserve existing Claude reports; new reviews use unique filenames.
+
+One implementation writer at a time. Claude reviews an explicit committed SHA
+read-only, except its uniquely named report. Do not stage another worker's files
+while it writes. Use Orca orchestration for Claude review and report results to
+the coordinator. No unrequested extra agents or model overrides. Authentication
+was verified: Codex ChatGPT login and Claude first-party claude.ai Pro.
+
+## Queue
+
+1. Observation-time native input/media projection over recorded pause intervals,
+   late queued input, stop drain and device loss, as achievable in coherent slices.
+   Preserve raw evidence and mark uncertainty; never fabricate edges or timing.
+2. Explicit live Godot/recording clock bridge and pause awareness with measured
+   bounds. Reuse clocks/session infrastructure; never infer exact timing from UTC.
+3. Presentation/review debt: excerpt caret bounds, SVG validation, conflicting flag
+   shortcut and non-native HUD state; font/clipping and rendering cost as feasible.
+4. Richer event review and agent workflows: evidence lanes/queries, selection and
+   controlled exports, following the current roadmap and existing contracts.
+5. Broaden acceptance and portability with available disposable fixtures. Physical
+   devices, Windows/macOS and real RPG Enemy proof remain open without suitable
+   hardware or a supplied fixture. Continue independent work when blocked.
+
+Choose achievable slices; this queue is a priority order, not a promise of complete
+production acceptance overnight. Incorporate Claude findings before moving on;
+send fixes back for review when material. Retain original capture evidence.
+
+## Validation and reporting
+
+Use pinned Node 22.22.1 and npm (see handoff). Run focused meaningful tests during
+implementation, both TypeScript configurations where relevant, lint/docs checks,
+and appropriate builds. Native changes require Rust tests and rebuilt helper
+identity. Run the full unit suite at milestones/final completion, not each edit.
+Record precise pass/fail/skip counts, commands, artifacts and scope. Fixtures,
+CDP/Xvfb and offline rendering do not prove real desktop capture or physical input.
+The last native slice had 5,330 Vitest passes; Rust 111 passed/one ignored; manual
+desktop acceptance remains skipped because screenshot/hotkey/focus support was
+unavailable. Do not reuse those results as validation of new changes.
+
+After every build, state coverage and the next concrete roadmap item. Commit and
+push each completed validated slice to `private` on the feature branch, verify
+remote SHA, and keep exact coverage documents current. Record failures honestly;
+never call an unreviewed slice approved or a partial pass production ready.
+
+Check wall time before each new slice and long command. **At 07:30 stop starting
+implementation**, finish/checkpoint the current slice, run final checks and prepare
+`lesson-capture/OVERNIGHT_REPORT_2026-11-06.md`. **At 08:00 stop development** and
+report completed commits, branch/remote HEAD, review findings, test coverage,
+remaining work and blockers. Preserve incomplete changes and label them explicitly;
+do not commit broken work as validated. Long commands must have suitable timeouts.
+Scheduled checkpoints are cooperative prompts, not forced process termination.
+
+The coordinator arranges 07:30 and 08:00 Orca checkpoints in this existing
+workspace. The scheduled agents must remain read-only coordinators, send deadline
+guidance to the implementation dispatch, and avoid competing code changes.
