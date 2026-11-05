@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,8 +15,13 @@ import {
 	factoryStylePresetAppearance,
 	stylePresetAppearanceFromSettings,
 } from "../../src/lib/ai-edition/stylePresetsEditor";
+import { disabledCapturePrivacyPolicy } from "../../src/lib/capturePrivacy";
 import { TypingCapture } from "../../src/lib/typing/capture";
 import { registerMediaLinks } from "../media/mediaLinksRegistry";
+import {
+	bindCapturePolicyToMedia,
+	writeCapturePolicyReceipt,
+} from "../recording/capturePolicyReceipt";
 import {
 	DocumentNotFoundError,
 	DocumentService,
@@ -45,6 +51,34 @@ describe("DocumentService", () => {
 		await fs.rm(mediaDir, { recursive: true, force: true });
 	});
 
+	it("imports, persists and reopens source-bound policy, then reports modified media", async () => {
+		const video = path.join(mediaDir, "policy.mp4");
+		await fs.writeFile(video, "completed media");
+		const captureId = randomUUID();
+		writeCapturePolicyReceipt(video, {
+			version: 2,
+			captureId,
+			policy: disabledCapturePrivacyPolicy(),
+			applicationIdentity: "unavailable",
+			collectionAllowedAtStart: false,
+			suppressedAtStart: false,
+		});
+		await bindCapturePolicyToMedia(video, captureId);
+		const created = await service.createProject("Source policy");
+		const added = await service.addAsset(created.project.id, { path: video });
+		expect(added.assets[0].capturePrivacy?.status).toBe("bound");
+		await fs.unlink(`${video}.capture-policy.json`);
+		await fs.unlink(`${video}.capture-policy.binding.json`);
+		const reopened = await new DocumentService(tempDir, mediaDir).getProject(created.project.id);
+		expect(reopened.assets[0].capturePrivacy?.status).toBe("bound");
+		await fs.writeFile(video, "changed media");
+		const changed = await new DocumentService(tempDir, mediaDir).getProject(created.project.id);
+		expect(changed.assets[0].capturePrivacy?.status).toBe("mismatch");
+		await fs.writeFile(`${video}.capture-policy.json`, "PRIVATE_RECEIPT_CANARY");
+		const invalid = await new DocumentService(tempDir, mediaDir).getProject(created.project.id);
+		expect(invalid.assets[0].capturePrivacy?.status).toBe("invalid");
+		expect(JSON.stringify(invalid)).not.toContain("PRIVATE_RECEIPT_CANARY");
+	});
 	describe("createProject", () => {
 		it("saves typing evidence and section pacing through an actual disk reopen", async () => {
 			const doc = await service.createProject("Typing proof");

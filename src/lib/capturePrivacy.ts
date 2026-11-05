@@ -58,3 +58,49 @@ export function decideButtonCollection(
 		return { allowed: true, scope: "applications", reason: "application-allowed" };
 	return { allowed: false, scope: "none", reason: "application-not-allowed" };
 }
+
+const receiptFields = {
+	policy: capturePrivacyPolicySchema,
+	applicationIdentity: z.literal("unavailable"),
+	collectionAllowedAtStart: z.boolean(),
+	suppressedAtStart: z.boolean(),
+};
+export const capturePrivacyReceiptSchema = z
+	.discriminatedUnion("version", [
+		z.object({ version: z.literal(1), ...receiptFields }).strict(),
+		z.object({ version: z.literal(2), captureId: z.string().uuid(), ...receiptFields }).strict(),
+	])
+	.refine(
+		(receipt) =>
+			receipt.collectionAllowedAtStart ===
+			decideButtonCollection(receipt.policy, null, receipt.suppressedAtStart).allowed,
+		"Policy receipt decision is inconsistent",
+	);
+export type CapturePrivacyReceipt = z.infer<typeof capturePrivacyReceiptSchema>;
+export const capturePrivacyBindingSchema = z
+	.object({
+		version: z.literal(1),
+		captureId: z.string().uuid(),
+		sizeBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+		sha256: z.string().regex(/^[a-f0-9]{64}$/),
+	})
+	.strict();
+export type CapturePrivacyBinding = z.infer<typeof capturePrivacyBindingSchema>;
+export const capturePrivacyInspectionSchema = z
+	.object({
+		status: z.enum([
+			"missing",
+			"legacy",
+			"pending",
+			"invalid",
+			"mismatch",
+			"bound",
+			"unavailable",
+			"conflict",
+		]),
+		journalPresent: z.boolean(),
+		receipt: capturePrivacyReceiptSchema.optional(),
+		binding: capturePrivacyBindingSchema.optional(),
+	})
+	.strict();
+export type CapturePrivacyInspection = z.infer<typeof capturePrivacyInspectionSchema>;

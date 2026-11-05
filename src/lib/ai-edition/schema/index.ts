@@ -1,3 +1,4 @@
+import { capturePrivacyInspectionSchema } from "../../capturePrivacy";
 // Vendored from @axcut/schema (https://github.com/EtienneLescot/axcut) —
 // original file: packages/axcut-schema/src/index.ts. Modifications for
 // OpenScreen's AI-edition merge (Phase 0, see technical-documentation/architecture/document-model.md):
@@ -200,6 +201,7 @@ export const assetSchema = z.object({
 	// Source-time teaching flags follow every placement of this recording.
 	recordingFlags: z.array(recordingFlagSchema).max(10000).optional(),
 	recordingClock: recordingClockSchema.optional(),
+	capturePrivacy: capturePrivacyInspectionSchema.optional(),
 });
 
 // A crop is a sub-rectangle of the source video, expressed as fractions

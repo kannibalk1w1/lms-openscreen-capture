@@ -93,7 +93,10 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
 2. The [Linux button collection policy](LESSON_CAPTURE_PRIVACY.md) now provides
    default-off/explicit global consent, fail-closed unknown application scope,
    producer/storage gates, live suppression, durable receipts and canary tests.
-   Its exact-SHA review is pending. It is a bounded collection gate, not complete
+   Actual [review 5](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_5.md) found two Medium
+   gaps; the [privacy lifecycle follow-up](LESSON_CAPTURE_PRIVACY_FOLLOWUP.md) fixes
+   asynchronous consent and adds real source-bound import/reopen inspection,
+   awaiting its own exact-SHA re-review. It is a bounded collection gate, not complete
    text/media redaction, retention exclusions or pre-export privacy inspection.
 3. Establish the simple optional capability interface, integration controls and
    disabled/failure/isolation/reopen regressions before deep Godot expansion.

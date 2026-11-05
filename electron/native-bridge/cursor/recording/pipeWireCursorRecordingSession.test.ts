@@ -384,3 +384,22 @@ describe("PipeWireCursorRecordingSession", () => {
 		expect(helper.killed).toBe(false);
 	});
 });
+
+it("ignores malformed private envelopes without logging raw data or breaking the cursor stream", async () => {
+	const session = newSession();
+	await startReady(session);
+	helper.stdout.write("PRIVATE_CURSOR_CANARY malformed\nnull\n[]\n");
+	helper.emitEvent({ event: "warning", message: "PRIVATE_CURSOR_CANARY" });
+	helper.emitEvent({
+		event: "pointer-button",
+		device: "PRIVATE_CURSOR_CANARY",
+		code: 272,
+		pressed: true,
+	});
+	await flushStdout();
+	expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+		"PRIVATE_CURSOR_CANARY",
+	);
+	expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain("PRIVATE_CURSOR_CANARY");
+	expect(helper.killed).toBe(false);
+});

@@ -41,7 +41,16 @@ describe("recording state routing", () => {
 	});
 
 	it.each(["windows", "mac", "linux"])("a native %s start and stop notify it", (platform) => {
-		expect(handlerBody(`start-native-${platform}-recording`)).toContain("setAppRecording(true");
+		if (platform === "linux") {
+			const start = source.indexOf("onStarted: (session, recordingId, cursorMode) => {");
+			expect(start).toBeGreaterThan(-1);
+			expect(source.slice(start, source.indexOf("removeEmptyOutput:", start))).toContain(
+				"setAppRecording(true",
+			);
+			expect(source).toContain("linuxCaptureStartup.register()");
+		} else {
+			expect(handlerBody(`start-native-${platform}-recording`)).toContain("setAppRecording(true");
+		}
 		expect(handlerBody(`stop-native-${platform}-recording`)).toContain("setAppRecording(false");
 	});
 

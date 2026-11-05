@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useScopedT } from "@/contexts/I18nContext";
 import {
 	type CapturePrivacyPolicy,
@@ -11,6 +11,7 @@ import styles from "./LaunchWindow.module.css";
 export function ButtonEvidenceSettings() {
 	const t = useScopedT("launch");
 	const id = useId();
+	const appliedPolicy = useRef<string | null>(null);
 	const [policy, setPolicy] = useState(disabledCapturePrivacyPolicy);
 	const [ready, setReady] = useState(false);
 	const [busy, setBusy] = useState(false);
@@ -23,6 +24,9 @@ export function ButtonEvidenceSettings() {
 		const apply = (value: unknown) => {
 			if (disposed) return;
 			const next = normalizeCapturePrivacyPolicy(value);
+			const serialized = JSON.stringify(next);
+			if (appliedPolicy.current === serialized) return;
+			appliedPolicy.current = serialized;
 			setPolicy(next);
 			setAllowed(next.allowedApplications.join("\n"));
 			setExcluded(next.excludedApplications.join("\n"));

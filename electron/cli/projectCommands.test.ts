@@ -85,8 +85,15 @@ describe("runPackCommand", () => {
 		await make("rec/clip.mp4.flags.json", flags);
 		const privacy = JSON.stringify({
 			version: 1,
-			policy: { buttonScope: "off" },
-			collectionAllowedAtStart: false,
+			policy: {
+				version: 1,
+				buttonScope: "global",
+				allowedApplications: [],
+				excludedApplications: [],
+			},
+			collectionAllowedAtStart: true,
+			applicationIdentity: "unavailable",
+			suppressedAtStart: false,
 		});
 		await make("rec/clip.mp4.capture-policy.json", privacy);
 		const project = await writeProject("demo.openscreen", {
@@ -102,6 +109,21 @@ describe("runPackCommand", () => {
 		);
 	});
 
+	it("refuses malformed privacy before copying source or private evidence", async () => {
+		const screen = await make("rec/clip.mp4", "video bytes");
+		await make("rec/clip.mp4.events.ndjson", "PRIVATE_PACK_CANARY");
+		await make("rec/clip.mp4.capture-policy.json", "PRIVATE_RECEIPT_CANARY");
+		const project = await writeProject("demo.openscreen", {
+			version: 1,
+			media: { screenVideoPath: screen },
+		});
+		const output = path.join(root, "packed");
+		const out = recorder();
+		await expect(runPackCommand(project, output, false, out.write)).rejects.toThrow(
+			"privacy is invalid",
+		);
+		expect(await fs.readdir(output)).toEqual([]);
+	});
 	it("keeps screen and webcam apart when they share a basename", async () => {
 		const screen = await make("rec/a/clip.mp4", "screen");
 		const webcam = await make("rec/b/clip.mp4", "webcam");

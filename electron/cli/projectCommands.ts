@@ -1,3 +1,4 @@
+import { inspectCapturePrivacy } from "../recording/capturePolicyReceipt";
 // The two CLI commands that only touch the project file and its media:
 // `openscreen pack` and `openscreen info`. They live outside cliMain.ts so they
 // carry no `electron` import and stay unit-testable — the caller passes the
@@ -11,6 +12,7 @@ import { isAxcutDocumentFile, parseDocumentFile } from "../../src/lib/ai-edition
 export type CliWriter = (text: string) => void;
 
 export interface PackedProjectData {
+	capturePrivacy?: import("../../src/lib/capturePrivacy").CapturePrivacyInspection;
 	version?: number;
 	media?: { screenVideoPath?: string; webcamVideoPath?: string; cursorCaptureMode?: string };
 	videoPath?: string;
@@ -80,6 +82,15 @@ export async function runPackCommand(
 	};
 
 	const screenSource = await resolveSource(screenVideoPath);
+	const capturePrivacy = await inspectCapturePrivacy(screenSource, data.capturePrivacy);
+	if (["invalid", "mismatch", "pending", "conflict", "unavailable"].includes(capturePrivacy.status))
+		throw new Error(
+			`Capture privacy is ${capturePrivacy.status}; refusing to attribute or package these evidence sidecars.`,
+		);
+	if (capturePrivacy.status !== "bound" && capturePrivacy.journalPresent)
+		emit(
+			"Warning: input evidence has no source-bound policy receipt; it remains unverified legacy evidence.",
+		);
 	const newScreenPath = await copyIn(screenSource);
 
 	let newWebcamPath: string | undefined;
@@ -100,12 +111,15 @@ export async function runPackCommand(
 
 	const capturePolicy = `${screenSource}.capture-policy.json`;
 	if (await isFile(capturePolicy)) await copyIn(capturePolicy);
+	const captureBinding = `${screenSource}.capture-policy.binding.json`;
+	if (await isFile(captureBinding)) await copyIn(captureBinding);
 
 	const flagsSidecar = `${screenSource}.flags.json`;
 	if (await isFile(flagsSidecar)) await copyIn(flagsSidecar);
 
 	const packedProject: PackedProjectData = {
 		...data,
+		capturePrivacy,
 		media: {
 			...media,
 			screenVideoPath: newScreenPath,

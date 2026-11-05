@@ -1,3 +1,4 @@
+import { inspectCapturePrivacy } from "../recording/capturePolicyReceipt";
 // DocumentService — main-process owner of v3 AxcutDocument projects.
 // Persists one .openscreen JSON per project under userData/projects/ (the file
 // carries its own `schemaVersion`, so migration keys off the content, not the
@@ -456,6 +457,12 @@ export class DocumentService {
 		const document = documentSchema.parse(
 			await relinkProjectMedia(migrated, this.mediaRegistryDir),
 		);
+		for (const asset of document.assets) {
+			if (asset.kind !== "video") continue;
+			const inspection = await inspectCapturePrivacy(asset.originalPath, asset.capturePrivacy);
+			if (inspection.status !== "missing" || inspection.journalPresent || asset.capturePrivacy)
+				asset.capturePrivacy = inspection;
+		}
 		// AFTER the relink, so what is granted is the path the renderer will actually ask for.
 		this.onProjectRead?.(document);
 		return document;
@@ -600,6 +607,9 @@ export class DocumentService {
 			cameraTrack: null,
 		};
 		if (asset.kind === "video") {
+			const inspection = await inspectCapturePrivacy(absolutePath);
+			if (inspection.status !== "missing" || inspection.journalPresent)
+				asset.capturePrivacy = inspection;
 			const { flags, recordingClock } = await readRecordingFlagData(absolutePath);
 			if (recordingClock) asset.recordingClock = recordingClock;
 			if (flags.length) asset.recordingFlags = flags;

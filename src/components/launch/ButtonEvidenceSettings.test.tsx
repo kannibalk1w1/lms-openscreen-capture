@@ -76,3 +76,29 @@ it("does not apply an old initial read after a newer preference notification", a
 	});
 	expect(screen.getByRole("combobox")).toHaveValue("global");
 });
+
+it("keeps unsaved application rules through unrelated preference broadcasts", async () => {
+	let listener: (value: { capturePrivacyPolicy: unknown }) => void = () => undefined;
+	const policy = {
+		...disabledCapturePrivacyPolicy(),
+		buttonScope: "applications" as const,
+		allowedApplications: ["teaching.app"],
+	};
+	Object.assign(window, {
+		electronAPI: {
+			getRecordingPrefs: vi.fn().mockResolvedValue({ capturePrivacyPolicy: policy }),
+			onRecordingPrefsChanged: vi.fn((callback) => {
+				listener = callback;
+				return vi.fn();
+			}),
+		},
+	});
+	render(<ButtonEvidenceSettings />);
+	await waitFor(() => expect(screen.getByRole("combobox")).toBeEnabled());
+	const draft = screen.getByLabelText("buttonPrivacy.allowed");
+	fireEvent.change(draft, { target: { value: "unsaved.app" } });
+	await act(async () => {
+		listener({ capturePrivacyPolicy: policy });
+	});
+	expect(draft).toHaveValue("unsaved.app");
+});

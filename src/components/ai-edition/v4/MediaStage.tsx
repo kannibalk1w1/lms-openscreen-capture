@@ -28,6 +28,7 @@ import {
 	TranscriptionStatusDot,
 	useTranscriptionLabel,
 } from "../TranscriptionStatus";
+import { CapturePrivacyNotice } from "./CapturePrivacyNotice";
 import styles from "./EditorShellV4.module.css";
 
 const ASSET_MIME = "application/x-axcut-asset";
@@ -292,6 +293,7 @@ export function MediaStage({
 							>
 								{selected.label || basename(selected.originalPath)}
 							</div>
+							<CapturePrivacyNotice asset={selected} />
 							<button
 								type="button"
 								onClick={addSelectedToTimeline}

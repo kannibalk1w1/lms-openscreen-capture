@@ -1,4 +1,5 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import type { Readable, Writable } from "node:stream";
 import {
 	type CapturePrivacyPolicy,
@@ -8,7 +9,11 @@ import {
 import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
 import { CaptureEventJournal } from "../../recording/captureEventJournal";
-import { writeCapturePolicyReceipt } from "../../recording/capturePolicyReceipt";
+import {
+	bindCapturePolicyToMedia,
+	reserveCaptureDestination,
+	writeCapturePolicyReceipt,
+} from "../../recording/capturePolicyReceipt";
 import type { CursorPauseRange } from "../cursor/recording/cursorPauseRanges";
 import {
 	NdjsonLineReader,
@@ -120,6 +125,10 @@ export interface LinuxCaptureResult {
 }
 
 export class LinuxNativeCaptureSession {
+	private readonly captureId = randomUUID();
+	private releaseDestination: (() => void) | undefined;
+	private discarded = false;
+	private bindingPromise: Promise<void> | undefined;
 	private readonly privacyPolicy: CapturePrivacyPolicy;
 	private inputSuppressed = false;
 	private capturePolicyPath: string | undefined;
@@ -182,7 +191,18 @@ export class LinuxNativeCaptureSession {
 			);
 		}
 
-		await requireButtonPrivacyHelper(helperPath);
+		if (this.config.capturePrivacyPolicy !== undefined)
+			this.releaseDestination = reserveCaptureDestination(this.config.outputPath, this.captureId);
+		try {
+			await requireButtonPrivacyHelper(helperPath);
+		} catch (error) {
+			this.releaseDestination?.();
+			throw error;
+		}
+		if (this.discarded) {
+			this.releaseDestination?.();
+			throw new Error("Capture was cancelled before helper launch");
+		}
 
 		this.cursor.reset(Date.now());
 		this.lines.reset();
@@ -219,6 +239,7 @@ export class LinuxNativeCaptureSession {
 			}
 		});
 		child.once("exit", (code, signal) => {
+			this.releaseDestination?.();
 			this.process = null;
 			if (this.capturing && !this.stopped) this.inputInterrupted = true;
 			const reason =
@@ -246,6 +267,7 @@ export class LinuxNativeCaptureSession {
 			this.stoppedReject = null;
 		});
 		child.once("error", (error) => {
+			this.releaseDestination?.();
 			this.process = null;
 			this.rejectReady(error);
 		});
@@ -478,6 +500,7 @@ export class LinuxNativeCaptureSession {
 		const child = this.process;
 		if (!child) {
 			if (this.stopped) {
+				await this.finalizePolicyBinding();
 				return this.stopped;
 			}
 			throw new Error("The Linux capture helper is not running.");
@@ -508,11 +531,25 @@ export class LinuxNativeCaptureSession {
 		if (!this.stopped) {
 			throw new Error(this.lastError ?? "The Linux capture helper produced no output file.");
 		}
+		await this.finalizePolicyBinding();
 		return this.stopped;
+	}
+
+	private finalizePolicyBinding(): Promise<void> {
+		if (!this.capturePolicyPath) return Promise.resolve();
+		if (!this.bindingPromise)
+			this.bindingPromise = bindCapturePolicyToMedia(this.config.outputPath, this.captureId)
+				.then(() => undefined)
+				.catch(() => {
+					this.inputWarning =
+						"Capture policy could not be bound to finished media; treat button evidence as unverified.";
+				});
+		return this.bindingPromise;
 	}
 
 	/** Kills the helper and discards whatever it wrote. */
 	discard() {
+		this.discarded = true;
 		this.kill();
 	}
 
@@ -585,6 +622,7 @@ export class LinuxNativeCaptureSession {
 	private handleEvent(payload: PipeWireHelperEvent) {
 		switch (payload.event) {
 			case "input-capture-status":
+				if (this.inputSuppressed) return;
 				this.inputStatus = {
 					event: "input-capture-status",
 					state: payload.state,
@@ -616,6 +654,7 @@ export class LinuxNativeCaptureSession {
 				}
 				return;
 			case "input-drain":
+				if (!this.buttonDecision.allowed) return;
 				if (this.capturing && !this.stopped)
 					this.journal?.append({
 						event: "input-drain",
@@ -722,7 +761,8 @@ export class LinuxNativeCaptureSession {
 				if (this.config.capturePrivacyPolicy !== undefined) {
 					try {
 						this.capturePolicyPath = writeCapturePolicyReceipt(this.config.outputPath, {
-							version: 1,
+							version: 2,
+							captureId: this.captureId,
 							policy: this.privacyPolicy,
 							applicationIdentity: "unavailable",
 							collectionAllowedAtStart: this.buttonDecision.allowed,

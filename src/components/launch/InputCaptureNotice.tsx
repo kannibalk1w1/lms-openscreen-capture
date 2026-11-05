@@ -34,9 +34,11 @@ export function InputCaptureNotice() {
 			<div className="mt-1 text-xs text-white/75">
 				{!health
 					? t("buttonPrivacy.unavailableStatus")
-					: health.scope === "global-compositor-buttons"
-						? t("inputCapture.compositorScope")
-						: t("inputCapture.physicalScope")}
+					: health.privacy?.allowed === false
+						? t("buttonPrivacy.disabledScope")
+						: health.scope === "global-compositor-buttons"
+							? t("inputCapture.compositorScope")
+							: t("inputCapture.physicalScope")}
 			</div>
 			{health?.privacy?.reason === "application-unknown" && (
 				<p className="mt-2 text-xs text-amber-200">{t("buttonPrivacy.unknown")}</p>

@@ -449,5 +449,21 @@
 	"cpuCompositor": {
 		"notice": "沒有相容的 GPU，正在使用 CPU 算繪，因此播放較慢。",
 		"exportWarning": "沒有相容的 GPU：這次匯出將在 CPU 上執行，耗時會比平常長很多。"
+	},
+	"capturePrivacy": {
+		"title": "Capture privacy at import/reopen",
+		"missing": "No policy receipt is available. Button evidence is unverified.",
+		"legacy": "This older receipt is not bound to this source media. Button evidence is unverified.",
+		"pending": "Capture or policy binding is incomplete. Evidence is unverified.",
+		"invalid": "The privacy sidecar is malformed or unsupported. Evidence is unverified.",
+		"mismatch": "The source media does not match its privacy binding. Evidence is unverified.",
+		"bound": "Source content matches its declared policy receipt.",
+		"unavailable": "The source or policy could not be verified.",
+		"conflict": "The privacy policy and evidence conflict. Evidence is unverified.",
+		"policyAtStart": "Declared button policy at capture start:",
+		"scope_off": "Off",
+		"scope_global": "Global pointer buttons",
+		"scope_applications": "Application allowlist",
+		"limit": "A matching receipt verifies association, not physical completeness or redaction. Video, audio, typing and earlier evidence still need privacy review."
 	}
 }

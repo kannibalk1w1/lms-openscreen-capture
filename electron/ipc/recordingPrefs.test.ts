@@ -39,9 +39,10 @@ function start(
 	getWindow: () => BrowserWindow | null = () => null,
 	getAppWindows?: () => BrowserWindow[],
 	onChange?: (previous: RecordingPrefs, next: RecordingPrefs) => void,
+	privacy?: Parameters<typeof registerRecordingPrefsHandlers>[4],
 ) {
 	electron.handle.mockClear();
-	registerRecordingPrefsHandlers(defaults, getWindow, getAppWindows, onChange);
+	registerRecordingPrefsHandlers(defaults, getWindow, getAppWindows, onChange, privacy);
 	const get = electron.handle.mock.calls.find(
 		([name]) => name === "get-recording-prefs",
 	)?.[1] as () => RecordingPrefs;
@@ -129,4 +130,22 @@ describe("recording preferences IPC", () => {
 		expect(() => session.set({ micEnabled: false })).toThrow();
 		expect(session.get().micEnabled).toBe(true);
 	});
+});
+
+it("revokes through the real preference callback even if the durable Off write fails", () => {
+	const requested = vi.fn();
+	const saved = vi.fn();
+	const changed = vi.fn();
+	const session = start(undefined, undefined, changed, { requested, saved });
+	const global = { ...disabledCapturePrivacyPolicy(), buttonScope: "global" as const };
+	session.set({ capturePrivacyPolicy: global });
+	requested.mockClear();
+	saved.mockClear();
+	changed.mockClear();
+	rmSync(dir, { recursive: true, force: true });
+	expect(() => session.set({ capturePrivacyPolicy: disabledCapturePrivacyPolicy() })).toThrow();
+	expect(requested).toHaveBeenCalledWith(disabledCapturePrivacyPolicy());
+	expect(saved).not.toHaveBeenCalled();
+	expect(changed).not.toHaveBeenCalled();
+	expect(session.get().capturePrivacyPolicy).toEqual(global);
 });

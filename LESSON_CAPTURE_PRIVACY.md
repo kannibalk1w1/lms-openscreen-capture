@@ -1,5 +1,9 @@
 # Button-evidence collection privacy — overnight slice 5
 
+Historical slice-5 behavior and validation below. [Slice 6](LESSON_CAPTURE_PRIVACY_FOLLOWUP.md)
+supersedes startup races, collision handling, post-revocation metadata and reopen
+claims following actual Claude review 5; preserve these original test boundaries.
+
 This is a bounded Linux button-evidence collection gate. It does **not** deliver
 complete application privacy, text/media redaction, retention exclusions or a
 pre-export inspection workflow. Video, audio, ordinary source cursor motion,

@@ -172,9 +172,17 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 	private handleStdoutChunk(chunk: string) {
 		this.lines.push(chunk, (line) => {
 			try {
-				this.handleEvent(JSON.parse(line) as PipeWireHelperEvent);
-			} catch (error) {
-				console.error("Failed to parse Linux cursor helper output:", error, line);
+				const parsed: unknown = JSON.parse(line);
+				if (
+					!parsed ||
+					typeof parsed !== "object" ||
+					Array.isArray(parsed) ||
+					typeof (parsed as { event?: unknown }).event !== "string"
+				)
+					throw new Error("Invalid helper envelope");
+				this.handleEvent(parsed as PipeWireHelperEvent);
+			} catch {
+				console.error("[cursor-linux] malformed helper record omitted");
 			}
 		});
 	}
@@ -204,6 +212,7 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 				this.cursor.addSample(payload);
 				return;
 			case "warning":
+				if (typeof payload.code !== "string" || typeof payload.message !== "string") return;
 				if (payload.code.startsWith("click-capture-")) return;
 				console.warn(`[cursor-linux] ${payload.code}: ${payload.message}`);
 				return;

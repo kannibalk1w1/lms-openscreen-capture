@@ -915,6 +915,9 @@ fn run<W: Write>(
                 driver,
                 scope,
             }) => {
+                if !config.input_gate.allows() {
+                    continue;
+                }
                 let _ = emitter.emit(&Event::InputCaptureStatus {
                     state,
                     driver,
@@ -1610,7 +1613,7 @@ fn run<W: Write>(
     if let Some(capture) = capture.as_mut() {
         capture.stop_clock(Instant::now());
     }
-    if input_evidence.started {
+    if input_evidence.started && config.input_gate.allows() {
         let drained = input_drain::drain_queued(
             &receiver,
             &sender,
@@ -1636,18 +1639,20 @@ fn run<W: Write>(
                 )
             },
         );
-        let _ = emitter.emit(&Event::InputDrain {
-            monotonic_ms: events::monotonic_ms_at(
-                capture.as_ref().unwrap().input_boundary_instant().unwrap(),
-            ),
-            scope: "queued-before-fence",
-            completed: drained.completed,
-            processed_messages: drained.processed_messages,
-            accepted_edges: drained.accepted_edges,
-            excluded_edges: drained.excluded_edges,
-        });
-        if !drained.completed {
-            let _ = emitter.emit(&Event::Warning { code: "click-capture-drain-incomplete".into(), message: "Stop input drain reached its message/time budget; queued evidence may be incomplete".into() });
+        if config.input_gate.allows() {
+            let _ = emitter.emit(&Event::InputDrain {
+                monotonic_ms: events::monotonic_ms_at(
+                    capture.as_ref().unwrap().input_boundary_instant().unwrap(),
+                ),
+                scope: "queued-before-fence",
+                completed: drained.completed,
+                processed_messages: drained.processed_messages,
+                accepted_edges: drained.accepted_edges,
+                excluded_edges: drained.excluded_edges,
+            });
+            if !drained.completed {
+                let _ = emitter.emit(&Event::Warning { code: "click-capture-drain-incomplete".into(), message: "Stop input drain reached its message/time budget; queued evidence may be incomplete".into() });
+            }
         }
     }
     emit_input_boundary(

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
@@ -40,7 +40,10 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import { execFile, spawn } from "node:child_process";
 import { disabledCapturePrivacyPolicy } from "../../../src/lib/capturePrivacy";
-import { readCapturePolicyReceipt } from "../../recording/capturePolicyReceipt";
+import {
+	inspectCapturePrivacy,
+	readCapturePolicyReceipt,
+} from "../../recording/capturePolicyReceipt";
 import { LinuxNativeCaptureSession } from "./linuxNativeCaptureSession";
 
 class FakeHelper extends EventEmitter {
@@ -136,6 +139,9 @@ function emitCursorSample(timestampMs: number) {
 }
 
 async function finishCapture(session: LinuxNativeCaptureSession, timestampMs: number) {
+	const request = JSON.parse((spawnMock.mock.calls.at(-1)?.[1] as string[])[0]);
+	if (existsSync(`${request.outputPath}.capture-policy.lock`))
+		writeFileSync(request.outputPath, "fake completed media");
 	const stopping = session.stop();
 	await flushStdout();
 	helper.emitEvent({
@@ -924,14 +930,14 @@ it("exposes live driver changes, warnings and unexpected exit", async () => {
 	expect(session.inputCaptureHealth.state).toBe("unavailable");
 });
 
-it("reports journal failure without failing video start", async () => {
+it("reports a journal collision introduced after reservation without failing video start", async () => {
 	const root = mkdtempSync(join(tmpdir(), "input-health-"));
 	try {
 		const video = join(root, "recording.mp4");
 		const { writeFileSync } = await import("node:fs");
-		writeFileSync(`${video}.events.ndjson`, "existing evidence");
 		const session = newSession(false, video);
 		await startReady(session);
+		writeFileSync(`${video}.events.ndjson`, "existing evidence");
 		emitCaptureStarted(1050);
 		await flushStdout();
 		expect(session.inputCaptureHealth.state).toBe("failed");
@@ -1310,34 +1316,37 @@ it("revokes an authorized take before queued helper lines arrive while retaining
 		expect(journal).toContain("input-policy-suppressed");
 		expect(journal).toContain('"buttonStateObservation":"suppressed"');
 		expect(journal).toContain('"event":"session-end"');
+		const afterSuppression = journal.slice(journal.indexOf("input-policy-suppressed"));
+		expect(afterSuppression).not.toContain("excludedEdges");
+		expect(afterSuppression).not.toContain('"state":"partial"');
 		for (const file of readdirSync(root))
 			expect(readFileSync(join(root, file), "utf8")).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
 		expect(JSON.stringify(result.cursor)).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
 		expect(session.helperOutput).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
 		expect(readCapturePolicyReceipt(video).collectionAllowedAtStart).toBe(true);
+		expect(readCapturePolicyReceipt(video).version).toBe(2);
+		expect((await inspectCapturePrivacy(video)).status).toBe("bound");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-it("keeps video operational and suppresses evidence if its policy receipt cannot be created", async () => {
+it("rejects a colliding destination before probing or spawning and preserves prior evidence", async () => {
 	const root = mkdtempSync(join(tmpdir(), "privacy-receipt-collision-"));
 	try {
 		const video = join(root, "take.mp4");
-		const { writeFileSync } = await import("node:fs");
 		writeFileSync(`${video}.capture-policy.json`, "prior source receipt");
+		writeFileSync(`${video}.events.ndjson`, "prior journal");
 		const session = policySession(video, {
 			...disabledCapturePrivacyPolicy(),
 			buttonScope: "global",
 		});
-		await startReady(session);
-		emitCaptureStarted(1050);
-		await flushStdout();
-		emitPrivateButtonCanary("PRIVATE_BUTTON_CANARY_COLLISION");
-		await flushStdout();
-		await finishCapture(session, 1500);
+		const probes = vi.mocked(execFile).mock.calls.length;
+		await expect(session.start()).rejects.toThrow("already contains media or evidence");
+		expect(spawnMock).not.toHaveBeenCalled();
+		expect(vi.mocked(execFile).mock.calls).toHaveLength(probes);
 		expect(readFileSync(`${video}.capture-policy.json`, "utf8")).toBe("prior source receipt");
-		expect(existsSync(`${video}.events.ndjson`)).toBe(false);
-		expect(session.inputCaptureHealth.privacy?.reason).toBe("suppressed");
+		expect(readFileSync(`${video}.events.ndjson`, "utf8")).toBe("prior journal");
+		expect(existsSync(video)).toBe(false);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

@@ -82,5 +82,8 @@ it("suppresses button evidence without changing recording controls and reports t
 	});
 	expect(suppressNativeButtonEvidence).toHaveBeenCalledTimes(1);
 	expect(screen.getByRole("status")).toHaveTextContent("buttonPrivacy.suppressed");
+	expect(screen.getByRole("status")).toHaveTextContent("buttonPrivacy.disabledScope");
+	expect(screen.getByRole("status")).not.toHaveTextContent("inputCapture.physicalScope");
+	expect(screen.getByRole("status")).not.toHaveTextContent("inputCapture.compositorScope");
 	expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });

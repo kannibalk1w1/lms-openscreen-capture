@@ -33,10 +33,6 @@ import {
 import type { CliSourcesResult } from "../../src/lib/cliContracts";
 import { pickRecordingSource } from "../../src/lib/cliSourcePick";
 import {
-	type NativeLinuxRecordingRequest,
-	portalCursorMode,
-} from "../../src/lib/nativeLinuxRecording";
-import {
 	collectMacCaptureExcludedWindowIds,
 	type NativeMacRecordingRequest,
 } from "../../src/lib/nativeMacRecording";
@@ -176,6 +172,7 @@ import {
 	WINDOWS_UPDATE_PENDING_MESSAGE,
 } from "../windows-update";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
+import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
 import { registerRecordingPrefsHandlers } from "./recordingPrefs";
@@ -919,105 +916,6 @@ let linuxNativeCaptureRecordingId: number | null = null;
 let linuxNativeCaptureCursorMode: CursorCaptureMode = "editable-overlay";
 /** What the portal granted for the running capture, for the tray's label. */
 let linuxNativeCaptureSourceLabel: string | null = null;
-/**
- * A portal session negotiated ahead of the countdown, waiting to be armed.
- *
- * Held here rather than in the renderer because the helper is a child process of
- * THIS process: a renderer that reloads, or a countdown abandoned without a
- * cancel, would otherwise leak a live ScreenCast session — the compositor's
- * "screen is being shared" indicator with nothing recording behind it.
- */
-let preparedLinuxCapture: {
-	session: LinuxNativeCaptureSession;
-	outputPath: string;
-	/** What the helper was actually spawned with. See [`captureSettingsOf`]. */
-	request: NativeLinuxRecordingRequest;
-} | null = null;
-/**
- * Identifies the prepare that is still waiting on the picker.
- *
- * The slot above is only filled AFTER an await with no upper bound — a human is
- * reading a dialog. For that whole window it is null, so without this token a
- * cancel would find nothing to cancel and a second prepare would find nothing to
- * supersede: the first session would then assign itself afterwards and stay
- * alive, holding a ScreenCast grant and the compositor's sharing indicator with
- * nothing recording behind it.
- */
-let preparingLinuxCaptureToken: symbol | null = null;
-
-function suppressLinuxButtonEvidence() {
-	// last includes a candidate still awaiting its capability probe/picker; it
-	// must not escape revocation merely because it is not prepared/active yet.
-	for (const session of new Set([
-		linuxNativeCaptureSession,
-		preparedLinuxCapture?.session,
-		lastLinuxCaptureSession,
-	]))
-		session?.suppressButtonEvidence();
-}
-
-/**
- * Claims the prepared session when it matches the recording about to start.
- *
- * A mismatch means the prepare was for a recording that never happened, so it is
- * discarded rather than reused: arming it would record against the wrong output
- * path, and leaving it would strand a portal session.
- */
-function takePreparedLinuxSession(
-	outputPath: string,
-	request: NativeLinuxRecordingRequest,
-): LinuxNativeCaptureSession | null {
-	const prepared = preparedLinuxCapture;
-	if (!prepared) {
-		return null;
-	}
-	preparedLinuxCapture = null;
-	if (prepared.outputPath !== outputPath) {
-		console.warn("[native-linux] discarding a prepared session for a different recording");
-		prepared.session.discard();
-		return null;
-	}
-	// EVERY CAPTURE SETTING IS FIXED AT SPAWN. `arm()` only writes `record`, so a
-	// prepared helper is already running with the audio and cursor settings it
-	// was created with — and the HUD does not lock its controls during the
-	// countdown, so the user really can change them in between. Reusing the
-	// session would record one thing while the app believed another, including
-	// the cursor mode that decides whether the editor draws its own pointer.
-	if (captureSettingsOf(prepared.request) !== captureSettingsOf(request)) {
-		console.info("[native-linux] settings changed during the countdown; renegotiating");
-		prepared.session.discard();
-		return null;
-	}
-	return prepared.session;
-}
-
-/** The request fields baked into the helper's spawn arguments, canonicalised. */
-function captureSettingsOf(request: NativeLinuxRecordingRequest): string {
-	return JSON.stringify({
-		fps: request.video?.fps ?? null,
-		bitrate: request.video?.bitrate ?? null,
-		system: request.audio?.system?.enabled ?? false,
-		microphone: request.audio?.microphone?.enabled ?? false,
-		deviceName: request.audio?.microphone?.deviceName ?? null,
-		gain: request.audio?.microphone?.gain ?? null,
-		cursor: normalizeCursorCaptureMode(request?.cursor?.mode) ?? "editable-overlay",
-		capturePrivacyPolicy: normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
-	});
-}
-
-/** Tears down a prepared-but-unarmed session, e.g. an abandoned countdown. */
-function discardPreparedLinuxCapture(reason: string) {
-	// Invalidate any negotiation still in flight, so the session it is about to
-	// produce is discarded on arrival instead of stranded.
-	preparingLinuxCaptureToken = null;
-	if (!preparedLinuxCapture) {
-		return;
-	}
-	console.info(`[native-linux] discarding the prepared capture: ${reason}`);
-	preparedLinuxCapture.session.discard();
-	preparedLinuxCapture = null;
-}
-
 /**
  * Names what the portal handed over, for the tray tooltip.
  *
@@ -2059,6 +1957,30 @@ export function registerIpcHandlers(
 		if (typeof paused === "boolean") recordingFlags.pause(paused);
 	});
 	const appSettings = new AppSettingsStore(app.getPath("userData"));
+	const linuxCaptureStartup = new LinuxCaptureStartup<LinuxNativeCaptureSession>({
+		handle: (channel, handler) => ipcMain.handle(channel, handler),
+		platform: () => process.platform,
+		helperAvailable: () => Boolean(findPipeWireCursorHelperPath()),
+		readPolicy: () => appSettings.getSnapshot().recording.capturePrivacyPolicy,
+		mkdir: () => fs.mkdir(RECORDINGS_DIR, { recursive: true }),
+		recordingsDir: RECORDINGS_DIR,
+		filePrefix: RECORDING_FILE_PREFIX,
+		maxCursorSamples: MAX_CURSOR_SAMPLES,
+		createSession: (config) => new LinuxNativeCaptureSession(config),
+		active: () => linuxNativeCaptureSession,
+		onCandidate: (session) => {
+			lastLinuxCaptureSession = session;
+		},
+		onStarted: (session, recordingId, cursorMode) => {
+			linuxNativeCaptureSession = session;
+			linuxNativeCaptureRecordingId = recordingId;
+			linuxNativeCaptureCursorMode = cursorMode;
+			linuxNativeCaptureSourceLabel = linuxSourceLabel(session.grantedSourceKind);
+			setAppRecording(true, linuxNativeCaptureSourceLabel);
+		},
+		removeEmptyOutput: removeEmptyCaptureOutput,
+	});
+
 	const broadcastSelectedSource = (source: SelectedSource | null) => {
 		for (const window of BrowserWindow.getAllWindows()) {
 			if (!window.isDestroyed()) {
@@ -2381,7 +2303,7 @@ export function registerIpcHandlers(
 				!decideButtonCollection(normalizeCapturePrivacyPolicy(next.capturePrivacyPolicy), null)
 					.allowed
 			) {
-				suppressLinuxButtonEvidence();
+				linuxCaptureStartup.suppress();
 			}
 			// Apple's picker bakes the exclusions into the filter it hands back, so a pick made
 			// before "Hide desktop icons" changed would still record the desktop the old way.
@@ -2400,6 +2322,10 @@ export function registerIpcHandlers(
 					.askForSystemAudioOnce()
 					.catch((error) => console.warn("[permissions] system audio request failed:", error));
 			}
+		},
+		{
+			requested: (policy) => linuxCaptureStartup.requestPolicy(policy),
+			saved: (policy) => linuxCaptureStartup.confirmPolicy(policy),
 		},
 	);
 
@@ -2679,7 +2605,7 @@ export function registerIpcHandlers(
 	);
 
 	ipcMain.handle("suppress-native-button-evidence", () => {
-		suppressLinuxButtonEvidence();
+		linuxCaptureStartup.suppress();
 		return { success: true };
 	});
 
@@ -2694,215 +2620,7 @@ export function registerIpcHandlers(
 			: { success: true, available: false, reason: "missing-helper" };
 	});
 
-	/**
-	 * Raises the compositor's picker and stops there, holding the grant.
-	 *
-	 * Best-effort by contract: every failure returns `success: false` rather than
-	 * throwing, because the caller's fallback is simply to start normally and get
-	 * the picker after its countdown — the behaviour that shipped before this
-	 * existed. Nothing downstream may depend on a prepare having succeeded.
-	 */
-	ipcMain.handle(
-		"prepare-native-linux-recording",
-		async (_, request: NativeLinuxRecordingRequest) => {
-			request = {
-				...request,
-				capturePrivacyPolicy: normalizeCapturePrivacyPolicy(
-					appSettings.getSnapshot().recording.capturePrivacyPolicy,
-				),
-			};
-			if (process.platform !== "linux") {
-				return { success: false, reason: "unsupported-platform" };
-			}
-			if (linuxNativeCaptureSession) {
-				return { success: false, reason: "already-recording" };
-			}
-			discardPreparedLinuxCapture("superseded by a new prepare");
-			const token = Symbol("prepare-native-linux-recording");
-			preparingLinuxCaptureToken = token;
-
-			try {
-				if (!findPipeWireCursorHelperPath()) {
-					return { success: false, reason: "missing-helper" };
-				}
-				const recordingId =
-					typeof request?.recordingId === "number" && Number.isFinite(request.recordingId)
-						? request.recordingId
-						: Date.now();
-				const outputPath = path.join(RECORDINGS_DIR, `${RECORDING_FILE_PREFIX}${recordingId}.mp4`);
-				const cursorCaptureMode =
-					normalizeCursorCaptureMode(request?.cursor?.mode) ?? "editable-overlay";
-
-				await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-
-				const session = new LinuxNativeCaptureSession({
-					captureInputEvents: decideButtonCollection(
-						normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
-						null,
-					).allowed,
-					capturePrivacyPolicy: request.capturePrivacyPolicy,
-					outputPath,
-					cursorMode: portalCursorMode(cursorCaptureMode),
-					fps: request.video.fps,
-					...(request.video.bitrate ? { bitrate: request.video.bitrate } : {}),
-					audio: {
-						system: { enabled: request.audio.system.enabled },
-						microphone: {
-							enabled: request.audio.microphone.enabled,
-							...(request.audio.microphone.deviceName
-								? { deviceName: request.audio.microphone.deviceName }
-								: {}),
-							gain: request.audio.microphone.gain,
-						},
-					},
-					maxCursorSamples: MAX_CURSOR_SAMPLES,
-					deferStart: true,
-				});
-				lastLinuxCaptureSession = session;
-
-				await session.start();
-				// The picker is up now. No timeout: a human is reading a dialog.
-				await session.waitUntilSourceSelected();
-
-				// Cancelled or superseded while the picker was up. Discard rather
-				// than assign: this grant is for a recording nobody is waiting for
-				// any more, and keeping it would leave the sharing indicator on.
-				if (preparingLinuxCaptureToken !== token) {
-					session.discard();
-					return { success: false, reason: "cancelled" };
-				}
-				preparingLinuxCaptureToken = null;
-
-				preparedLinuxCapture = { session, outputPath, request };
-				return {
-					success: true,
-					recordingId,
-					sourceKind: session.grantedSourceKind ?? null,
-				};
-			} catch (error) {
-				console.warn("Could not prepare the native Linux capture:", error);
-				discardPreparedLinuxCapture("prepare failed");
-				return { success: false, error: String(error) };
-			}
-		},
-	);
-
-	/** Drops a prepared session, e.g. when the countdown was cancelled. */
-	ipcMain.handle("cancel-native-linux-prepare", async () => {
-		discardPreparedLinuxCapture("cancelled by the renderer");
-		return { success: true };
-	});
-
-	ipcMain.handle(
-		"start-native-linux-recording",
-		async (_, request: NativeLinuxRecordingRequest) => {
-			request = {
-				...request,
-				capturePrivacyPolicy: normalizeCapturePrivacyPolicy(
-					appSettings.getSnapshot().recording.capturePrivacyPolicy,
-				),
-			};
-			let outputPath: string | null = null;
-			try {
-				if (process.platform !== "linux") {
-					return { success: false, error: "Native Linux capture requires Linux." };
-				}
-				if (linuxNativeCaptureSession) {
-					return { success: false, error: "Native Linux capture is already running." };
-				}
-				if (!findPipeWireCursorHelperPath()) {
-					return { success: false, error: "Native Linux capture helper is not available." };
-				}
-
-				const recordingId =
-					typeof request?.recordingId === "number" && Number.isFinite(request.recordingId)
-						? request.recordingId
-						: Date.now();
-				outputPath = path.join(RECORDINGS_DIR, `${RECORDING_FILE_PREFIX}${recordingId}.mp4`);
-				const cursorCaptureMode =
-					normalizeCursorCaptureMode(request?.cursor?.mode) ?? "editable-overlay";
-
-				await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-
-				// A session prepared before the countdown, if there was one. Taking
-				// it here rather than requiring it is what keeps every caller
-				// working: a path that never prepared still gets a full start
-				// below, just with the picker after its countdown instead of
-				// before. Nothing has to know which path it is on.
-				const prepared = takePreparedLinuxSession(outputPath, request);
-				const session =
-					prepared ??
-					new LinuxNativeCaptureSession({
-						captureInputEvents: decideButtonCollection(
-							normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
-							null,
-						).allowed,
-						capturePrivacyPolicy: request.capturePrivacyPolicy,
-						outputPath,
-						cursorMode: portalCursorMode(cursorCaptureMode),
-						fps: request.video.fps,
-						...(request.video.bitrate ? { bitrate: request.video.bitrate } : {}),
-						audio: {
-							system: { enabled: request.audio.system.enabled },
-							microphone: {
-								enabled: request.audio.microphone.enabled,
-								...(request.audio.microphone.deviceName
-									? { deviceName: request.audio.microphone.deviceName }
-									: {}),
-								gain: request.audio.microphone.gain,
-							},
-						},
-						maxCursorSamples: MAX_CURSOR_SAMPLES,
-					});
-				lastLinuxCaptureSession = session;
-
-				console.info("[native-linux] starting capture", {
-					outputPath,
-					prepared: Boolean(prepared),
-					cursor: { mode: cursorCaptureMode },
-					audio: request.audio,
-					video: request.video,
-				});
-
-				if (!prepared) {
-					await session.start();
-					// Blocks until the user answers the portal picker, which has no
-					// upper bound. On this path the countdown has already run.
-					await session.waitUntilSourceSelected();
-				}
-				// Idempotent, and a no-op for a session that was not deferred.
-				session.arm();
-				await session.waitUntilCapturing();
-
-				linuxNativeCaptureSession = session;
-				linuxNativeCaptureRecordingId = recordingId;
-				// The portal may lack EMBEDDED and get METADATA instead (#1357): the
-				// pointer is then not in the pixels, so the editor has to draw it.
-				linuxNativeCaptureCursorMode =
-					session.cursorMode === "metadata" ? "editable-overlay" : cursorCaptureMode;
-
-				// The portal's answer, not an in-app selection — on Wayland there
-				// is none to have. This used to read `selectedSource || { name:
-				// "Screen" }`, so the tray confidently displayed the name of a
-				// window the capture had never been told about.
-				linuxNativeCaptureSourceLabel = linuxSourceLabel(session.grantedSourceKind);
-				setAppRecording(true, linuxNativeCaptureSourceLabel);
-
-				return { success: true, recordingId, path: outputPath };
-			} catch (error) {
-				console.error("Failed to start native Linux recording:", error);
-				linuxNativeCaptureSession = null;
-				linuxNativeCaptureRecordingId = null;
-				linuxNativeCaptureCursorMode = "editable-overlay";
-				// The helper opens its mp4 on the first frame, before it reports capture
-				// started, so an encoder that failed there leaves it empty.
-				if (outputPath) {
-					await removeEmptyCaptureOutput(outputPath);
-				}
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	linuxCaptureStartup.register();
 
 	ipcMain.handle("pause-native-linux-recording", async () => {
 		if (!linuxNativeCaptureSession) {
@@ -2941,6 +2659,7 @@ export function registerIpcHandlers(
 					fs.rm(`${discarded}.cursor.json`, { force: true }),
 					fs.rm(`${discarded}.events.ndjson`, { force: true }),
 					fs.rm(`${discarded}.capture-policy.json`, { force: true }),
+					fs.rm(`${discarded}.capture-policy.binding.json`, { force: true }),
 				]);
 				return { success: true, discarded: true };
 			}

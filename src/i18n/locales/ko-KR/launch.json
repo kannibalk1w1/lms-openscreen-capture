@@ -182,13 +182,14 @@
 		"allowed": "Allowed application IDs (one per line)",
 		"excluded": "Excluded application IDs (one per line)",
 		"unsupported": "This driver cannot verify the active application. Application restrictions suppress button evidence; they do not restrict the video.",
-		"error": "Privacy settings could not be saved. The last saved policy still applies.",
+		"error": "Privacy settings could not be saved. The saved policy is unchanged; a request to disable collection still suppresses current and pending button evidence.",
 		"suppress": "Stop button evidence for this take",
 		"suppressed": "Button evidence is suppressed for this take.",
 		"unknown": "Application identity is unavailable; restricted button evidence is suppressed.",
 		"saveRules": "Save application rules",
 		"unavailableStatus": "Button evidence status is unavailable; no application scope is verified.",
 		"loading": "Loading saved privacy policy…",
-		"unavailableSettings": "Saved privacy policy could not be read"
+		"unavailableSettings": "Saved privacy policy could not be read",
+		"disabledScope": "No button evidence is being collected. Video and cursor motion are separate."
 	}
 }

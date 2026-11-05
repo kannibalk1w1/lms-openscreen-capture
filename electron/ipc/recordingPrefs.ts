@@ -1,4 +1,5 @@
 import { app, type BrowserWindow, ipcMain } from "electron";
+import type { CapturePrivacyPolicy } from "../../src/lib/capturePrivacy";
 import { AppSettingsStore } from "../app-settings";
 import type { RecordingPrefs } from "./handlers";
 
@@ -15,6 +16,10 @@ export function registerRecordingPrefsHandlers(
 		return mainWindow ? [mainWindow] : [];
 	},
 	onChange?: (previous: RecordingPrefs, next: RecordingPrefs) => void,
+	privacy?: {
+		requested(policy: unknown): void;
+		saved(policy: CapturePrivacyPolicy | undefined): void;
+	},
 ): { get(): RecordingPrefs; set(prefs: Partial<RecordingPrefs>): RecordingPrefs } {
 	const userData = app.getPath("userData");
 	const settings = new AppSettingsStore(userData);
@@ -30,8 +35,11 @@ export function registerRecordingPrefsHandlers(
 	const set = (prefs: Partial<RecordingPrefs>) => {
 		// Persist every validated field first. A failed save must leave both the
 		// durable value and the main-process published snapshot unchanged.
+		const changesPrivacy = Object.keys(prefs).includes("capturePrivacyPolicy");
+		if (changesPrivacy) privacy?.requested(prefs.capturePrivacyPolicy);
 		const previous = recordingPrefs;
 		recordingPrefs = settings.setRecordingPreferences(prefs).recording;
+		if (changesPrivacy) privacy?.saved(recordingPrefs.capturePrivacyPolicy);
 		onChange?.(previous, recordingPrefs);
 		publish();
 		return recordingPrefs;
