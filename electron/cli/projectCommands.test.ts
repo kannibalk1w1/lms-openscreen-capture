@@ -83,6 +83,12 @@ describe("runPackCommand", () => {
 		await make("rec/clip.mp4.events.ndjson", events);
 		const flags = JSON.stringify({ version: 1, flags: [{ id: "f", timeMs: 10, label: "Clap" }] });
 		await make("rec/clip.mp4.flags.json", flags);
+		const privacy = JSON.stringify({
+			version: 1,
+			policy: { buttonScope: "off" },
+			collectionAllowedAtStart: false,
+		});
+		await make("rec/clip.mp4.capture-policy.json", privacy);
 		const project = await writeProject("demo.openscreen", {
 			version: 1,
 			media: { screenVideoPath: screen },
@@ -91,6 +97,9 @@ describe("runPackCommand", () => {
 		await runPackCommand(project, output, false, recorder().write);
 		expect(await fs.readFile(path.join(output, "clip.mp4.events.ndjson"), "utf8")).toBe(events);
 		expect(await fs.readFile(path.join(output, "clip.mp4.flags.json"), "utf8")).toBe(flags);
+		expect(await fs.readFile(path.join(output, "clip.mp4.capture-policy.json"), "utf8")).toBe(
+			privacy,
+		);
 	});
 
 	it("keeps screen and webcam apart when they share a basename", async () => {

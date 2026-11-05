@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { disabledCapturePrivacyPolicy } from "../../src/lib/capturePrivacy";
 import type { RecordingPrefs } from "./handlers";
 import { registerRecordingPrefsHandlers } from "./recordingPrefs";
 
@@ -13,6 +14,7 @@ vi.mock("electron", () => ({
 }));
 
 const defaults: RecordingPrefs = {
+	capturePrivacyPolicy: disabledCapturePrivacyPolicy(),
 	micEnabled: false,
 	micDeviceId: null,
 	micDeviceName: null,

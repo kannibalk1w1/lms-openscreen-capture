@@ -122,6 +122,8 @@ const MAX_CONSECUTIVE_IMPORT_FAILURES: u32 = 60;
 #[serde(rename_all = "camelCase", default)]
 struct Request {
     sample_interval_ms: Option<u64>,
+    /// Explicit global button evidence consent; missing means no readers.
+    capture_pointer_buttons: bool,
     /// Where to write the MP4. Absent means cursor-only: no pixels are mapped,
     /// no encoder is opened, and the helper behaves exactly as Stage 1 did.
     output_path: Option<String>,
@@ -255,6 +257,7 @@ enum Message {
     },
     /// FIFO fence for a bounded drain of messages already queued at Stop.
     InputDrainComplete,
+    SuppressInput,
     InputStatus {
         state: &'static str,
         driver: &'static str,
@@ -328,6 +331,7 @@ fn main() {
 
     let _ = emitter.emit(&Event::Ready {
         timestamp_ms: timestamp_ms(),
+        button_privacy_version: 1,
         pipewire_version: shim::library_version(),
         cursor_metadata_supported,
         cursor_mode: cursor_mode.as_str(),
@@ -338,17 +342,19 @@ fn main() {
     }
 
     let (sender, receiver) = mpsc::channel::<Message>();
-    spawn_stdin_reader(sender.clone());
+    let input_gate = Arc::new(input::InputGate::new(request.capture_pointer_buttons));
+    spawn_stdin_reader(sender.clone(), Arc::clone(&input_gate));
     spawn_portal(sender.clone(), cursor_mode);
     // Explicit opt-in: do not silently change a recording's authoritative driver.
     let kwin = std::env::var("OPENSCREEN_INPUT_DRIVER").as_deref() == Ok("kwin");
-    let capture = if std::env::var_os("OPENSCREEN_DISABLE_CLICK_CAPTURE").is_some() {
-        input::ClickCapture::Disabled
-    } else if kwin {
-        kwin_input::spawn_reader(&sender)
-    } else {
-        input::spawn_readers(&sender)
-    };
+    let capture =
+        if !input_gate.allows() || std::env::var_os("OPENSCREEN_DISABLE_CLICK_CAPTURE").is_some() {
+            input::ClickCapture::Disabled
+        } else if kwin {
+            kwin_input::spawn_reader(&sender, &input_gate)
+        } else {
+            input::spawn_readers(&sender, &input_gate)
+        };
     let input_state = match capture {
         input::ClickCapture::Disabled => "disabled",
         input::ClickCapture::NoDevice => "unavailable",
@@ -369,6 +375,7 @@ fn main() {
     });
 
     let session = RunConfig {
+        input_gate,
         tick,
         sample_interval,
         output_path,
@@ -384,6 +391,7 @@ fn main() {
 }
 
 struct RunConfig {
+    input_gate: Arc<input::InputGate>,
     /// How often the loop wakes when nothing arrives.
     tick: Duration,
     /// Minimum spacing between cursor samples on stdout.
@@ -525,7 +533,7 @@ fn fail<W: Write>(emitter: &mut Emitter<W>, code: &str, message: &str) -> ! {
 /// `resume`, one per line on stdin (see the `proc.stdin.write("pause\n")` calls
 /// in electron/ipc/handlers.ts). Unknown lines are ignored rather than fatal —
 /// a newer parent talking to an older helper should degrade, not crash.
-fn spawn_stdin_reader(sender: Sender<Message>) {
+fn spawn_stdin_reader(sender: Sender<Message>, gate: Arc<input::InputGate>) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {
@@ -537,6 +545,12 @@ fn spawn_stdin_reader(sender: Sender<Message>) {
                 // so an older helper receiving this degrades instead of dying.
                 "record" => {
                     if sender.send(Message::Record).is_err() {
+                        return;
+                    }
+                }
+                "suppress-input" => {
+                    gate.suppress();
+                    if sender.send(Message::SuppressInput).is_err() {
                         return;
                     }
                 }
@@ -828,6 +842,22 @@ fn run<W: Write>(
         match receiver.recv_timeout(config.tick) {
             Ok(Message::Stop) => break,
             Ok(Message::InputDrainComplete) => {}
+            Ok(Message::SuppressInput) => {
+                config.input_gate.suppress();
+                let _ = emitter.emit(&Event::InputCaptureStatus {
+                    state: "disabled",
+                    driver: if std::env::var("OPENSCREEN_INPUT_DRIVER").as_deref() == Ok("kwin") {
+                        kwin_input::DRIVER
+                    } else {
+                        "linux-evdev"
+                    },
+                    scope: if std::env::var("OPENSCREEN_INPUT_DRIVER").as_deref() == Ok("kwin") {
+                        kwin_input::SCOPE
+                    } else {
+                        "global-physical-buttons-no-taps"
+                    },
+                });
+            }
 
             // Button evidence is independent of cursor effects. Journal events use
             // a monotonic start boundary; picker input cannot become lesson input.
@@ -839,6 +869,9 @@ fn run<W: Write>(
                 pressed,
                 device,
             }) => {
+                if !config.input_gate.allows() {
+                    continue;
+                }
                 let content = content_rect(&capture, size);
                 if config.output_path.is_some() {
                     emit_input_message(
@@ -894,6 +927,9 @@ fn run<W: Write>(
                 reason,
                 detail,
             }) => {
+                if !config.input_gate.allows() {
+                    continue;
+                }
                 emit_input_discontinuity(
                     emitter,
                     &mut input_evidence,
@@ -1581,6 +1617,13 @@ fn run<W: Write>(
             65_536,
             Duration::from_millis(100),
             |message| {
+                if !config.input_gate.allows() {
+                    return if matches!(message, Message::PointerButton { .. }) {
+                        Some(false)
+                    } else {
+                        None
+                    };
+                }
                 emit_input_message(
                     emitter,
                     &mut input_evidence,
@@ -2116,8 +2159,95 @@ mod cursor_sample_tests {
         serde_json::from_str(line.trim()).expect("json")
     }
 
-    /// A full-screen capture crops nothing, so the pointer keeps the numbers the
-    /// portal gave and is normalised against the whole stream.
+    #[test]
+    fn returning_to_a_delivered_sprite_clears_an_excluded_pending_bitmap() {
+        let mut assets = CursorAssets::default();
+        let asset = |id: &str| CursorAsset {
+            id: id.into(),
+            image_data_url: id.into(),
+            width: 1,
+            height: 1,
+            hotspot_x: 0,
+            hotspot_y: 0,
+        };
+        assets.delivered.insert("A".into());
+        assert!(assets.observe(asset("B")));
+        assert_eq!(assets.pending.as_ref().unwrap().id, "B");
+        assert!(!assets.observe(asset("A")));
+        assert!(assets.pending.is_none());
+    }
+
+    #[test]
+    fn failed_sample_write_keeps_the_bitmap_for_successful_retry() {
+        struct FailOnce {
+            bytes: Vec<u8>,
+            failed: bool,
+        }
+        impl Write for FailOnce {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                if !self.failed {
+                    self.failed = true;
+                    return Err(std::io::Error::other("fixture write failure"));
+                }
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut assets = CursorAssets::default();
+        assets.observe(CursorAsset {
+            id: "retry".into(),
+            image_data_url: "bitmap".into(),
+            width: 1,
+            height: 1,
+            hotspot_x: 0,
+            hotspot_y: 0,
+        });
+        let cursor = Some(CursorState {
+            x: 1,
+            y: 1,
+            asset_id: Some("retry".into()),
+        });
+        let content = Some(shim::CropRect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        });
+        let mut writer = FailOnce {
+            bytes: Vec::new(),
+            failed: false,
+        };
+        {
+            let mut emitter = Emitter::new(&mut writer, false);
+            emit_sample(
+                &mut emitter,
+                &cursor,
+                content,
+                &mut assets,
+                None,
+                CursorTiming::Legacy,
+            );
+            assert!(assets.delivered.is_empty());
+            assert_eq!(assets.pending.as_ref().unwrap().id, "retry");
+            emit_sample(
+                &mut emitter,
+                &cursor,
+                content,
+                &mut assets,
+                None,
+                CursorTiming::Legacy,
+            );
+        }
+        assert!(assets.pending.is_none());
+        assert!(assets.delivered.contains("retry"));
+        let record: serde_json::Value = serde_json::from_slice(&writer.bytes).unwrap();
+        assert_eq!(record["assetId"], "retry");
+        assert_eq!(record["asset"]["id"], "retry");
+    }
+
     #[test]
     fn excluded_sprite_changes_only_deliver_the_current_asset_when_capture_resumes() {
         let mut assets = CursorAssets::default();
@@ -2208,6 +2338,8 @@ mod cursor_sample_tests {
         assert_eq!(delivered, HashSet::from(["A".to_owned(), "B".to_owned()]));
     }
 
+    /// A full-screen capture crops nothing, so the pointer keeps the numbers the
+    /// portal gave and is normalised against the whole stream.
     #[test]
     fn a_full_screen_capture_reports_stream_coordinates() {
         let value = sample_json(
@@ -2917,5 +3049,29 @@ mod input_warning_tests {
             6,
             "prestart gap adds neither journal evidence nor latched live warning"
         );
+    }
+}
+
+#[cfg(test)]
+mod privacy_request_tests {
+    use super::*;
+    #[test]
+    fn missing_consent_is_disabled_and_malformed_consent_is_not_truthy() {
+        assert!(
+            !serde_json::from_str::<Request>("{}")
+                .unwrap()
+                .capture_pointer_buttons
+        );
+        assert!(
+            !serde_json::from_str::<Request>(r#"{"capturePointerButtons":false}"#)
+                .unwrap()
+                .capture_pointer_buttons
+        );
+        assert!(
+            serde_json::from_str::<Request>(r#"{"capturePointerButtons":true}"#)
+                .unwrap()
+                .capture_pointer_buttons
+        );
+        assert!(serde_json::from_str::<Request>(r#"{"capturePointerButtons":"yes"}"#).is_err());
     }
 }

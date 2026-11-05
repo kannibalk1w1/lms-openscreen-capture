@@ -18,6 +18,8 @@
  *     — the only source chooser Wayland offers — never reappeared.
  */
 export type NativeLinuxRecordingRequest = {
+	/** Canonical main-process policy snapshot, not a claim of video/application scope. */
+	capturePrivacyPolicy?: import("./capturePrivacy").CapturePrivacyPolicy;
 	recordingId?: number;
 	video: {
 		fps: number;

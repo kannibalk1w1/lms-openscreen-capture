@@ -25,6 +25,11 @@ import {
 	isAxcutDocumentFile,
 	parseDocumentFile,
 } from "../../src/lib/ai-edition/schema";
+import {
+	type CapturePrivacyPolicy,
+	decideButtonCollection,
+	normalizeCapturePrivacyPolicy,
+} from "../../src/lib/capturePrivacy";
 import type { CliSourcesResult } from "../../src/lib/cliContracts";
 import { pickRecordingSource } from "../../src/lib/cliSourcePick";
 import {
@@ -691,6 +696,7 @@ let currentRecordingSession: RecordingSession | null = null;
 // startNewRecording() switches windows. Persisted in AppSettingsStore and
 // broadcast on change; not project content.
 export interface RecordingPrefs {
+	capturePrivacyPolicy?: CapturePrivacyPolicy;
 	micEnabled: boolean;
 	micDeviceId: string | null;
 	/**
@@ -718,6 +724,7 @@ export interface RecordingPrefs {
 	autoZoomEnabled: boolean;
 }
 const defaultRecordingPrefs: RecordingPrefs = {
+	capturePrivacyPolicy: normalizeCapturePrivacyPolicy(undefined),
 	micEnabled: false,
 	micDeviceId: null,
 	micDeviceName: null,
@@ -938,6 +945,17 @@ let preparedLinuxCapture: {
  */
 let preparingLinuxCaptureToken: symbol | null = null;
 
+function suppressLinuxButtonEvidence() {
+	// last includes a candidate still awaiting its capability probe/picker; it
+	// must not escape revocation merely because it is not prepared/active yet.
+	for (const session of new Set([
+		linuxNativeCaptureSession,
+		preparedLinuxCapture?.session,
+		lastLinuxCaptureSession,
+	]))
+		session?.suppressButtonEvidence();
+}
+
 /**
  * Claims the prepared session when it matches the recording about to start.
  *
@@ -983,6 +1001,7 @@ function captureSettingsOf(request: NativeLinuxRecordingRequest): string {
 		deviceName: request.audio?.microphone?.deviceName ?? null,
 		gain: request.audio?.microphone?.gain ?? null,
 		cursor: normalizeCursorCaptureMode(request?.cursor?.mode) ?? "editable-overlay",
+		capturePrivacyPolicy: normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
 	});
 }
 
@@ -2358,6 +2377,12 @@ export function registerIpcHandlers(
 		getMainWindow,
 		() => BrowserWindow.getAllWindows(),
 		(previous, next) => {
+			if (
+				!decideButtonCollection(normalizeCapturePrivacyPolicy(next.capturePrivacyPolicy), null)
+					.allowed
+			) {
+				suppressLinuxButtonEvidence();
+			}
 			// Apple's picker bakes the exclusions into the filter it hands back, so a pick made
 			// before "Hide desktop icons" changed would still record the desktop the old way.
 			// Dropping it makes the HUD ask for a new pick instead of ignoring the toggle.
@@ -2653,6 +2678,11 @@ export function registerIpcHandlers(
 		() => linuxNativeCaptureSession?.inputCaptureHealth ?? null,
 	);
 
+	ipcMain.handle("suppress-native-button-evidence", () => {
+		suppressLinuxButtonEvidence();
+		return { success: true };
+	});
+
 	ipcMain.handle("is-native-linux-capture-available", async () => {
 		if (process.platform !== "linux") {
 			return { success: true, available: false, reason: "unsupported-platform" };
@@ -2675,6 +2705,12 @@ export function registerIpcHandlers(
 	ipcMain.handle(
 		"prepare-native-linux-recording",
 		async (_, request: NativeLinuxRecordingRequest) => {
+			request = {
+				...request,
+				capturePrivacyPolicy: normalizeCapturePrivacyPolicy(
+					appSettings.getSnapshot().recording.capturePrivacyPolicy,
+				),
+			};
 			if (process.platform !== "linux") {
 				return { success: false, reason: "unsupported-platform" };
 			}
@@ -2700,7 +2736,11 @@ export function registerIpcHandlers(
 				await fs.mkdir(RECORDINGS_DIR, { recursive: true });
 
 				const session = new LinuxNativeCaptureSession({
-					captureInputEvents: true,
+					captureInputEvents: decideButtonCollection(
+						normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
+						null,
+					).allowed,
+					capturePrivacyPolicy: request.capturePrivacyPolicy,
 					outputPath,
 					cursorMode: portalCursorMode(cursorCaptureMode),
 					fps: request.video.fps,
@@ -2756,6 +2796,12 @@ export function registerIpcHandlers(
 	ipcMain.handle(
 		"start-native-linux-recording",
 		async (_, request: NativeLinuxRecordingRequest) => {
+			request = {
+				...request,
+				capturePrivacyPolicy: normalizeCapturePrivacyPolicy(
+					appSettings.getSnapshot().recording.capturePrivacyPolicy,
+				),
+			};
 			let outputPath: string | null = null;
 			try {
 				if (process.platform !== "linux") {
@@ -2787,7 +2833,11 @@ export function registerIpcHandlers(
 				const session =
 					prepared ??
 					new LinuxNativeCaptureSession({
-						captureInputEvents: true,
+						captureInputEvents: decideButtonCollection(
+							normalizeCapturePrivacyPolicy(request.capturePrivacyPolicy),
+							null,
+						).allowed,
+						capturePrivacyPolicy: request.capturePrivacyPolicy,
 						outputPath,
 						cursorMode: portalCursorMode(cursorCaptureMode),
 						fps: request.video.fps,
@@ -2890,6 +2940,7 @@ export function registerIpcHandlers(
 					fs.rm(discarded, { force: true }),
 					fs.rm(`${discarded}.cursor.json`, { force: true }),
 					fs.rm(`${discarded}.events.ndjson`, { force: true }),
+					fs.rm(`${discarded}.capture-policy.json`, { force: true }),
 				]);
 				return { success: true, discarded: true };
 			}

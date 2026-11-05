@@ -9,7 +9,10 @@ The helper now owns delivered IDs separately from the single current undelivered
 bitmap. Observing a shape does not mark it delivered; only successful sample
 emission does. Excluded A→B→C→B changes emit no sample or standalone bitmap. On
 Resume the current B bitmap accompanies its first emitted reference. An excluded
-unused C is not exported. Returning to a delivered shape clears an obsolete
+unused C in this regression is not exported. A retained late click can still use
+the latest dispatch sprite/position, including a current sprite observed during
+Pause; a referenced bitmap can then be emitted. This is not appearance-time
+reconstruction or visual privacy redaction. Returning to a delivered shape clears an obsolete
 pending bitmap. Retention does not grow with excluded shape history.
 
 Normal recording input and Stop draining now call one production message handler,
@@ -50,7 +53,9 @@ not a desktop end-to-end proof. The `late` contract now includes Stop drain.
   PipeWire 1.6.10 metadata readiness is only a startup probe. Renderer/main/preload
   source is unchanged from the last successful build; it was not rebuilt here.
 - Original review reports 2 and 3 are preserved verbatim. Their independent results
-  remain separate from implementation checks. This fix needs further Claude review.
+  remain separate from implementation checks. Actual [review 4](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_4.md) confirms M1 is resolved
+  at `a58f56d9`; its [minor follow-up](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_4.md)
+  is incorporated separately. This does not review later privacy code.
 
 Logs: `../openscreen-evaluation/overnight-2026-11-06/slice-4-*`.
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { InputCaptureNotice } from "./InputCaptureNotice";
 
@@ -55,4 +55,32 @@ it("shows unknown rather than retaining a stale healthy state when IPC fails", a
 		await vi.advanceTimersByTimeAsync(500);
 	});
 	expect(screen.getByRole("status")).toHaveTextContent("inputCapture.unknown");
+});
+
+it("suppresses button evidence without changing recording controls and reports the returned policy", async () => {
+	const getInputCaptureHealth = vi
+		.fn()
+		.mockResolvedValueOnce({
+			state: "partial",
+			scope: "global-physical-buttons-no-taps",
+			privacy: { allowed: true, reason: "explicit-global" },
+		})
+		.mockResolvedValue({
+			state: "disabled",
+			scope: "global-physical-buttons-no-taps",
+			privacy: { allowed: false, reason: "suppressed" },
+		});
+	const suppressNativeButtonEvidence = vi.fn().mockResolvedValue({ success: true });
+	Object.assign(window, { electronAPI: { getInputCaptureHealth, suppressNativeButtonEvidence } });
+	render(<InputCaptureNotice />);
+	await act(async () => {
+		await Promise.resolve();
+	});
+	fireEvent.click(screen.getByRole("button", { name: "buttonPrivacy.suppress" }));
+	await act(async () => {
+		await Promise.resolve();
+	});
+	expect(suppressNativeButtonEvidence).toHaveBeenCalledTimes(1);
+	expect(screen.getByRole("status")).toHaveTextContent("buttonPrivacy.suppressed");
+	expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });

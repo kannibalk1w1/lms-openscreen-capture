@@ -172,5 +172,23 @@
 		"saveError": "The recording was saved, but its flags could not be saved.",
 		"requested": "Hotkey requested",
 		"approvalPending": "Allow the desktop shortcut request, then press {{key}}. Until it responds, use the flag button."
+	},
+	"buttonPrivacy": {
+		"title": "Button evidence privacy",
+		"off": "Off · default",
+		"global": "Global pointer buttons · explicit opt-in",
+		"applications": "Application allowlist · suppressed on this driver",
+		"description": "Linux native button evidence is separate from video, audio, cursor motion and typing. Global capture can include other applications; no cloud processing is enabled.",
+		"allowed": "Allowed application IDs (one per line)",
+		"excluded": "Excluded application IDs (one per line)",
+		"unsupported": "This driver cannot verify the active application. Application restrictions suppress button evidence; they do not restrict the video.",
+		"error": "Privacy settings could not be saved. The last saved policy still applies.",
+		"suppress": "Stop button evidence for this take",
+		"suppressed": "Button evidence is suppressed for this take.",
+		"unknown": "Application identity is unavailable; restricted button evidence is suppressed.",
+		"saveRules": "Save application rules",
+		"unavailableStatus": "Button evidence status is unavailable; no application scope is verified.",
+		"loading": "Loading saved privacy policy…",
+		"unavailableSettings": "Saved privacy policy could not be read"
 	}
 }

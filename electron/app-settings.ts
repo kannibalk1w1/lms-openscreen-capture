@@ -6,10 +6,17 @@ import {
 	type WebcamQualityId,
 	webcamQualityFrom,
 } from "../src/hooks/webcamCaptureTarget";
+import {
+	type CapturePrivacyPolicy,
+	capturePrivacyPolicySchema,
+	disabledCapturePrivacyPolicy,
+	normalizeCapturePrivacyPolicy,
+} from "../src/lib/capturePrivacy";
 import type { CursorCaptureMode } from "../src/lib/recordingSession";
 import { renameSyncWithFallback } from "./atomic-rename";
 
 export interface RecordingPreferences {
+	capturePrivacyPolicy?: CapturePrivacyPolicy;
 	micEnabled: boolean;
 	micDeviceId: string | null;
 	micDeviceName: string | null;
@@ -33,6 +40,7 @@ export interface RecordingPreferences {
 }
 
 export const DEFAULT_RECORDING_PREFERENCES: RecordingPreferences = {
+	capturePrivacyPolicy: disabledCapturePrivacyPolicy(),
 	micEnabled: false,
 	micDeviceId: null,
 	micDeviceName: null,
@@ -104,6 +112,7 @@ const nullableString = (value: unknown, fallback: string | null) =>
 
 function parseRecording(raw: RawSettings): RecordingPreferences {
 	return {
+		capturePrivacyPolicy: normalizeCapturePrivacyPolicy(raw.capturePrivacyPolicy),
 		micEnabled: bool(raw.micEnabled, DEFAULT_RECORDING_PREFERENCES.micEnabled),
 		micDeviceId: nullableString(raw.micDeviceId, DEFAULT_RECORDING_PREFERENCES.micDeviceId),
 		micDeviceName: nullableString(raw.micDeviceName, DEFAULT_RECORDING_PREFERENCES.micDeviceName),
@@ -167,6 +176,8 @@ function validateRecordingPatch(patch: Partial<RecordingPreferences>): void {
 	for (const [key, value] of Object.entries(patch)) {
 		if (!allowed.has(key)) throw new TypeError(`unknown recording preference: ${key}`);
 		if (value === undefined) continue;
+		if (key === "capturePrivacyPolicy" && !capturePrivacyPolicySchema.safeParse(value).success)
+			throw new TypeError("capturePrivacyPolicy is invalid");
 		if ((key.endsWith("Enabled") || key === "hideDesktopIcons") && typeof value !== "boolean") {
 			throw new TypeError(`${key} must be a boolean`);
 		}

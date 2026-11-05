@@ -98,6 +98,9 @@ export async function runPackCommand(
 	const eventJournal = `${screenSource}.events.ndjson`;
 	if (await isFile(eventJournal)) await copyIn(eventJournal);
 
+	const capturePolicy = `${screenSource}.capture-policy.json`;
+	if (await isFile(capturePolicy)) await copyIn(capturePolicy);
+
 	const flagsSidecar = `${screenSource}.flags.json`;
 	if (await isFile(flagsSidecar)) await copyIn(flagsSidecar);
 

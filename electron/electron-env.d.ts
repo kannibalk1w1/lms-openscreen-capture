@@ -238,6 +238,7 @@ interface Window {
 			import("../src/lib/recordingFlags").RecordingFlagStatus & { success: boolean }
 		>;
 		setRecordingFlagsPaused: (paused: boolean) => Promise<void>;
+		suppressNativeButtonEvidence: () => Promise<{ success: boolean }>;
 		getInputCaptureHealth: () => Promise<
 			import("../src/native/captureEvents").InputCaptureHealth | null
 		>;

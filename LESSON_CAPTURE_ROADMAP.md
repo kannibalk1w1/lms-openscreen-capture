@@ -81,17 +81,20 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
 found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
-fixes delivery ownership and strengthens shared production-handler tests, pending
-exact-SHA rereview. Actual reviews 2/3 and their [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_2_3.md)
-are preserved; privacy implementation is next, with ordinary capture adapter-free.
+fixes delivery ownership and strengthens shared production-handler tests.
+Actual [review 4](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_4.md) confirms M1 resolved
+at `a58f56d9`; [the Linux button-policy slice](LESSON_CAPTURE_PRIVACY.md) follows
+with separate validation/review and explicit remaining privacy gaps. Actual reviews 2/3 and their [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_2_3.md)
+are preserved; ordinary capture remains adapter-free while privacy coverage expands.
 
-1. Cursor-click timing is committed as `43c2f91d`; its Claude review is pending.
-   Incorporate the completed stop/audio/recovery review's warning-label and test/
-   documentation findings without disrupting the active privacy implementation.
-2. Implement a coherent privacy collection-gating slice with real producer/storage
-   integration, status, persisted policy/reopen and canary tests. Unknown application
-   scope cannot be reported as restricted capture. Do not equate blur with raw-data
-   redaction or claim complete privacy after a partial slice.
+1. Actual Claude review 4 confirms the cursor bitmap Medium finding resolved at
+   `a58f56d9`; minor retry/pending-clear and documentation regressions are included
+   in the next slice. Reviews 1–4 retain their exact SHA and test boundaries.
+2. The [Linux button collection policy](LESSON_CAPTURE_PRIVACY.md) now provides
+   default-off/explicit global consent, fail-closed unknown application scope,
+   producer/storage gates, live suppression, durable receipts and canary tests.
+   Its exact-SHA review is pending. It is a bounded collection gate, not complete
+   text/media redaction, retention exclusions or pre-export privacy inspection.
 3. Establish the simple optional capability interface, integration controls and
    disabled/failure/isolation/reopen regressions before deep Godot expansion.
    Continue explicit Godot/video clock bridge under that policy, then shared

@@ -18,7 +18,16 @@ type WithDefault = { default?: Record<string, unknown> };
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:child_process")>();
 	const spawn = vi.fn();
-	return { ...actual, spawn, default: { ...((actual as WithDefault).default ?? {}), spawn } };
+	const execFile = vi.fn((...args: unknown[]) => {
+		const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+		callback(null, '{"event":"ready","buttonPrivacyVersion":1}\n', "");
+	});
+	return {
+		...actual,
+		spawn,
+		execFile,
+		default: { ...((actual as WithDefault).default ?? {}), spawn, execFile },
+	};
 });
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -63,7 +72,9 @@ class FakeHelper extends EventEmitter {
 
 	/** Feeds one NDJSON line, the way the real helper emits them. */
 	emitEvent(event: Record<string, unknown>) {
-		this.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...event })}\n`);
+		this.stdout.write(
+			`${JSON.stringify({ schemaVersion: 1, ...(event.event === "ready" ? { buttonPrivacyVersion: 1 } : {}), ...event })}\n`,
+		);
 	}
 }
 
@@ -81,8 +92,7 @@ function newSession(overrides: Partial<{ maxSamples: number; sampleIntervalMs: n
 /** Starts a session that becomes ready as soon as the helper says so. */
 async function startReady(session: PipeWireCursorRecordingSession) {
 	const started = session.start();
-	// The listeners are attached synchronously inside start(), so a microtask is
-	// enough before the fake helper speaks.
+	// The capability probe resolves in a microtask before capture listeners attach.
 	await Promise.resolve();
 	helper.emitEvent({ event: "ready", timestampMs: 1_000, pipewireVersion: "1.0.5" });
 	await started;
@@ -113,7 +123,10 @@ describe("PipeWireCursorRecordingSession", () => {
 	it("passes the sample interval to the helper as a JSON request argument", async () => {
 		await startReady(newSession({ sampleIntervalMs: 20 }));
 		const [, args] = spawnMock.mock.calls[0];
-		expect(JSON.parse((args as string[])[0])).toEqual({ sampleIntervalMs: 20 });
+		expect(JSON.parse((args as string[])[0])).toEqual({
+			sampleIntervalMs: 20,
+			capturePointerButtons: false,
+		});
 	});
 
 	it("resolves start() on `ready`, before the portal picker has been answered", async () => {
@@ -194,7 +207,33 @@ describe("PipeWireCursorRecordingSession", () => {
 		expect(sample.visible).toBe(false);
 	});
 
-	it("never reports a click: Wayland exposes no mouse buttons to this process", async () => {
+	it("never retains an unexpected button click or its bitmap in cursor-only mode", async () => {
+		const session = newSession();
+		await startReady(session);
+		helper.emitEvent({
+			event: "cursor-sample",
+			timestampMs: 2000,
+			x: 1,
+			y: 1,
+			width: 10,
+			height: 10,
+			visible: true,
+			interactionType: "click",
+			assetId: "PRIVATE_CURSOR_BUTTON_CANARY",
+			asset: {
+				id: "PRIVATE_CURSOR_BUTTON_CANARY",
+				imageDataUrl: "PRIVATE_CURSOR_BUTTON_CANARY",
+				width: 1,
+				height: 1,
+				hotspotX: 0,
+				hotspotY: 0,
+			},
+		});
+		await flushStdout();
+		expect(JSON.stringify(await session.stop())).not.toContain("PRIVATE_CURSOR_BUTTON_CANARY");
+	});
+
+	it("keeps cursor-only motion samples independent of button evidence", async () => {
 		const session = newSession();
 		await startReady(session);
 		for (let i = 0; i < 3; i++) {

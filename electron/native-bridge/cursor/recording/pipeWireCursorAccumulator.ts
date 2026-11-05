@@ -43,6 +43,8 @@ export type PipeWireHelperEvent =
 	| {
 			event: "ready";
 			timestampMs: number;
+			/** Native button collection opt-in and one-way suppression protocol. */
+			buttonPrivacyVersion?: number;
 			pipewireVersion?: string | null;
 			/** The mode really negotiated; absent from helpers older than #1357. */
 			cursorMode?: "metadata" | "embedded" | "hidden";

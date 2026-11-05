@@ -1,8 +1,14 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
+import {
+	type CapturePrivacyPolicy,
+	decideButtonCollection,
+	normalizeCapturePrivacyPolicy,
+} from "../../../src/lib/capturePrivacy";
 import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
 import { CaptureEventJournal } from "../../recording/captureEventJournal";
+import { writeCapturePolicyReceipt } from "../../recording/capturePolicyReceipt";
 import type { CursorPauseRange } from "../cursor/recording/cursorPauseRanges";
 import {
 	NdjsonLineReader,
@@ -10,6 +16,7 @@ import {
 	type PipeWireHelperEvent,
 } from "../cursor/recording/pipeWireCursorAccumulator";
 import { findPipeWireCursorHelperPath } from "../cursor/recording/pipeWireCursorRecordingSession";
+import { requireButtonPrivacyHelper } from "./buttonPrivacyProbe";
 
 /**
  * Drives the Linux capture helper for a full recording: video, audio and cursor
@@ -52,8 +59,27 @@ const FIRST_FRAME_TIMEOUT_MS = 10_000;
  * macOS.
  */
 const HELPER_OUTPUT_MAX_BYTES = 64 * 1024;
+const HELPER_EVENTS = new Set([
+	"ready",
+	"source-selected",
+	"stream-started",
+	"cursor-sample",
+	"audio-source",
+	"encoder-selection",
+	"capture-started",
+	"capture-stopped",
+	"warning",
+	"error",
+	"debug",
+	"pointer-button",
+	"capture-boundary",
+	"input-capture-status",
+	"input-discontinuity",
+	"input-drain",
+]);
 
 export interface LinuxCaptureConfig {
+	capturePrivacyPolicy?: CapturePrivacyPolicy;
 	/** Persist physical button evidence separately from visual cursor samples. */
 	captureInputEvents?: boolean;
 	outputPath: string;
@@ -81,6 +107,7 @@ export interface LinuxCaptureConfig {
 export type LinuxCaptureSourceKind = "monitor" | "window" | "virtual";
 
 export interface LinuxCaptureResult {
+	capturePolicyPath?: string;
 	inputEvents?: { path: string; status: InputCaptureHealth["state"] };
 	path: string;
 	durationMs: number;
@@ -93,6 +120,9 @@ export interface LinuxCaptureResult {
 }
 
 export class LinuxNativeCaptureSession {
+	private readonly privacyPolicy: CapturePrivacyPolicy;
+	private inputSuppressed = false;
+	private capturePolicyPath: string | undefined;
 	private readonly cursor: PipeWireCursorAccumulator;
 	private journal: CaptureEventJournal | null = null;
 	private inputStatus: InputCaptureStatus = {
@@ -135,6 +165,7 @@ export class LinuxNativeCaptureSession {
 	private cursorPauseRanges: CursorPauseRange[] = [];
 
 	constructor(private readonly config: LinuxCaptureConfig) {
+		this.privacyPolicy = normalizeCapturePrivacyPolicy(config.capturePrivacyPolicy);
 		this.cursor = new PipeWireCursorAccumulator(config.maxCursorSamples);
 	}
 
@@ -151,6 +182,8 @@ export class LinuxNativeCaptureSession {
 			);
 		}
 
+		await requireButtonPrivacyHelper(helperPath);
+
 		this.cursor.reset(Date.now());
 		this.lines.reset();
 		this.cursorRecordingStartMs = 0;
@@ -159,6 +192,7 @@ export class LinuxNativeCaptureSession {
 		this.paused = false;
 
 		const request = {
+			capturePointerButtons: this.buttonDecision.allowed,
 			outputPath: this.config.outputPath,
 			cursorMode: this.config.cursorMode,
 			video: {
@@ -352,14 +386,28 @@ export class LinuxNativeCaptureSession {
 		this.cursorPauseStartedAtMs = null;
 	}
 
+	private get buttonDecision() {
+		// Current global drivers cannot attest application identity.
+		return decideButtonCollection(this.privacyPolicy, null, this.inputSuppressed);
+	}
+
+	/** One-way for this take; reenabling requires a fresh explicitly authorized take. */
+	suppressButtonEvidence() {
+		if (this.inputSuppressed) return;
+		this.inputSuppressed = true;
+		this.journal?.append({ event: "input-policy-suppressed", policy: this.privacyPolicy });
+		this.write("suppress-input");
+	}
+
 	get inputCaptureHealth(): InputCaptureHealth {
 		return {
+			privacy: this.buttonDecision,
 			state:
 				this.journal && !this.journal.available
 					? "failed"
 					: this.inputInterrupted
 						? "interrupted"
-						: !this.config.captureInputEvents
+						: !this.config.captureInputEvents || !this.buttonDecision.allowed
 							? "disabled"
 							: this.inputStatus.state,
 			driver: this.inputStatus.driver,
@@ -493,13 +541,41 @@ export class LinuxNativeCaptureSession {
 		this.lines.push(chunk, (line) => {
 			let payload: PipeWireHelperEvent;
 			try {
-				payload = JSON.parse(line) as PipeWireHelperEvent;
-			} catch (error) {
-				this.appendHelperOutput(`${line}\n`);
-				console.error("Failed to parse Linux capture helper output:", error, line);
+				const decoded: unknown = JSON.parse(line);
+				if (
+					!decoded ||
+					typeof decoded !== "object" ||
+					Array.isArray(decoded) ||
+					typeof (decoded as { event?: unknown }).event !== "string"
+				)
+					throw new Error("Invalid helper envelope");
+				payload = decoded as PipeWireHelperEvent;
+			} catch {
+				// Parse errors can quote the original payload. Never retain an unknown
+				// record in diagnostics where an input privacy decision cannot be applied.
+				this.appendHelperOutput("[protocol] malformed helper record omitted\n");
+				console.error("[capture-linux] malformed helper record omitted");
 				return;
 			}
-			if (payload.event !== "cursor-sample" && payload.event !== "pointer-button") {
+			if (!HELPER_EVENTS.has(payload.event)) return;
+			if (
+				payload.event === "warning" &&
+				(typeof payload.code !== "string" || typeof payload.message !== "string")
+			)
+				return;
+			const privateInputLine =
+				payload.event === "input-capture-status" ||
+				payload.event === "input-drain" ||
+				payload.event === "capture-boundary" ||
+				payload.event === "input-discontinuity" ||
+				(payload.event === "warning" &&
+					typeof payload.code === "string" &&
+					payload.code.startsWith("click-capture-"));
+			if (
+				payload.event !== "cursor-sample" &&
+				payload.event !== "pointer-button" &&
+				((this.buttonDecision.allowed && this.capturing && !this.stopped) || !privateInputLine)
+			) {
 				this.appendHelperOutput(`${line}\n`);
 			}
 			this.handleEvent(payload);
@@ -509,20 +585,65 @@ export class LinuxNativeCaptureSession {
 	private handleEvent(payload: PipeWireHelperEvent) {
 		switch (payload.event) {
 			case "input-capture-status":
-				this.inputStatus = payload;
-				this.journal?.append(payload);
+				this.inputStatus = {
+					event: "input-capture-status",
+					state: payload.state,
+					driver: payload.driver,
+					scope: payload.scope,
+				};
+				this.journal?.append(this.inputStatus);
 				return;
 			case "input-discontinuity":
-			case "input-drain":
+				if (this.buttonDecision.allowed && this.capturing && !this.stopped)
+					this.journal?.append(payload);
+				return;
 			case "capture-boundary":
-				if (this.capturing && !this.stopped) this.journal?.append(payload);
+				if (this.capturing && !this.stopped) {
+					this.journal?.append(
+						this.buttonDecision.allowed
+							? payload
+							: {
+									event: "capture-boundary",
+									timestampMs: payload.timestampMs,
+									monotonicMs: payload.monotonicMs,
+									mediaTimeMs: payload.mediaTimeMs,
+									reason: payload.reason,
+									intervalId: payload.intervalId,
+									buttonStateObservation: "suppressed",
+									buttonsDown: [],
+								},
+					);
+				}
+				return;
+			case "input-drain":
+				if (this.capturing && !this.stopped)
+					this.journal?.append({
+						event: "input-drain",
+						monotonicMs: payload.monotonicMs,
+						scope: payload.scope,
+						completed: payload.completed,
+						processedMessages: payload.processedMessages,
+						acceptedEdges: payload.acceptedEdges,
+						excludedEdges: payload.excludedEdges,
+					});
 				return;
 			case "pointer-button":
 				// Native driver projects reader observations through the encoder
 				// pause history, including late delivery from closed intervals. Never derive clicks from cursor samples a second time.
-				if (this.capturing && !this.stopped) this.journal?.append(payload);
+				if (this.buttonDecision.allowed && this.capturing && !this.stopped)
+					this.journal?.append(payload);
 				return;
 			case "ready":
+				if (payload.buttonPrivacyVersion !== 1) {
+					this.suppressButtonEvidence();
+					this.rejectReady(
+						new Error(
+							"The Linux helper lacks button privacy controls. Rebuild it with npm run build:native:linux.",
+						),
+					);
+					this.kill();
+					return;
+				}
 				if (payload.cursorMode === "metadata" || payload.cursorMode === "embedded") {
 					this.negotiatedCursorMode = payload.cursorMode;
 				}
@@ -598,7 +719,23 @@ export class LinuxNativeCaptureSession {
 				this.cursor.rebase(payload.timestampMs);
 				this.cursorRecordingStartMs = payload.timestampMs;
 				this.capturing = true;
-				if (this.config.captureInputEvents && !this.journal) {
+				if (this.config.capturePrivacyPolicy !== undefined) {
+					try {
+						this.capturePolicyPath = writeCapturePolicyReceipt(this.config.outputPath, {
+							version: 1,
+							policy: this.privacyPolicy,
+							applicationIdentity: "unavailable",
+							collectionAllowedAtStart: this.buttonDecision.allowed,
+							suppressedAtStart: this.inputSuppressed,
+						});
+					} catch {
+						this.inputWarning =
+							"Button evidence suppressed: capture policy receipt could not be saved.";
+						this.suppressButtonEvidence();
+					}
+				}
+
+				if (this.buttonDecision.allowed && this.config.captureInputEvents && !this.journal) {
 					this.journal = new CaptureEventJournal(this.config.outputPath, (error) => {
 						this.inputWarning = "Input event journal could not be saved. Video continues.";
 						console.error("[capture-linux] input event journal failed; video continues", error);
@@ -625,12 +762,18 @@ export class LinuxNativeCaptureSession {
 				return;
 
 			case "cursor-sample":
+				if (
+					payload.interactionType === "click" &&
+					(!this.capturing || this.stopped !== null || !this.buttonDecision.allowed)
+				)
+					return;
 				this.cursor.addSample(payload);
 				return;
 
 			case "capture-stopped":
 				this.journal?.append({ event: "session-end", durationMs: payload.durationMs });
 				this.stopped = {
+					...(this.capturePolicyPath ? { capturePolicyPath: this.capturePolicyPath } : {}),
 					...(this.journal
 						? {
 								inputEvents: {
@@ -661,7 +804,13 @@ export class LinuxNativeCaptureSession {
 				return;
 
 			case "warning":
-				if (payload.code.startsWith("click-capture-")) {
+				if (typeof payload.code !== "string" || typeof payload.message !== "string") return;
+				if (
+					payload.code.startsWith("click-capture-") &&
+					(!this.capturing || this.stopped !== null || !this.buttonDecision.allowed)
+				)
+					return;
+				if (payload.code.startsWith("click-capture-") && this.buttonDecision.allowed) {
 					this.inputWarning = payload.message;
 					this.journal?.append({
 						event: "input-warning",

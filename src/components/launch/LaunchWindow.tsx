@@ -21,6 +21,7 @@ import { useUpdateBadge } from "../../hooks/useUpdateBadge";
 import type { WebcamQualityId } from "../../hooks/webcamCaptureTarget";
 import { requestCameraAccess } from "../../lib/requestCameraAccess";
 import { Toaster } from "../ui/sonner";
+import { ButtonEvidenceSettings } from "./ButtonEvidenceSettings";
 import {
 	HudCameraButton,
 	HudCursorButton,
@@ -1189,7 +1190,10 @@ export function LaunchWindow() {
 
 	const showInputCapture = recording && getPlatform() === "linux";
 	const hasNotices =
-		Boolean(systemLocaleSuggestion) || softwareEncoderFallbackNoticeVisible || showInputCapture;
+		Boolean(systemLocaleSuggestion) ||
+		softwareEncoderFallbackNoticeVisible ||
+		showInputCapture ||
+		(getPlatform() === "linux" && !recording && !saving);
 
 	return (
 		// Avoid w-screen/h-screen: 100vw can exceed the inner layout width when scrollbars
@@ -1450,6 +1454,7 @@ export function LaunchWindow() {
 								data-testid="hud-notice-column"
 								className={styles.hudNoticeColumn}
 							>
+								{getPlatform() === "linux" && !recording && !saving && <ButtonEvidenceSettings />}
 								{showInputCapture && <InputCaptureNotice />}
 								{systemLocaleSuggestion && (
 									<HudNotice

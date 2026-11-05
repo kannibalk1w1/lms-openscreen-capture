@@ -16,6 +16,22 @@ use evdev::{raw_stream::RawDevice, EventType, KeyCode, SynchronizationCode};
 use crate::events::timestamp_ms;
 use crate::Message;
 
+/// Startup opt-in plus one-way per-take suppression. The stdin thread closes
+/// forwarding immediately; queued messages are checked again on the main loop.
+#[derive(Default)]
+pub struct InputGate(std::sync::atomic::AtomicBool);
+impl InputGate {
+    pub fn new(enabled: bool) -> Self {
+        Self(std::sync::atomic::AtomicBool::new(enabled))
+    }
+    pub fn allows(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::Acquire)
+    }
+    pub fn suppress(&self) {
+        self.0.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
 const DISABLE_ENV: &str = "OPENSCREEN_DISABLE_CLICK_CAPTURE";
 
 /// How often the hotplug watcher re-scans `/dev/input` for pointer devices that
@@ -56,8 +72,8 @@ pub enum ClickCapture {
 /// simply means every sample stays `"move"`, exactly as before this existed. The
 /// returned value reflects the INITIAL scan only — a device attached afterwards
 /// is adopted by the watcher without changing it.
-pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
-    if std::env::var_os(DISABLE_ENV).is_some() {
+pub fn spawn_readers(sender: &Sender<Message>, gate: &Arc<InputGate>) -> ClickCapture {
+    if !gate.allows() || std::env::var_os(DISABLE_ENV).is_some() {
         return ClickCapture::Disabled;
     }
     // Paths with a LIVE reader. Shared with the reader threads: each removes its
@@ -65,7 +81,7 @@ pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
     // node path is adopted again by the next scan. A set that only grew skipped
     // such a replug for the rest of the recording.
     let opened: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
-    scan_once(sender, &opened);
+    scan_once(sender, &opened, gate);
     let result = if opened.lock().unwrap().is_empty() {
         ClickCapture::NoDevice
     } else {
@@ -76,9 +92,13 @@ pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
     // Detached, like the reader threads — it ends when the process does.
     let watch_sender = sender.clone();
     let watch_opened = Arc::clone(&opened);
+    let watch_gate = Arc::clone(gate);
     thread::spawn(move || loop {
         thread::sleep(RESCAN_INTERVAL);
-        scan_once(&watch_sender, &watch_opened);
+        if !watch_gate.allows() {
+            break;
+        }
+        scan_once(&watch_sender, &watch_opened, &watch_gate);
     });
     result
 }
@@ -86,9 +106,16 @@ pub fn spawn_readers(sender: &Sender<Message>) -> ClickCapture {
 /// Spawns a reader for every `BTN_LEFT` device not already being read, recording
 /// each newly opened node's path. Shared by the initial scan and the watcher; the
 /// check-and-insert is one locked step so two scans cannot both adopt one path.
-fn scan_once(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
+fn scan_once(
+    sender: &Sender<Message>,
+    opened: &Arc<Mutex<HashSet<PathBuf>>>,
+    gate: &Arc<InputGate>,
+) {
     let before = opened.lock().unwrap().len();
     for (path, device) in evdev::raw_stream::enumerate() {
+        if !gate.allows() {
+            break;
+        }
         if !device_reports_left_button(&device) {
             continue;
         }
@@ -97,7 +124,8 @@ fn scan_once(sender: &Sender<Message>, opened: &Arc<Mutex<HashSet<PathBuf>>>) {
         }
         let forward = sender.clone();
         let owned = Arc::clone(opened);
-        thread::spawn(move || read_device(device, path, forward, owned));
+        let reader_gate = Arc::clone(gate);
+        thread::spawn(move || read_device(device, path, forward, owned, reader_gate));
     }
     if before != opened.lock().unwrap().len() {
         report_status(sender, opened);
@@ -142,6 +170,7 @@ fn read_device(
     path: PathBuf,
     sender: Sender<Message>,
     opened: Arc<Mutex<HashSet<PathBuf>>>,
+    gate: Arc<InputGate>,
 ) {
     let release = || {
         opened.lock().unwrap().remove(&path);
@@ -149,6 +178,10 @@ fn read_device(
     };
     let mut recovery = RecoveryFilter::default();
     loop {
+        if !gate.allows() {
+            release();
+            return;
+        }
         let events = match device.fetch_events() {
             Ok(events) => events,
             // A signal interrupted the blocking read — not a device failure.
@@ -168,6 +201,10 @@ fn read_device(
             }
         };
         for event in events {
+            if !gate.allows() {
+                release();
+                return;
+            }
             if event.event_type() == EventType::SYNCHRONIZATION
                 && event.code() == SynchronizationCode::SYN_DROPPED.0
             {
@@ -222,6 +259,20 @@ impl RecoveryFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn no_consent_never_opens_readers_and_suppression_is_one_way() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let gate = Arc::new(InputGate::default());
+        assert!(!gate.allows());
+        assert_eq!(spawn_readers(&sender, &gate), ClickCapture::Disabled);
+        assert!(receiver.try_recv().is_err());
+        let enabled = InputGate::new(true);
+        assert!(enabled.allows());
+        enabled.suppress();
+        enabled.suppress();
+        assert!(!enabled.allows());
+    }
 
     #[test]
     fn kernel_overflow_excludes_the_incomplete_packet_without_reconstructing_edges() {

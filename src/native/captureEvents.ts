@@ -1,3 +1,4 @@
+import type { ButtonCollectionDecision, CapturePrivacyPolicy } from "../lib/capturePrivacy";
 /** Append-only input evidence. These are source events, never editor effects. */
 export interface CaptureEventPosition {
 	x: number;
@@ -34,7 +35,7 @@ export interface CaptureBoundaryEvidence {
 	mediaTimeMs: number;
 	reason: "start" | "pause" | "resume" | "stop";
 	intervalId: number;
-	buttonStateObservation: "dispatch";
+	buttonStateObservation: "dispatch" | "suppressed";
 	buttonsDown: { device: string; code: number }[];
 }
 
@@ -85,6 +86,7 @@ export type CaptureJournalPayload =
 	| PointerButtonEvidence
 	| InputCaptureStatus
 	| { event: "input-warning"; code: string; message: string }
+	| { event: "input-policy-suppressed"; policy: CapturePrivacyPolicy }
 	| { event: "session-end"; durationMs: number };
 
 export type CaptureJournalRecord = CaptureJournalPayload & {
@@ -97,6 +99,7 @@ export type CaptureJournalRecord = CaptureJournalPayload & {
 
 /** Live capture health; journal errors take precedence over driver availability. */
 export interface InputCaptureHealth {
+	privacy?: ButtonCollectionDecision;
 	state: InputCaptureStatus["state"] | "failed" | "interrupted";
 	driver: InputCaptureStatus["driver"];
 	scope: InputCaptureStatus["scope"];

@@ -27,7 +27,13 @@ fn parse_edge(line: &str, expected: u64) -> Result<Edge, String> {
     Ok(edge)
 }
 
-pub fn spawn_reader(sender: &Sender<Message>) -> super::input::ClickCapture {
+pub fn spawn_reader(
+    sender: &Sender<Message>,
+    gate: &std::sync::Arc<super::input::InputGate>,
+) -> super::input::ClickCapture {
+    if !gate.allows() {
+        return super::input::ClickCapture::Disabled;
+    }
     let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") else {
         return super::input::ClickCapture::NoDevice;
     };
@@ -44,8 +50,9 @@ pub fn spawn_reader(sender: &Sender<Message>) -> super::input::ClickCapture {
     }
     let _ = reader.get_ref().set_read_timeout(None);
     let sender = sender.clone();
+    let gate = std::sync::Arc::clone(gate);
     std::thread::spawn(move || {
-        let Err(reason) = forward_edges(&mut reader, &sender) else {
+        let Err(reason) = forward_edges(&mut reader, &sender, &gate) else {
             return;
         };
         let _ = sender.send(Message::InputStatus {
@@ -63,11 +70,21 @@ pub fn spawn_reader(sender: &Sender<Message>) -> super::input::ClickCapture {
     super::input::ClickCapture::Active
 }
 
-fn forward_edges(reader: &mut impl BufRead, sender: &Sender<Message>) -> Result<(), String> {
+fn forward_edges(
+    reader: &mut impl BufRead,
+    sender: &Sender<Message>,
+    gate: &super::input::InputGate,
+) -> Result<(), String> {
     let mut sequence = 0;
     loop {
+        if !gate.allows() {
+            return Ok(());
+        }
         let mut line = String::new();
         read_line(reader, &mut line)?;
+        if !gate.allows() {
+            return Ok(());
+        }
         let edge = parse_edge(&line, sequence)?;
         sequence += 1;
         let observed_at = std::time::Instant::now();
@@ -100,6 +117,23 @@ fn read_line(reader: &mut impl BufRead, line: &mut String) -> Result<(), String>
 mod tests {
     use super::*;
     #[test]
+    fn disabled_or_suppressed_gate_never_connects_or_forwards_compositor_edges() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let gate = std::sync::Arc::new(super::super::input::InputGate::new(false));
+        assert_eq!(
+            spawn_reader(&sender, &gate),
+            super::super::input::ClickCapture::Disabled
+        );
+        forward_edges(
+            &mut BufReader::new("{\"sequence\":0,\"code\":272,\"pressed\":true}\n".as_bytes()),
+            &sender,
+            &gate,
+        )
+        .unwrap();
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
     fn counts_all_buttons_and_rejects_gaps_keys_and_duplicates() {
         for (sequence, code) in (0x110..=0x117).enumerate() {
             for pressed in [true, false] {
@@ -119,8 +153,12 @@ mod tests {
             "{\"sequence\":3,\"code\":273,\"pressed\":true}\n"
         );
         let (sender, receiver) = std::sync::mpsc::channel();
-        let error =
-            forward_edges(&mut BufReader::with_capacity(3, input.as_bytes()), &sender).unwrap_err();
+        let error = forward_edges(
+            &mut BufReader::with_capacity(3, input.as_bytes()),
+            &sender,
+            &super::super::input::InputGate::new(true),
+        )
+        .unwrap_err();
         assert!(error.contains("sequence"));
         let edges: Vec<_> = receiver.try_iter().collect();
         assert_eq!(edges.len(), 2);

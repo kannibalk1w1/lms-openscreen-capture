@@ -3,6 +3,7 @@ import { accessSync, constants as fsConstants } from "node:fs";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { CursorRecordingData } from "../../../../src/native/contracts";
+import { requireButtonPrivacyHelper } from "../../capture/buttonPrivacyProbe";
 import {
 	NdjsonLineReader,
 	PipeWireCursorAccumulator,
@@ -105,9 +106,16 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 			);
 		}
 
+		await requireButtonPrivacyHelper(helperPath);
+
 		const child = spawn(
 			helperPath,
-			[JSON.stringify({ sampleIntervalMs: this.options.sampleIntervalMs })],
+			[
+				JSON.stringify({
+					sampleIntervalMs: this.options.sampleIntervalMs,
+					capturePointerButtons: false,
+				}),
+			],
 			{ stdio: ["pipe", "pipe", "pipe"] },
 		);
 		this.process = child;
@@ -174,6 +182,11 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 	private handleEvent(payload: PipeWireHelperEvent) {
 		switch (payload.event) {
 			case "ready":
+				if (payload.buttonPrivacyVersion !== 1) {
+					this.rejectReady(new Error("Linux cursor helper lacks button privacy controls"));
+					this.process?.kill("SIGTERM");
+					return;
+				}
 				this.resolveReady();
 				return;
 			case "stream-started":
@@ -187,9 +200,11 @@ export class PipeWireCursorRecordingSession implements CursorRecordingSession {
 				);
 				return;
 			case "cursor-sample":
+				if (payload.interactionType === "click") return;
 				this.cursor.addSample(payload);
 				return;
 			case "warning":
+				if (payload.code.startsWith("click-capture-")) return;
 				console.warn(`[cursor-linux] ${payload.code}: ${payload.message}`);
 				return;
 			case "error":

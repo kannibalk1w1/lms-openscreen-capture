@@ -15,6 +15,30 @@ afterEach(() => {
 });
 
 describe("app settings store", () => {
+	it("persists explicit collection policy, reopens it, and fails closed on corrupt policy", () => {
+		const dir = temp();
+		const policy = {
+			version: 1 as const,
+			buttonScope: "applications" as const,
+			allowedApplications: ["teaching.app"],
+			excludedApplications: ["private.app"],
+		};
+		new AppSettingsStore(dir).setRecordingPreferences({ capturePrivacyPolicy: policy });
+		expect(new AppSettingsStore(dir).getSnapshot().recording.capturePrivacyPolicy).toEqual(policy);
+		expect(() =>
+			new AppSettingsStore(dir).setRecordingPreferences({
+				capturePrivacyPolicy: { ...policy, version: 2 } as unknown as typeof policy,
+			}),
+		).toThrow("capturePrivacyPolicy");
+		writeFileSync(
+			path.join(dir, "recording-settings.json"),
+			JSON.stringify({ capturePrivacyPolicy: { ...policy, version: 2 } }),
+		);
+		expect(
+			new AppSettingsStore(dir).getSnapshot().recording.capturePrivacyPolicy?.buttonScope,
+		).toBe("off");
+	});
+
 	it("uses defaults for absent fields and preserves unknown keys", () => {
 		const dir = temp();
 		const file = path.join(dir, "recording-settings.json");

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
@@ -15,7 +15,16 @@ type WithDefault = { default?: Record<string, unknown> };
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:child_process")>();
 	const spawn = vi.fn();
-	return { ...actual, spawn, default: { ...((actual as WithDefault).default ?? {}), spawn } };
+	const execFile = vi.fn((...args: unknown[]) => {
+		const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+		callback(null, '{"event":"ready","buttonPrivacyVersion":1}\n', "");
+	});
+	return {
+		...actual,
+		spawn,
+		execFile,
+		default: { ...((actual as WithDefault).default ?? {}), spawn, execFile },
+	};
 });
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -29,7 +38,9 @@ vi.mock("node:fs", async (importOriginal) => {
 	};
 });
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { disabledCapturePrivacyPolicy } from "../../../src/lib/capturePrivacy";
+import { readCapturePolicyReceipt } from "../../recording/capturePolicyReceipt";
 import { LinuxNativeCaptureSession } from "./linuxNativeCaptureSession";
 
 class FakeHelper extends EventEmitter {
@@ -56,7 +67,9 @@ class FakeHelper extends EventEmitter {
 	}
 
 	emitEvent(event: Record<string, unknown>) {
-		this.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...event })}\n`);
+		this.stdout.write(
+			`${JSON.stringify({ schemaVersion: 1, ...(event.event === "ready" ? { buttonPrivacyVersion: 1 } : {}), ...event })}\n`,
+		);
 	}
 }
 
@@ -68,6 +81,16 @@ function newSession(deferStart = false, inputOutputPath?: string) {
 		...(deferStart ? { deferStart: true } : {}),
 		outputPath: inputOutputPath ?? "/tmp/recording.mp4",
 		captureInputEvents: Boolean(inputOutputPath),
+		...(inputOutputPath
+			? {
+					capturePrivacyPolicy: {
+						version: 1 as const,
+						buttonScope: "global" as const,
+						allowedApplications: [],
+						excludedApplications: [],
+					},
+				}
+			: {}),
 		cursorMode: "metadata",
 		fps: 30,
 		audio: {
@@ -535,7 +558,8 @@ describe("LinuxNativeCaptureSession", () => {
 	});
 
 	it("keeps native projected late clicks and resumed motion out of UTC pause compaction", async () => {
-		const session = newSession(false);
+		const root = mkdtempSync(join(tmpdir(), "projected-click-policy-"));
+		const session = newSession(false, join(root, "take.mp4"));
 		await startReady(session);
 		emitCaptureStarted(1000);
 		await flushStdout();
@@ -575,6 +599,7 @@ describe("LinuxNativeCaptureSession", () => {
 		const result = await finishCapture(session, 2400);
 		expect(result.cursor.samples.map((point) => point.timeMs)).toEqual([190, 210]);
 		expect(result.cursor.samples[0].interactionType).toBe("click");
+		rmSync(root, { recursive: true, force: true });
 	});
 
 	it("closes the cursor pause range when the recording stops while paused", async () => {
@@ -776,13 +801,14 @@ describe("LinuxNativeCaptureSession", () => {
 			expect(output).not.toContain("cursor-sample");
 		});
 
-		it("keeps a line the helper wrote that is not JSON", async () => {
+		it("records a protocol error without retaining unclassified stdout", async () => {
 			const session = newSession();
 			await startReady(session);
 			helper.stdout.write("thread 'main' panicked at src/main.rs:12\n");
 			await flushStdout();
 
-			expect(session.helperOutput).toContain("thread 'main' panicked at src/main.rs:12\n");
+			expect(session.helperOutput).toContain("[protocol] malformed helper record omitted");
+			expect(session.helperOutput).not.toContain("thread 'main' panicked");
 		});
 
 		it("keeps the newest 64 KiB of a helper that keeps talking", async () => {
@@ -891,7 +917,7 @@ it("exposes live driver changes, warnings and unexpected exit", async () => {
 	await flushStdout();
 	expect(session.inputCaptureHealth).toMatchObject({
 		state: "unavailable",
-		warning: "Compositor disconnected",
+		warning: null,
 	});
 	// No capture-started, so no journal is created or recording interrupted.
 	helper.emit("exit", 1, null);
@@ -1106,6 +1132,279 @@ it("persists device discontinuities and incomplete stop drain without creating r
 			code: "click-capture-drain-incomplete",
 		});
 		expect(records.at(-1).event).toBe("session-end");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+function policySession(
+	video: string,
+	capturePrivacyPolicy?: ReturnType<typeof disabledCapturePrivacyPolicy>,
+) {
+	return new LinuxNativeCaptureSession({
+		outputPath: video,
+		captureInputEvents: true,
+		capturePrivacyPolicy,
+		cursorMode: "metadata",
+		fps: 30,
+		audio: { system: { enabled: false }, microphone: { enabled: false, gain: 1 } },
+		maxCursorSamples: 100,
+	});
+}
+function emitPrivateButtonCanary(canary: string) {
+	helper.emitEvent({
+		event: "pointer-button",
+		timestampMs: 1200,
+		monotonicMs: 20,
+		mediaTimeMs: 10,
+		code: 0x110,
+		pressed: true,
+		device: canary,
+		position: null,
+		intervalId: 0,
+	});
+	helper.emitEvent({
+		event: "cursor-sample",
+		timestampMs: 1200,
+		mediaTimeMs: 10,
+		intervalId: 0,
+		mediaTimeObservation: "reader",
+		x: 2,
+		y: 2,
+		width: 10,
+		height: 10,
+		visible: true,
+		interactionType: "click",
+		assetId: canary,
+		asset: { id: canary, imageDataUrl: canary, width: 1, height: 1, hotspotX: 0, hotspotY: 0 },
+	});
+	helper.emitEvent({
+		event: "input-discontinuity",
+		monotonicMs: 21,
+		device: canary,
+		reason: "kernel-overflow",
+		buttonStateObservation: "dispatch",
+		clearedButtons: [{ intervalId: 0, code: 0x110 }],
+	});
+	helper.emitEvent({ event: "warning", code: "click-capture-kernel-overflow", message: canary });
+	helper.emitEvent({
+		event: "capture-boundary",
+		timestampMs: 1300,
+		monotonicMs: 22,
+		mediaTimeMs: 20,
+		reason: "stop",
+		intervalId: 0,
+		buttonStateObservation: "dispatch",
+		buttonsDown: [{ device: canary, code: 0x110 }],
+	});
+	helper.stdout.write(`malformed-private-record:${canary}\n`);
+	helper.emitEvent({ event: "unknown-input-extension", device: canary });
+	helper.emitEvent({
+		event: "input-capture-status",
+		state: "partial",
+		driver: "linux-evdev",
+		scope: "global-physical-buttons-no-taps",
+		futureDeviceMetadata: canary,
+	});
+	helper.emitEvent({
+		event: "input-drain",
+		monotonicMs: 22,
+		scope: "queued-before-fence",
+		completed: true,
+		processedMessages: 0,
+		acceptedEdges: 0,
+		excludedEdges: 0,
+		futureDeviceMetadata: canary,
+	});
+}
+it.each([
+	"off",
+	"unknown-app",
+	"unknown-exclusion",
+	"legacy-flag",
+])("suppresses %s collection before startup and keeps a private canary out of disk, cursor and diagnostics", async (mode) => {
+	const root = mkdtempSync(join(tmpdir(), "privacy-denied-"));
+	try {
+		const video = join(root, "take.mp4");
+		const policy =
+			mode === "legacy-flag"
+				? undefined
+				: {
+						...disabledCapturePrivacyPolicy(),
+						...(mode === "unknown-app"
+							? { buttonScope: "applications" as const, allowedApplications: ["teaching.app"] }
+							: {}),
+						...(mode === "unknown-exclusion"
+							? { buttonScope: "global" as const, excludedApplications: ["private.app"] }
+							: {}),
+					};
+		const session = policySession(video, policy);
+		await startReady(session);
+		const request = JSON.parse((spawnMock.mock.calls[0][1] as string[])[0]);
+		expect(request.capturePointerButtons).toBe(false);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		emitPrivateButtonCanary("PRIVATE_BUTTON_CANARY_DENIED");
+		await flushStdout();
+		expect(session.inputCaptureHealth.state).toBe("disabled");
+		const result = await finishCapture(session, 1500);
+		expect(existsSync(`${video}.events.ndjson`)).toBe(false);
+		for (const file of readdirSync(root))
+			expect(readFileSync(join(root, file), "utf8")).not.toContain("PRIVATE_BUTTON_CANARY_DENIED");
+		expect(JSON.stringify(result.cursor)).not.toContain("PRIVATE_BUTTON_CANARY_DENIED");
+		expect(session.helperOutput).not.toContain("PRIVATE_BUTTON_CANARY_DENIED");
+		expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+			"PRIVATE_BUTTON_CANARY_DENIED",
+		);
+		expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain(
+			"PRIVATE_BUTTON_CANARY_DENIED",
+		);
+		if (policy)
+			expect(readCapturePolicyReceipt(video)).toMatchObject({
+				policy,
+				applicationIdentity: "unavailable",
+				collectionAllowedAtStart: false,
+			});
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+it("revokes an authorized take before queued helper lines arrive while retaining earlier evidence and video completion", async () => {
+	const root = mkdtempSync(join(tmpdir(), "privacy-revoke-"));
+	try {
+		const video = join(root, "take.mp4");
+		const session = policySession(video, {
+			...disabledCapturePrivacyPolicy(),
+			buttonScope: "global",
+		});
+		await startReady(session);
+		expect(JSON.parse((spawnMock.mock.calls[0][1] as string[])[0]).capturePointerButtons).toBe(
+			true,
+		);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		helper.emitEvent({
+			event: "pointer-button",
+			timestampMs: 1100,
+			monotonicMs: 10,
+			mediaTimeMs: 5,
+			code: 0x110,
+			pressed: true,
+			device: "authorized-before-suppression",
+			position: null,
+			intervalId: 0,
+		});
+		await flushStdout();
+		session.suppressButtonEvidence();
+		session.suppressButtonEvidence();
+		expect(helper.stdinWrites.filter((line) => line === "suppress-input\n")).toHaveLength(1);
+		emitPrivateButtonCanary("PRIVATE_BUTTON_CANARY_REVOKED");
+		await flushStdout();
+		expect(session.inputCaptureHealth).toMatchObject({
+			state: "disabled",
+			privacy: { reason: "suppressed", allowed: false },
+		});
+		const result = await finishCapture(session, 1500);
+		const journal = readFileSync(`${video}.events.ndjson`, "utf8");
+		expect(journal).toContain("authorized-before-suppression");
+		expect(journal).toContain("input-policy-suppressed");
+		expect(journal).toContain('"buttonStateObservation":"suppressed"');
+		expect(journal).toContain('"event":"session-end"');
+		for (const file of readdirSync(root))
+			expect(readFileSync(join(root, file), "utf8")).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
+		expect(JSON.stringify(result.cursor)).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
+		expect(session.helperOutput).not.toContain("PRIVATE_BUTTON_CANARY_REVOKED");
+		expect(readCapturePolicyReceipt(video).collectionAllowedAtStart).toBe(true);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+it("keeps video operational and suppresses evidence if its policy receipt cannot be created", async () => {
+	const root = mkdtempSync(join(tmpdir(), "privacy-receipt-collision-"));
+	try {
+		const video = join(root, "take.mp4");
+		const { writeFileSync } = await import("node:fs");
+		writeFileSync(`${video}.capture-policy.json`, "prior source receipt");
+		const session = policySession(video, {
+			...disabledCapturePrivacyPolicy(),
+			buttonScope: "global",
+		});
+		await startReady(session);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		emitPrivateButtonCanary("PRIVATE_BUTTON_CANARY_COLLISION");
+		await flushStdout();
+		await finishCapture(session, 1500);
+		expect(readFileSync(`${video}.capture-policy.json`, "utf8")).toBe("prior source receipt");
+		expect(existsSync(`${video}.events.ndjson`)).toBe(false);
+		expect(session.inputCaptureHealth.privacy?.reason).toBe("suppressed");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+it("rejects an unsupported helper before declaring readiness, with parent retention suppressed", async () => {
+	const session = newSession();
+	const started = session.start();
+	const rejection = expect(started).rejects.toThrow("lacks button privacy controls");
+	await Promise.resolve();
+	helper.emitEvent({ event: "ready", timestampMs: 1000, buttonPrivacyVersion: 0 });
+	await rejection;
+	expect(helper.killed).toBe(true);
+	expect(session.inputCaptureHealth.privacy?.allowed).toBe(false);
+});
+
+it("checks a stale helper in probe-only mode before launching any real capture", async () => {
+	vi.mocked(execFile).mockImplementationOnce(((...args: unknown[]) => {
+		const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+		callback(null, '{"event":"ready"}\n', "");
+	}) as typeof execFile);
+	await expect(newSession().start()).rejects.toThrow("lacks button privacy controls");
+	expect(spawnMock).not.toHaveBeenCalled();
+	const probe = vi.mocked(execFile).mock.calls.at(-1);
+	expect(JSON.parse((probe?.[1] as string[])[0])).toEqual({
+		probeOnly: true,
+		capturePointerButtons: false,
+		cursorMode: "hidden",
+	});
+});
+
+it("keeps revocation effective while the safe capability probe is still pending", async () => {
+	const root = mkdtempSync(join(tmpdir(), "privacy-probe-revocation-"));
+	try {
+		let completeProbe: (error: Error | null, stdout: string, stderr: string) => void = () =>
+			undefined;
+		vi.mocked(execFile).mockImplementationOnce(((...args: unknown[]) => {
+			completeProbe = args.at(-1) as typeof completeProbe;
+		}) as typeof execFile);
+		const video = join(root, "take.mp4");
+		const session = policySession(video, {
+			...disabledCapturePrivacyPolicy(),
+			buttonScope: "global",
+		});
+		const starting = session.start();
+		session.suppressButtonEvidence();
+		completeProbe(null, '{"event":"ready","buttonPrivacyVersion":1}\n', "");
+		await Promise.resolve();
+		helper.emitEvent({ event: "ready", timestampMs: 1000 });
+		await starting;
+		expect(JSON.parse((spawnMock.mock.calls[0][1] as string[])[0]).capturePointerButtons).toBe(
+			false,
+		);
+		emitCaptureStarted(1050);
+		await flushStdout();
+		emitPrivateButtonCanary("PRIVATE_BUTTON_CANARY_PROBE_REVOKED");
+		await flushStdout();
+		await finishCapture(session, 1500);
+		expect(readCapturePolicyReceipt(video)).toMatchObject({
+			collectionAllowedAtStart: false,
+			suppressedAtStart: true,
+		});
+		expect(existsSync(`${video}.events.ndjson`)).toBe(false);
+		for (const file of readdirSync(root))
+			expect(readFileSync(join(root, file), "utf8")).not.toContain(
+				"PRIVATE_BUTTON_CANARY_PROBE_REVOKED",
+			);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

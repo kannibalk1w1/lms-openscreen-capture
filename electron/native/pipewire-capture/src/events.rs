@@ -94,6 +94,7 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     Ready {
         timestamp_ms: u64,
+        button_privacy_version: u8,
         /// Runtime libpipewire version, not the vendored header version.
         pipewire_version: Option<String>,
         /// Whether the portal advertises METADATA cursor mode at all.
@@ -312,6 +313,7 @@ mod tests {
         let text = emit_one(
             &Event::Ready {
                 timestamp_ms: 42,
+                button_privacy_version: 1,
                 pipewire_version: Some("1.0.5".to_owned()),
                 cursor_metadata_supported: true,
                 cursor_mode: "metadata",
@@ -359,11 +361,13 @@ mod tests {
     fn ready_uses_the_shared_helper_vocabulary() {
         let value = parse_one(&Event::Ready {
             timestamp_ms: 7,
+            button_privacy_version: 1,
             pipewire_version: None,
             cursor_metadata_supported: false,
             cursor_mode: "embedded",
         });
         assert_eq!(value["event"], "ready");
+        assert_eq!(value["buttonPrivacyVersion"], 1);
         assert_eq!(value["timestampMs"], 7);
         assert!(value["pipewireVersion"].is_null());
         assert_eq!(value["cursorMetadataSupported"], false);

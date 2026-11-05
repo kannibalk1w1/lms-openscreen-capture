@@ -273,6 +273,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	addRecordingFlag: () => ipcRenderer.invoke("recording-flags:add"),
 	setRecordingFlagsPaused: (paused: boolean) =>
 		ipcRenderer.invoke("recording-flags:paused", paused),
+	suppressNativeButtonEvidence: () => ipcRenderer.invoke("suppress-native-button-evidence"),
 	getInputCaptureHealth: () => ipcRenderer.invoke("get-input-capture-health"),
 	isNativeLinuxCaptureAvailable: () => {
 		return ipcRenderer.invoke("is-native-linux-capture-available");
