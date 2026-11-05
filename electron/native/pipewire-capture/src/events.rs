@@ -42,6 +42,16 @@ pub struct CursorAsset {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
+    CaptureBoundary {
+        timestamp_ms: u64,
+        monotonic_ms: u64,
+        media_time_ms: u64,
+        reason: &'static str,
+        interval_id: u64,
+        button_state_observation: &'static str,
+        buttons_down: Vec<crate::input_evidence::ButtonIdentity>,
+    },
+    #[serde(rename_all = "camelCase")]
     PointerButton {
         timestamp_ms: u64,
         monotonic_ms: u64,
@@ -49,6 +59,9 @@ pub enum Event {
         code: u16,
         pressed: bool,
         device: String,
+        interval_id: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        continuity: Option<&'static str>,
         /// Latest PipeWire position, not a synchronous button-position observation.
         position: Option<serde_json::Value>,
     },
@@ -292,6 +305,8 @@ mod tests {
             code: 0x111,
             pressed: false,
             device: "/dev/input/event1".into(),
+            interval_id: 0,
+            continuity: None,
             position: None,
         });
         assert_eq!(value["event"], "pointer-button");

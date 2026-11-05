@@ -18,6 +18,10 @@ OpenScreen is a free, open-source screen recorder and video editor (Electron + R
 
 ## Development principles
 
+- **Lesson-capture workflow:** commit each completed, validated work slice locally.
+  Push or merge when the user requests it. After every build, report exact coverage
+  and the next concrete roadmap item.
+
 - Prefer the simplest solution that stays readable — no abstraction for hypothetical needs (YAGNI).
 - **No mandated app-stack choice yet.** Contributors pick their own state/data library. Don't impose one across the codebase and don't refactor existing code onto a different one — keep each addition self-contained and consistent within its own module. A single choice may be enforced later.
 - Don't optimize for line count. A dense one-liner that hides control flow is worse than the explicit version.

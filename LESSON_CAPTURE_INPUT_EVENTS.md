@@ -143,3 +143,11 @@ Validation for this slice, 5 November 2026:
 
 This remains partial milestone-1 coverage. Actual text/edit capture, editable
 sections and portable typing exports have not been implemented in this slice.
+
+## Subsequent native boundary slice
+
+[Capture boundary records and continuity markers](LESSON_CAPTURE_INPUT_BOUNDARIES.md)
+are now implemented locally. These preserve dispatch-time pause/interval evidence;
+observation-time mapping and a fresh counted physical/virtual capture pass remain
+next. The preceding input-event runtime reports describe the older helper and do
+not validate this new native build.

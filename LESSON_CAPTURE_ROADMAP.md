@@ -1,13 +1,15 @@
 # Lesson Capture roadmap
 
-Updated 5 November 2026. The next priority is complete input evidence and reusable
-typing sequences. The initial Linux physical-button journal is implemented;
-complete input capture and typing exports remain roadmap items.
+Updated 5 November 2026. Scoped Godot/pad capture, code presentation, explicit
+source association, portable exports/bundles and typing-section review are
+implemented. Clock/input fidelity, the full event-review workflow and production
+acceptance remain open.
 
 ## Build reports and current next step
 
 After every build, report what changed, exact validation coverage and the next
-concrete item on this roadmap. This is the user's standing preference.
+concrete item on this roadmap. Commit each completed, validated slice locally;
+push or merge when requested. These are the user's standing preferences.
 
 Recording/editor flags are now implemented as a dedicated timeline row, with a
 configurable recording hotkey and source-time persistence; see
@@ -32,10 +34,43 @@ retain independent baselines and original edit evidence, with import/edit/re-exp
 provides onset markers, per-occurrence seeking, a searchable independent-section
 catalog, direct editing links and exports.
 
-**Next implementation:** native pause/resume journal records and button-edge
-reconciliation across capture boundaries, followed by counted helper tests.
+**Native boundary stage started:** explicit journal boundaries, interval IDs and
+dispatch-time continuity markers are local; see [coverage/limits](LESSON_CAPTURE_INPUT_BOUNDARIES.md).
+
+**Next implementation:** observation-time media projection across pause history
+and counted capture-boundary input tests.
 Broader application/IME/Windows acceptance and physical tap/recovery checks remain
 open before promoting capture drivers.
+
+## Current outstanding work, in priority order
+
+1. **Native input timing and continuity.** Map observation timestamps to media
+   time across pause history; handle queued late events, stop-time draining and
+   device loss. Run counted start/pause/resume/stop/held-button tests on the rebuilt
+   helper. Current interval/boundary metadata is dispatch-time evidence only.
+2. **Live Godot/video synchronization.** Replace manual onset calibration where
+   possible with an explicit live clock bridge and automatic recording-pause
+   awareness. Measure timing bounds; do not infer encoder alignment from UTC.
+3. **Complete input/editor coverage.** Physical mouse and touchpad-tap acceptance,
+   scroll, application/dialog scoping and source geometry/context; Windows input
+   support; physical Godot/IME/layout/multicaret tests and other editor adapters.
+   The opt-in KWin driver and visible capability reporting already exist.
+4. **Richer lesson review and outputs.** Click/shortcut/narration evidence lanes,
+   reliable typing ranges once clocks support them, section split/reorder/exclude,
+   and still/clip/MP4/GIF excerpts from selections. Application playback/format
+   adapters remain separate from the implemented controlled-buffer recipes.
+5. **Presentation and review-debt fixes.** Native CJK/font fallback and clipping,
+   excerpt caret bounds, cold compilation/IPC/raster/hash costs, project-sourced
+   SVG validation, the Godot-conflicting flag default and non-native input HUD
+   state. Low-priority export style/bundle filenames and raw bridge errors remain.
+6. **Agent workflow and production acceptance.** CLI/MCP event queries, section
+   export and controlled playback; the real RPG Enemy human/agent handoff proof;
+   full Linux/Windows/macOS capture/edit/export, sustained/audio/webcam/device and
+   cut/speed/undo testing, portable project transfer and recovery acceptance.
+
+**Immediate next slice:** observation-time media projection across pause history,
+followed by counted input-boundary tests. Foundational delivery is not full
+production acceptance; detailed tests and exclusions are linked below.
 
 ## Completed first slice
 
@@ -65,8 +100,8 @@ Use an appropriate Windows driver behind the same event contract.
 Progress: [first input-event slice](LESSON_CAPTURE_INPUT_EVENTS.md) now saves
 versioned journals and eight physical button down/up types, independently of
 cursor effects. The counted KDE smoke test passed, including pause/resume and
-device loss. Tap-to-click, application scoping, complete geometry/context,
-capability UI and Windows remain pending. Panoptix's KWin effect was inspected;
+device loss. Physical tap acceptance, application scoping, complete geometry/context and
+Windows remain pending. Capability UI and the opt-in KWin driver are implemented. Panoptix's KWin effect was inspected;
 its current left-only, in-flight-dropping sender needs a different delivery path.
 
 Acceptance: run a counted sequence of button clicks, taps, double-clicks and
@@ -77,6 +112,10 @@ Expose unavailable or interrupted event capture visibly; do not silently claim
 that every click was captured.
 
 ## 2. Typing capture
+
+Scoped pad and Godot unsaved-buffer capture are delivered. Remaining work is live
+recording alignment, physical/IME/layout/multicaret acceptance and additional
+editor/platform adapters. The following remains the full milestone contract.
 
 Record both physical key/shortcut events and the text/edit operations they cause.
 They answer different questions: a shortcut is not a character, a paste is not
@@ -101,6 +140,10 @@ application adapters. A raw keystroke log alone does not satisfy this milestone.
 
 ## 3. ScriptWriter-style typing exports
 
+Portable section JSON, resulting code/text, clean/captured recipes and independent
+bundles with import/edit/re-export are delivered. Selection-based video/GIF excerpts
+and target-application adapters remain open. The following is the full contract.
+
 Allow selection of one or more captured typing sections and export:
 
 - A portable, editable sequence of text/edit operations and timing, with source
@@ -122,6 +165,9 @@ auto-indentation and bracket completion. Reopen and edit the exported sequence
 without relying on the original video.
 
 ## 4. Event timeline and lesson selection
+
+Flags, Code regions and typing onset/catalog review are delivered. Other evidence
+lanes, clock-supported ranges and broader lesson section operations remain open.
 
 Show click, typing, shortcut, teaching-marker and narration tracks against the
 footage. An event seeks to its source moment; a typing section selects a range.
@@ -164,3 +210,14 @@ The opt-in KWin driver has passed its nested-compositor counted test. Physical
 libinput taps, OS/global hotkey delivery, visual HUD and recovery/device checks,
 Windows runtime and full typing/IME acceptance remain open. No raw-key-only or
 saved-file-diff-only result satisfies those capture checks.
+
+## Native boundary stage started
+
+The completed typing stack is now merged/pushed to private main at fd2775e2.
+A local [native boundary slice](LESSON_CAPTURE_INPUT_BOUNDARIES.md) adds explicit
+start/pause/resume/stop journal records, active interval IDs, observed held-button
+snapshots and unmatched-release/repeated-press flags without synthetic edges.
+
+Next concrete item: observation-time media projection across pause history and
+counted boundary input tests. Dispatch-time scheduling, queued late events,
+physical/device acceptance and the shared Godot/encoder clock remain open.

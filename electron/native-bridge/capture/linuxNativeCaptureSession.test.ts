@@ -887,3 +887,73 @@ it("reports interrupted evidence after an unexpected helper exit", async () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+it("persists native control boundaries, interval identity and unmatched releases without synthesizing clicks", async () => {
+	const root = mkdtempSync(join(tmpdir(), "native-boundaries-"));
+	try {
+		const video = join(root, "take.mp4"),
+			session = newSession(false, video);
+		await startReady(session);
+		const boundary = {
+			event: "capture-boundary",
+			timestampMs: 1100,
+			monotonicMs: 100,
+			mediaTimeMs: 50,
+			reason: "pause",
+			intervalId: 0,
+			buttonStateObservation: "dispatch",
+			buttonsDown: [{ device: "mouse", code: 0x110 }],
+		};
+		helper.emitEvent(boundary); // No recording journal exists during the picker.
+		emitCaptureStarted(1050);
+		helper.emitEvent({ ...boundary, reason: "start", mediaTimeMs: 0, buttonsDown: [] });
+		helper.emitEvent(boundary);
+		helper.emitEvent({
+			...boundary,
+			reason: "resume",
+			monotonicMs: 5100,
+			intervalId: 1,
+			buttonsDown: [],
+		});
+		helper.emitEvent({
+			event: "pointer-button",
+			timestampMs: 6200,
+			monotonicMs: 5200,
+			mediaTimeMs: 150,
+			code: 0x110,
+			pressed: false,
+			device: "mouse",
+			position: null,
+			intervalId: 1,
+			continuity: "unmatched-release",
+		});
+		helper.emitEvent({
+			...boundary,
+			reason: "stop",
+			mediaTimeMs: 200,
+			intervalId: 1,
+			buttonsDown: [],
+		});
+		await flushStdout();
+		await finishCapture(session, 200);
+		const records = readFileSync(`${video}.events.ndjson`, "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		expect(
+			records
+				.filter((record) => record.event === "capture-boundary")
+				.map((record) => record.reason),
+		).toEqual(["start", "pause", "resume", "stop"]);
+		expect(records.filter((record) => record.event === "pointer-button")).toHaveLength(1);
+		expect(records.find((record) => record.continuity)).toMatchObject({
+			continuity: "unmatched-release",
+			intervalId: 1,
+			pressed: false,
+		});
+		expect(records.at(-1).event).toBe("session-end");
+		expect(new Set(records.map((record) => record.id)).size).toBe(records.length);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});

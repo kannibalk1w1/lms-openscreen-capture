@@ -34,6 +34,7 @@ mod encoder;
 mod events;
 mod ffmpeg;
 mod input;
+mod input_evidence;
 mod kwin_input;
 mod portal;
 mod shim;
@@ -758,6 +759,7 @@ fn run<W: Write>(
     // before the frame size is known, and `pause` can arrive first.
     let mut paused = false;
     let mut recording_started_monotonic = None;
+    let mut input_evidence = input_evidence::InputEvidence::default();
     // Backdated so the very first sample is not held back by the throttle.
     // `checked_sub` because a bare `Instant - Duration` panics on underflow, and
     // this runs milliseconds after process start.
@@ -856,7 +858,9 @@ fn run<W: Write>(
                                 media_time_ms: elapsed.as_millis() as u64,
                                 code,
                                 pressed,
-                                device,
+                                device: device.clone(),
+                                interval_id: input_evidence.interval_id,
+                                continuity: input_evidence.edge(&device, code, pressed),
                                 position,
                             });
                         }
@@ -886,17 +890,38 @@ fn run<W: Write>(
             }
 
             Ok(Message::Pause) => {
+                if paused {
+                    continue;
+                }
                 paused = true;
                 if let Some(capture) = capture.as_mut() {
                     capture.pause();
                 }
+                emit_input_boundary(
+                    emitter,
+                    &mut input_evidence,
+                    "pause",
+                    capture.as_ref().and_then(|c| c.elapsed_active()),
+                );
             }
 
             Ok(Message::Resume) => {
+                if !paused {
+                    continue;
+                }
                 paused = false;
                 if let Some(capture) = capture.as_mut() {
                     capture.resume();
                 }
+                if input_evidence.started {
+                    input_evidence.resume();
+                }
+                emit_input_boundary(
+                    emitter,
+                    &mut input_evidence,
+                    "resume",
+                    capture.as_ref().and_then(|c| c.elapsed_active()),
+                );
             }
 
             Ok(Message::Stream(StreamEvent::FrameReady)) => {
@@ -1112,6 +1137,21 @@ fn run<W: Write>(
                             height,
                             fps: config.fps,
                         });
+                        input_evidence.begin();
+                        emit_input_boundary(
+                            emitter,
+                            &mut input_evidence,
+                            "start",
+                            capture.elapsed_active(),
+                        );
+                        if paused {
+                            emit_input_boundary(
+                                emitter,
+                                &mut input_evidence,
+                                "pause",
+                                capture.elapsed_active(),
+                            );
+                        }
                     }
                 }
                 if let Some(capture) = capture.as_mut() {
@@ -1521,6 +1561,13 @@ fn run<W: Write>(
         }
     }
 
+    emit_input_boundary(
+        emitter,
+        &mut input_evidence,
+        "stop",
+        capture.as_ref().and_then(|c| c.elapsed_active()),
+    );
+
     // Before the file is closed: this joins the PipeWire thread, so no callback
     // can fire against a freed Sender or write into a mailbox that is about to
     // be dropped.
@@ -1530,6 +1577,30 @@ fn run<W: Write>(
         finish_capture(emitter, capture, frames.as_deref(), &mut exit_code);
     }
     exit_code
+}
+
+/// Boundaries use the encoder's active dispatch clock, just like current button evidence.
+fn emit_input_boundary<W: Write>(
+    emitter: &mut Emitter<W>,
+    state: &mut input_evidence::InputEvidence,
+    reason: &'static str,
+    elapsed: Option<Duration>,
+) {
+    if !state.started {
+        return;
+    }
+    let Some(elapsed) = elapsed else {
+        return;
+    };
+    let _ = emitter.emit(&Event::CaptureBoundary {
+        timestamp_ms: timestamp_ms(),
+        monotonic_ms: events::monotonic_ms(),
+        media_time_ms: elapsed.as_millis() as u64,
+        reason,
+        interval_id: state.interval_id,
+        button_state_observation: "dispatch",
+        buttons_down: state.close_interval(),
+    });
 }
 
 /// Writes the trailer and reports what the recording cost.
@@ -2048,7 +2119,10 @@ mod microphone_resolution_tests {
 
 #[cfg(test)]
 mod capture_fallback_tests {
-    use super::{holds_for_crop, should_retry_shared_memory, stream_error_is_fatal, MAX_CROP_WAIT};
+    use super::{
+        emit_input_boundary, holds_for_crop, input_evidence, should_retry_shared_memory,
+        stream_error_is_fatal, Emitter, MAX_CROP_WAIT,
+    };
     use std::time::Duration;
 
     #[test]
@@ -2116,5 +2190,63 @@ mod capture_fallback_tests {
             false,
             true,
         ));
+    }
+
+    #[test]
+    fn input_boundaries_carry_compacted_clock_and_observed_open_buttons() {
+        let mut bytes = Vec::new();
+        let mut emitter = Emitter::new(&mut bytes, false);
+        let mut state = input_evidence::InputEvidence::default();
+        emit_input_boundary(
+            &mut emitter,
+            &mut state,
+            "pause",
+            Some(Duration::from_millis(0)),
+        );
+        state.begin();
+        emit_input_boundary(
+            &mut emitter,
+            &mut state,
+            "start",
+            Some(Duration::from_millis(0)),
+        );
+        state.edge("mouse", 0x110, true);
+        emit_input_boundary(
+            &mut emitter,
+            &mut state,
+            "pause",
+            Some(Duration::from_millis(500)),
+        );
+        state.resume();
+        emit_input_boundary(
+            &mut emitter,
+            &mut state,
+            "resume",
+            Some(Duration::from_millis(500)),
+        );
+        state.edge("mouse", 0x111, true);
+        emit_input_boundary(
+            &mut emitter,
+            &mut state,
+            "stop",
+            Some(Duration::from_millis(900)),
+        );
+        let text = String::from_utf8(bytes).unwrap();
+        let values: Vec<serde_json::Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(values.len(), 4);
+        assert_eq!(values[0]["reason"], "start");
+        assert_eq!(values[1]["buttonsDown"][0]["code"], 0x110);
+        assert_eq!(values[1]["mediaTimeMs"], values[2]["mediaTimeMs"]);
+        assert_eq!(values[2]["intervalId"], 1);
+        assert!(values[2]["buttonsDown"].as_array().unwrap().is_empty());
+        assert_eq!(values[3]["buttonsDown"][0]["code"], 0x111);
+        for value in values {
+            assert_eq!(value["event"], "capture-boundary");
+            assert_eq!(value["schemaVersion"], 1);
+            assert_eq!(value["buttonStateObservation"], "dispatch");
+        }
     }
 }

@@ -1,4 +1,5 @@
 import type {
+	CaptureBoundaryEvidence,
 	InputCaptureStatus,
 	PointerButtonEvidence,
 } from "../../../../src/native/captureEvents";
@@ -31,6 +32,7 @@ export interface PipeWireCursorAssetPayload {
 }
 
 export type PipeWireHelperEvent =
+	| CaptureBoundaryEvidence
 	| PointerButtonEvidence
 	| InputCaptureStatus
 	| {

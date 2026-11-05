@@ -8,6 +8,17 @@ export interface CaptureEventPosition {
 	observation: "latest-frame";
 }
 
+export interface CaptureBoundaryEvidence {
+	event: "capture-boundary";
+	timestampMs: number;
+	monotonicMs: number;
+	mediaTimeMs: number;
+	reason: "start" | "pause" | "resume" | "stop";
+	intervalId: number;
+	buttonStateObservation: "dispatch";
+	buttonsDown: { device: string; code: number }[];
+}
+
 export interface PointerButtonEvidence {
 	event: "pointer-button";
 	timestampMs: number;
@@ -21,6 +32,9 @@ export interface PointerButtonEvidence {
 	device: string;
 	/** Unknown in embedded cursor mode; never infer a position from the desktop. */
 	position: CaptureEventPosition | null;
+	/** Optional for journals written by older helpers. Intervals separate pause boundaries. */
+	intervalId?: number;
+	continuity?: "unmatched-release" | "repeated-press";
 }
 
 export interface InputCaptureStatus {
@@ -41,6 +55,7 @@ export type CaptureJournalPayload =
 			application: null;
 			window: null;
 	  }
+	| CaptureBoundaryEvidence
 	| PointerButtonEvidence
 	| InputCaptureStatus
 	| { event: "input-warning"; code: string; message: string }
