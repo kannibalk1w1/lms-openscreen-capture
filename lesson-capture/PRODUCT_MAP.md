@@ -8,6 +8,12 @@ The [original specification](project-spec.md) remains authoritative for existing
 rolling-buffer, step replacement, lesson/slide mapping, checkpoints and handoff requirements.
 This map adds requirements; it does not replace those workflows.
 
+**Core requirement:** ordinary capture, editing and outputs must work with every
+adapter disabled and Godot absent. Use the three levels and
+[optional capability architecture](APPLICATION_INTEGRATIONS.md). Godot is the first
+deep adapter; Blockbench, Unity, Unreal Engine, MCreator, Roblox Studio and other
+desktop/web tools are generic capture subjects. No other adapters are requested now.
+
 ## Status and evidence rules
 
 **Implemented** means code exists for the stated bounded capability; it does not
@@ -26,6 +32,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 
 | Feature | Status at audit | Existing foundation | Delivery order |
 | --- | --- | --- | --- |
+| Universal core / optional integration manager | Partial | Core media independent; Godot typing opt-in; closed producer/anchor assumptions remain | Foundation before deeper adapters; settings planned |
 | C Privacy-safe capture, storage and export | Partial | Explicit scoped pad/Godot start; input status; local journals; visual blur | Critical, phase 0; broad capture gate |
 | A Illustrated lesson guides | Planned | Flags, typing sections, editable arrows, native rendering | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
@@ -60,6 +67,9 @@ when dependencies and privacy requirements are satisfied; phases are not release
 3. Explicit live Godot/video clock bridge remains important, but must respect
    collection policy. Measure bounds; independent control/encoder/Godot clocks
    and human cue anchors must remain distinguishable.
+   First establish the [minimal capability boundary](APPLICATION_INTEGRATIONS.md),
+   per-instance isolation, graceful failure and disabled-adapter reopen tests before
+   deep expansion. Keep old Godot files compatible; presets never enable adapters.
 4. Build **P1.1 versioned lesson-step contract + adapter + manifest validator**,
    then a useful A1 offline guide slice: select existing flags/typing evidence,
    review steps, extract source-linked screenshots, export HTML/Markdown and
@@ -241,6 +251,10 @@ flowchart TD
 
 - **Purpose/reuse:** explain demonstrated editor actions; extend current opt-in
   plugin/CodeEdit adapter and versioned event journal rather than global hooks.
+- **Architecture gate:** [generic capabilities and integration settings](APPLICATION_INTEGRATIONS.md)
+  precede expansion. All adapters disabled/missing/crashing leave ordinary capture,
+  generic guides and stored-project exports usable. Each adapter declares its own
+  subset; no mandatory Godot hierarchy concepts in core.
 - **Approach:** investigate supported Godot editor signals, undo/history and safe
   state snapshots for node create/delete/rename/reparent, inspector properties,
   resources/assets, script attach/edit, signals, scene saves, meaningful editor

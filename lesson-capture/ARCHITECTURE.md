@@ -6,6 +6,14 @@ to a completed implementation. See [audit](CURRENT_STATE_AUDIT.md) and
 [backlog/dependencies](PRODUCT_MAP.md). No major migration is authorized by this
 document, and no new external service is required.
 
+**Core invariant:** universal recording, editing and teaching outputs work with
+every application integration disabled and Godot absent. The
+[application integration contract](APPLICATION_INTEGRATIONS.md) defines three
+progressive levels, per-adapter capability subsets, failure isolation, settings,
+cross-adapter privacy, durable data and seven required validation scenarios.
+Presets never imply adapter enablement or new collection authorization. Establish
+this simple internal boundary before expanding Godot semantic capture.
+
 ## Existing boundaries to preserve
 
 - Electron recording managers coordinate backend-specific helpers. Linux native

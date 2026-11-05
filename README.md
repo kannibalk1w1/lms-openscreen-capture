@@ -6,6 +6,11 @@ source-linked review, recording flags, editable code presentation, portable typi
 recipes and native input evidence. Current acceptance is partial; targets are
 Windows and Linux (especially CachyOS/KDE).
 
+Godot is optional. The core teaching workflow must remain useful for any desktop
+or web application with every integration disabled. Deeper application intelligence
+uses [optional capability-based adapters](lesson-capture/APPLICATION_INTEGRATIONS.md);
+application appearance presets do not enable those adapters.
+
 Start with the [fork roadmap](LESSON_CAPTURE_ROADMAP.md),
 [feature-status matrix and expanded backlog](lesson-capture/PRODUCT_MAP.md),
 [current implementation audit](lesson-capture/CURRENT_STATE_AUDIT.md),

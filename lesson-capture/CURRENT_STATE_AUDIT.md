@@ -102,3 +102,33 @@ previous roadmap matches `249a09da:LESSON_CAPTURE_ROADMAP.md` byte-for-byte.
 No application/native build, unit-suite rerun, physical capture, accessibility or
 cross-platform execution was performed for these documentation-only changes.
 Concurrent implementation results belong to their own SHA/report, not this slice.
+
+## Application-agnostic follow-up audit
+
+Additional source inspection at `0593b2fe` (code now includes cursor slice
+`43c2f91d`) confirms Godot is not an installed dependency of general screen/media
+recording or ordinary editor/export. The Godot addon is opt-in and records one
+selected CodeEdit; disabled-addon projects do not need it to play recorded video.
+However, this does not prove the seven new failure/isolation/guide tests pass;
+there is no shipped common adapter manager or guide generator at this snapshot.
+
+| Existing coupling | Refactor before expanding adapters | Compatibility and test requirement |
+| --- | --- | --- |
+| `src/lib/typing/schema.ts`: producer enum only pad/Godot; source anchors reject other producers | Introduce bounded versioned producer/capability metadata and generic anchor eligibility | Existing pad/Godot takes and portable recipes roundtrip unchanged; unknown producers not accepted by weakening validation |
+| `src/lib/typing/association.ts`: `associateTypingSection` requires `godot-codeedit` | Source association validates explicit clock/evidence relation, independent of application name | No UTC guesses or implicit alignment; legacy manual Godot anchors and independent placement retained |
+| `src/components/ai-edition/v4/TypingCaptureDialog.tsx`: source/anchor UI branches on Godot producer | Capability-driven labels/actions and plain unavailable state | Missing adapter cannot block embedded take review/export or ordinary capture |
+| `src/lib/typing/import.ts`: Godot JSONL header/parser | Keep format-specific adapter parser behind common validated import boundary | Preserve old compact/snapshot Godot formats; reject malformed/unsupported data helpfully |
+| `src/lib/typing/presentation.ts`: bundled GDScript grammar always selected | Add language metadata and plain-text fallback before claiming general language support | No Godot installation needed today; old GDScript colors/replay and source text preserved |
+| `src/native/captureEvents.ts`: fixed Linux producer/driver vocabulary | Retain raw native contract; normalize optional adapter envelopes with instance/session/scope/capability identity | Never mislabel Unity/Blockbench observations as Linux pointer evidence; prevent cross-instance contamination |
+| Current Godot project toolbar/plugin setup | Explicit per-integration settings/selection and connection health with no hidden project install/watchers | Disable/revoke tears down new collection, generic recording continues, recorded data remains readable |
+
+The required all-disabled, explicit Godot, missing/crashing/incompatible adapter,
+adapter-free reopen, generic guide, multiple-instance isolation and shared privacy
+tests are specified in [APPLICATION_INTEGRATIONS.md](APPLICATION_INTEGRATIONS.md).
+They are planned acceptance tests, not executed results. No new adapter, runtime
+dependency, framework or schema migration was introduced by this documentation.
+
+Follow-up documentation checks: `npm run docs:check` passes (37 files),
+`git diff --check` passes, and all 47 local links across the five planning
+documents resolve. No runtime, native or adapter acceptance test was run for this
+documentation-only follow-up. Concurrent code/test results remain separately scoped.

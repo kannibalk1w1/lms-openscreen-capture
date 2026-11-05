@@ -7,6 +7,14 @@ are Windows and Linux, particularly CachyOS/KDE. Keep inherited macOS behavior
 intact, without claiming untested fork support. This is incremental development,
 not a replacement recorder/editor or a complete LMS.
 
+**Application-agnostic foundation:** every ordinary feature must work with all
+application adapters disabled and Godot absent. Three levels—universal capture,
+generic enhanced context, optional application intelligence—progressively improve
+evidence. Missing semantics reduce automation, not ordinary capture/edit/export.
+See [integration controls, contract, refactor seams and required tests](lesson-capture/APPLICATION_INTEGRATIONS.md).
+Godot is the first deep integration; no additional adapters are being built now.
+Application presets and adapter enablement are separate.
+
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).
 It covers all new proposals A–K, smaller editor improvements, dependencies, risks,
 acceptance/test strategies, relative complexity and now/later/experimental choices.
@@ -71,13 +79,16 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-1. Finish the active projected cursor-click timing slice and incorporate actual
-   Claude review of the stop/audio/recovery commit. Preserve all ongoing code.
+1. Cursor-click timing is committed as `43c2f91d`; its Claude review is pending.
+   Incorporate the completed stop/audio/recovery review's warning-label and test/
+   documentation findings without disrupting the active privacy implementation.
 2. Implement a coherent privacy collection-gating slice with real producer/storage
    integration, status, persisted policy/reopen and canary tests. Unknown application
    scope cannot be reported as restricted capture. Do not equate blur with raw-data
    redaction or claim complete privacy after a partial slice.
-3. Continue explicit Godot/video clock bridge under that policy, then shared
+3. Establish the simple optional capability interface, integration controls and
+   disabled/failure/isolation/reopen regressions before deep Godot expansion.
+   Continue explicit Godot/video clock bridge under that policy, then shared
    versioned lesson-step/asset manifest and an offline illustrated-guide vertical
    slice, with export and reopening. Expanded semantic capture waits for privacy.
 4. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
@@ -92,7 +103,14 @@ Vite/native build/probe and lint/docs/i18n; no new full-suite claim for slice 2.
 Claude [review 1](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_1.md) independently reproduced
 117 Rust passes/one ignored, both TS and a snapshot full run of 5,330 passes/one
 environment skip. No High/Medium finding; the audio-stop Low is addressed by
-slice 2 and awaits its independent review at this roadmap revision. See
+slice 2. Claude [review 2](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_2.md) is now complete
+for `249a09da`: the audio fix and stop/recovery handling check out, with no High/
+Medium defect; one Low warning-code issue plus documentation/test-strength notes
+remain to disposition. Independent checks: 124 Rust passed/one ignored, 80 focused
+Vitest/seven files, both TS configurations. Cursor slice `43c2f91d` has implementer
+results of 5,336 full Vitest/398 files, 124 Rust/one ignored and 88 focused Vitest/
+eight files, plus both TS and native/Vite builds; its review is separately pending.
+See [cursor evidence](LESSON_CAPTURE_CURSOR_TIMING.md) and
 [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_1.md) and dated audit.
 Later worker implementation documents carry newer slice evidence; never extend
 these counts/approvals to an unreviewed SHA. Historical docs retain old next-step
