@@ -1,3 +1,27 @@
+# LMS OpenScreen Lesson Capture fork
+
+**Record once. Produce multiple editable teaching resources.** This private
+education-focused fork extends upstream OpenScreen with scoped typing capture,
+source-linked review, recording flags, editable code presentation, portable typing
+recipes and native input evidence. Current acceptance is partial; targets are
+Windows and Linux (especially CachyOS/KDE).
+
+Start with the [fork roadmap](LESSON_CAPTURE_ROADMAP.md),
+[feature-status matrix and expanded backlog](lesson-capture/PRODUCT_MAP.md),
+[current implementation audit](lesson-capture/CURRENT_STATE_AUDIT.md),
+[architecture](lesson-capture/ARCHITECTURE.md) and
+[original specification](lesson-capture/project-spec.md).
+Illustrated guides, an offline learner player, semantic Godot capture and stronger
+privacy controls are planned extensions, not features certified by this README.
+
+The upstream README below is retained for attribution and inherited product/build
+information. Its download, release, CI, website and demo-skill links refer to
+**upstream OpenScreen**, not a validated release of this lesson-capture fork.
+Upstream history and the MIT licence are preserved. Fork-specific evidence and
+limitations are in the linked implementation documents.
+
+---
+
 <p align="center">
   <img src="public/openscreen.png" alt="OpenScreen Logo" width="64" />
 </p>

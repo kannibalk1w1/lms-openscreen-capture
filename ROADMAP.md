@@ -1,3 +1,8 @@
+> **Lesson Capture fork:** use [LESSON_CAPTURE_ROADMAP.md](LESSON_CAPTURE_ROADMAP.md)
+> and its [expanded product map](lesson-capture/PRODUCT_MAP.md) for this fork's
+> current priorities and evidence. The upstream roadmap below is preserved as a
+> dated 27 October 2026 snapshot; issue/PR statuses are not reverified here.
+
 # OpenScreen Roadmap
 
 Record → Edit → Export. The priority is reliable recording and editing on Windows, macOS and Linux, with a simple workflow and a free, open-source app.

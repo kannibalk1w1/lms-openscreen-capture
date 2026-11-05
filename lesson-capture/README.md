@@ -1,3 +1,9 @@
+> For the current fork, start with the [roadmap](../LESSON_CAPTURE_ROADMAP.md),
+> [expanded feature/status map](PRODUCT_MAP.md), [architecture](ARCHITECTURE.md)
+> and [dated audit](CURRENT_STATE_AUDIT.md). The snapshot and its 'Next' section
+> below are historical; subsequent association/export/timeline/native slices
+> are documented from the root roadmap.
+
 # LMS OpenScreen development snapshot
 
 The application lives at this repository root. All lesson-capture work based on

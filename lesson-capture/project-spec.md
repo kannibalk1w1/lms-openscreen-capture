@@ -1,3 +1,10 @@
+> Original interview specification, preserved below. Current implementation status,
+> expanded requirements and dependencies live in the [fork roadmap](../LESSON_CAPTURE_ROADMAP.md),
+> [product map](PRODUCT_MAP.md) and [audit](CURRENT_STATE_AUDIT.md). Historical
+> `openscreen/...` links below reflect its earlier parent-folder location.
+> Rolling buffer, retakes, lesson/slide mapping, checkpoints and handoff remain
+> requirements; completed implementation must be established from code and evidence.
+
 # Lesson capture toolkit — working specification
 
 Version: 0.1, 5 November 2026.
