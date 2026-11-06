@@ -1,3 +1,26 @@
+# Runtime video validation checkpoint — 6 November 2026
+
+The user authorized pushing and continuing the roadmap. The coordinator verified
+private feature HEAD f28c56f7 (review checkpoint after accepted2c29d268); main
+remains fd2775e2dbc540306b46085eb0301fa06a6a3aaa. The worker does not push.
+
+[Slice24](../LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md) adds bounded Linux-only
+runtime nonfragmented H.264 MP4 sample timing plus actual full-frame decode using
+the existing shipped FFmpeg resolver, before a completion receipt. Only successful
+video validation enables video flags; audio flags remain false. Retained pre-fix
+zero-last-sample output is rejected; rebuilt selected/single/short fixtures pass.
+Validation:97focused/5files and5669full/427files pass,0skip; root/test TS,
+lint35existing warnings, docs/i18n/lesson links pass. Native source/binaries are
+unchanged; the affected backend bundle and real native export were exercised.
+Actual exact-SHA Claude review of slice24 is pending, owned by the coordinator.
+No GUI/CLI/MCP materialization entry point or timed player is added.
+
+Next prerequisite: historical authored source-file identity/availability remains
+separate from per-operation hashes; do not treat those hashes as author-time
+attestation. L23-1, remaining T22-1 guards, L23-W1, audio timing and broader
+physical/platform/product acceptance remain open. Earlier reports/checkpoints
+below remain unchanged historical evidence.
+
 # Current post-restart checkpoint — 6 November 2026
 
 The user explicitly resumed work: “continue from where we left off pre-restart”.

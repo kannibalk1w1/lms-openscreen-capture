@@ -88,10 +88,14 @@ constraints. [Current authorization and superseded schedule](lesson-capture/OVER
 
 **Post-restart resumption:** the user explicitly said “continue from where we
 left off pre-restart”. The pause is resumed; original time cutoffs remain revoked.
-Review20 accepted the bounded range-media backend at125ec5de. The next coherent
-slice is [B22-2 Linux native last-video-sample duration](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md),
-with local validation and coordinator-dispatched exact-SHA Claude review before
-any timed player or GUI/CLI/MCP integration. Earlier pause/pending notes below are
+Review20 accepted the bounded range-media backend at125ec5de. Actual
+[review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md) accepts
+[B22-2 Linux native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md) at2c29d268
+with no High/Medium, within Linux software synthetic/offscreen scope.
+[Slice24 runtime video validation](LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
+adds bounded stored-sample timing and actual decoded-frame evidence; exact-SHA
+review of this new slice remains pending. Historical authored source identity
+remains the next prerequisite before user-facing materialization or timed delivery. Earlier pause/pending notes below are
 historical snapshots, not new authority to stop or claims of current approval.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
@@ -139,9 +143,10 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    boundary-test gaps are addressed in slice22.
    Current phase: backend selected-media materialization/revalidation and native
    encoded-output proof, including the bounded review19 M22-1 fix CLOSED by actual review20 at125ec5de.
-   Post-restart B22-2 addresses the native last-sample duration with bounded Linux
-   encoded proof; exact-SHA review is pending. Synthesized AAC remains separate
-   from video timing, and runtime validator flags stay false. This is not
+   Actual review21 accepts the post-restart B22-2 Linux software timing fix.
+   Slice24 adds runtime sample/decode validation for a narrow Linux MP4 subset,
+   with video flags true only on success; its exact-SHA review remains pending.
+   Synthesized AAC stays separate from video checks; audio flags remain false. This is not
    GUI/API/player delivery; physical/native/platform acceptance remains open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.

@@ -6,11 +6,14 @@ range through the existing native compositor callback. No listener, discovery,
 recording/input collection, recovery API, application adapter or auth/config
 change is added. Existing capture, editor export and static guides are unchanged.
 
-The user explicitly resumed after the restart. [B22-2 native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md)
-now addresses the Linux final-video-sample defect with new proof; exact-SHA review
-is pending. The slice22 evidence and paused checkpoint below are historical.
-Runtime receipt flags remain false: this backend does not decode output or prove
-audio alignment. No player or GUI/CLI/MCP materialization integration is added.
+Actual [review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md) accepts
+[B22-2 native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md) at2c29d268 for Linux
+software synthetic/offscreen output. [Slice24 runtime validation](LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
+now verifies stored video sample timing and fully decoded video frames before
+completion, enabling video flags only on success; audio flags remain false.
+Slice24 exact-SHA review is pending. The slice22 account below is preserved as
+history, including its then-false flags and original limitations. No player or
+GUI/CLI/MCP materialization integration is added.
 
 ## Source, selection and output checks
 

@@ -16,6 +16,7 @@ import type {
 	CompositorExportResult,
 } from "../../src/native/contracts";
 import { buildNativeClipList } from "../../src/native/sceneDescription";
+import { validateRangeVideo } from "./encodedVideo";
 import { planLessonRange } from "./rangePlan";
 
 export class RangeMediaError extends Error {
@@ -212,6 +213,10 @@ export async function materializeLessonRange(options: {
 				Math.abs(stats.videoDurationS - prepared.expectedFrames / 30) > 1e-6
 			)
 				throw new RangeMediaError("range-media-incomplete");
+			const videoEvidence = await validateRangeVideo(file, {
+				...prepared.params,
+				frames: prepared.expectedFrames,
+			});
 			await prepareLessonRangeMedia(await options.readDocument(selection.projectId), selection);
 			for (let index = 0; index < sources.length; index++) {
 				await requireNoCursorSidecar(sources[index]);
@@ -219,6 +224,8 @@ export async function materializeLessonRange(options: {
 					throw new RangeMediaError("range-media-changed");
 			}
 			const output = await hashRegularFile(file);
+			if (output.bytes !== videoEvidence.bytes || output.sha256 !== videoEvidence.sha256)
+				throw new RangeMediaError("range-media-changed");
 			await fs.chmod(file, 0o600);
 			const receipt = {
 				format: "openscreen-lesson-range-media",
@@ -236,9 +243,10 @@ export async function materializeLessonRange(options: {
 					basis: "selected-programme-seconds",
 				},
 				sources: before.map((hash, index) => ({ index, ...hash })),
-				validation: "native-reported-stats-and-file-hashes",
-				mediaDecodedByValidator: false,
-				encodedTimingVerified: false,
+				validation: "mp4-video-samples-and-full-frame-decode",
+				videoEvidence,
+				mediaDecodedByValidator: true,
+				encodedTimingVerified: true,
 				audio: {
 					policy: "native-source-or-synthesized-silence",
 					streamMetadataVerified: false,

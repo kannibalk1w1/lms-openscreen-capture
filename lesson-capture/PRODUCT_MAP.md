@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (through accepted slice21; bounded backend accepted at125ec5de by review20; user resumed after restart). **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (review21 accepts native timing at2c29d268; slice24 runtime video validation awaits exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -49,7 +49,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | Idle-cut suggestions | Planned | Existing trims/speed edits and transcript/cursor signals | M, phase 4 |
 | Portable course visual presets | Partial | Existing style-preset service and arrow styles | M, phase 1 |
 | Recording preflight | Partial | Platform/helper checks and live journal health | M, phase 0 |
-| Export manifest integrity | Partial | Validated static lesson assets/projection and hash receipts; range backend uses native-stat/hash receipts, not encoded timing proof; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
+| Export manifest integrity | Partial | Validated static lesson assets/projection and hash receipts; range backend adds bounded Linux stored-sample timing/full video decode receipts; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
 | Rolling buffer/save recent | Planned | Full recording, clips and source ranges | L/XL, preserved phase 0 reliability work |
 | Retakes/checkpoints/handoff | Partial | Existing editor checkpoints/CLI/MCP; no complete lesson retake workflow | L, phases 1–2/acceptance |
 
@@ -67,11 +67,15 @@ claims that every listed operation exists.
    CLI or player release. Its first native MP4 proof found a video-stream duration
    discrepancy; do not claim timed-playback readiness from native stats alone.
 2. The user explicitly resumed after restart. [B22-2 Linux native video timing](../LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md)
-   fixes the unknown final-sample duration with bounded rebuilt-addon proof;
-   actual exact-SHA Claude review remains pending. Preserve all earlier artifacts.
-3. After that review, source identity/availability and remaining guard coverage
-   precede user-facing materialization with cancellation and authority controls.
-   Runtime encoded timing validation is still absent. Timed Next/Previous/Replay/
+   fixes the unknown final-sample duration with bounded rebuilt-addon proof. Actual
+   [review21](CLAUDE_POST_RESTART_REVIEW_21.md) accepts2c29d268 with no High/Medium
+   for Linux software synthetic/offscreen encoding. LowL23-W1 tracks unchanged
+   macOS/Windows drains. Preserve all earlier artifacts.
+3. [Slice24 runtime video validation](../LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
+   checks stored MP4 video samples and actual decoded frames with shipped FFmpeg,
+   under bounded Linux-only limits; exact-SHA review remains pending. Historical
+   authored source identity/availability and remaining guard coverage still precede
+   user-facing materialization with cancellation and authority controls. Timed Next/Previous/Replay/
    loop/speed, captions and local progress remain unimplemented.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
@@ -238,8 +242,9 @@ model and broad undo/mapping acceptance remain; arbitrary authored text is not r
 
 **Delivered:** strict bounded source/image validation, dependency-minimal static
 projection and SHA256 readback receipts. Authored range plans retain source pins,
-not playable media. Slice22 backend media proof remains experimental until review;
-full editor/course dependency packaging and timed output acceptance remain.
+not playable media. Reviews20/21 accept the bounded backend and Linux native
+timing; slice24 runtime sample/decode proof awaits review. Historical authored
+source identity, full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
 import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import { validateRangeVideo } from "./encodedVideo";
 import {
 	materializeLessonRange,
 	prepareLessonRangeMedia,
@@ -11,6 +12,15 @@ import {
 	type RangeMediaRenderer,
 } from "./rangeMedia";
 import { planLessonRange } from "./rangePlan";
+
+// Authority/receipt unit tests isolate the separately integration-tested decoder.
+vi.mock("./encodedVideo", () => ({
+	validateRangeVideo: vi.fn(async (file: string) => {
+		const bytes = await fs.readFile(file);
+		const { createHash } = await import("node:crypto");
+		return { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+	}),
+}));
 
 let root: string;
 beforeEach(async () => {
@@ -99,8 +109,9 @@ it("verifies source and output bytes before writing a path-minimal completion re
 	);
 	expect(receipt).toMatchObject({
 		format: "openscreen-lesson-range-media",
-		validation: "native-reported-stats-and-file-hashes",
-		mediaDecodedByValidator: false,
+		validation: "mp4-video-samples-and-full-frame-decode",
+		mediaDecodedByValidator: true,
+		encodedTimingVerified: true,
 		output: {
 			path: "range.mp4",
 			frames: 45,
@@ -301,3 +312,59 @@ it.skipIf(process.platform === "win32")(
 		});
 	},
 );
+
+it.each([
+	"source",
+	"project",
+	"output",
+	"decoder",
+])("withholds completion after %s changes or fails during validation", async (kind) => {
+	const f = await fixture();
+	vi.mocked(validateRangeVideo).mockImplementationOnce(async (file) => {
+		const bytes = await fs.readFile(file);
+		const { createHash } = await import("node:crypto");
+		const evidence = {
+			bytes: bytes.length,
+			sha256: createHash("sha256").update(bytes).digest("hex"),
+		};
+		if (kind === "source") await fs.writeFile(f.source, "late change");
+		if (kind === "project") f.doc.timeline.clips[0].sourceStartSec = 0.25;
+		if (kind === "output") await fs.writeFile(file, "changed output");
+		if (kind === "decoder") throw new Error("PRIVATE_DECODER_DIAGNOSTICS");
+		return evidence as Awaited<ReturnType<typeof validateRangeVideo>>;
+	});
+	try {
+		await materializeLessonRange(f.options);
+		throw new Error("Unexpected receipt");
+	} catch (error) {
+		expect(error).toBeInstanceOf(RangeMediaError);
+		const failure = error as RangeMediaError;
+		expect(failure.code).toBe(
+			kind === "decoder" ? "range-media-incomplete" : "range-media-changed",
+		);
+		expect(failure.message).not.toContain("PRIVATE");
+		expect(await fs.readdir(failure.artifactPath!)).toEqual(["range.mp4"]);
+	}
+});
+it.each([1 / 30, 120, 0.03, 120.001])("pins programme duration boundary %s", async (duration) => {
+	const f = await fixture();
+	f.doc.timeline.trimRanges = [];
+	f.doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
+	f.doc.assets[0].durationSec = 121;
+	f.doc.timeline.clips[0].sourceEndSec = 121;
+	f.doc.timeline.clips[0].timelineEndSec = 121;
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 0,
+		endSec: duration,
+	});
+	if (duration === 1 / 30 || duration === 120)
+		expect((await prepareLessonRangeMedia(f.doc, selection)).expectedFrames).toBe(
+			Math.round(duration * 30),
+		);
+	else
+		await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow(
+			"range-media-unsupported",
+		);
+});
