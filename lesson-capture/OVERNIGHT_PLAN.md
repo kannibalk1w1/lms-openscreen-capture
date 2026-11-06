@@ -1,3 +1,18 @@
+# Current authorization update — 6 November 2026
+
+The user explicitly rescinded the original time limits after a subscription usage
+interruption: “Ignore the original time limits imposed too, you ran out of usage
+credits.” The original 07:30 implementation cutoff and 08:00 stop below are
+**superseded history**, not current instructions. Continue coherent authorized
+work and exact-SHA review cycles. Both scheduled checkpoint automations
+`e55b174b-a644-4e7d-8ac4-665dd5ec3cdd` and
+`224fdd07-887f-4e9b-8347-c4c7e4c407bc` were disabled by the coordinator and
+verified `enabled:false`. All other private-branch/main/evidence/authority limits
+remain. Use signed-in Codex/Claude plans only; preserve work and report an actual
+subscription blocker rather than bypassing it through paid APIs or auth changes.
+
+The prior schedule and receipts are preserved verbatim below as history.
+
 # Overnight implementation — 5–6 November 2026
 
 User authorization: start now, finish at **08:00 Europe/London on 6 November**

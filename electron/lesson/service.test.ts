@@ -6,7 +6,10 @@ import { createEmptyDocument, documentSchema } from "../../src/lib/ai-edition/sc
 import { disabledCapturePrivacyPolicy } from "../../src/lib/capturePrivacy";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { imageFixture, jpegBase64 } from "../../src/lib/lesson/fixtures.test-support";
-import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import {
+	buildLessonSceneDescription,
+	lessonRenderFingerprint,
+} from "../../src/lib/lesson/frameSource";
 import { sha256 } from "../../src/lib/lesson/schema";
 import { DocumentService } from "../ai-edition/document-service";
 import {
@@ -244,4 +247,70 @@ it("rejects raw clip geometry overhang beyond the source extent", async () => {
 		f.service.captureFrame({ projectId: "p", rulerSec: 3, documentSha256: await f.digest() }),
 	).rejects.toThrow("frame-unavailable");
 	expect(f.render).not.toHaveBeenCalled();
+});
+it.each([
+	"trim",
+	"clips",
+])("captures both sides of a crossing region through real saved %s geometry", async (geometry) => {
+	const root = await directory(),
+		media = path.join(root, "crossing.mp4");
+	await fs.writeFile(media, "source fixture");
+	const documents = new DocumentService(path.join(root, "projects"), root);
+	const created = await documents.createProject("Crossing zoom");
+	const doc = await documents.addAsset(created.project.id, { path: media });
+	const clip = {
+		id: "c",
+		assetId: doc.assets[0].id,
+		sourceStartSec: 0,
+		sourceEndSec: 10,
+		timelineStartSec: 0,
+		timelineEndSec: 10,
+		wordRefs: [],
+		origin: "user" as const,
+		reason: "",
+	};
+	doc.timeline.clips = [clip];
+	if (geometry === "trim")
+		doc.timeline.trimRanges = [
+			{
+				id: "cut",
+				assetId: clip.assetId,
+				clipId: "c",
+				startSec: 3,
+				endSec: 5,
+				origin: "user",
+				reason: "",
+			},
+		];
+	else
+		doc.timeline.clips = [
+			{ ...clip, id: "c1", sourceEndSec: 5, timelineEndSec: 5 },
+			{ ...clip, id: "c2", sourceStartSec: 5, timelineStartSec: 5 },
+		];
+	doc.zoomRanges = [
+		{ id: "zoom", startMs: 500, endMs: 9000, depth: 2, focus: { cx: 0.5, cy: 0.5 } },
+	];
+	const store = documentSchema.parse(await documents.saveProject(doc)),
+		digest = await lessonRenderFingerprint(store);
+	expect(
+		await lessonRenderFingerprint(
+			documentSchema.parse(await documents.getProject(created.project.id)),
+		),
+	).toBe(digest);
+	const render = vi.fn(async (_clips: unknown, scene: string, _fps: number, frames: number[]) => {
+		expect(JSON.parse(scene).zoomRegions).toHaveLength(2);
+		expect(scene).toBe(JSON.stringify(buildLessonSceneDescription(store)));
+		return [{ index: frames[0], width: 2, height: 2, jpeg: Buffer.from(jpegBase64, "base64") }];
+	});
+	const service = new LessonService((id) => documents.getProject(id), render);
+	for (const rulerSec of [1, 6])
+		await service.captureFrame({ projectId: created.project.id, rulerSec, documentSha256: digest });
+	expect(render).toHaveBeenCalledTimes(2);
+	const edit = await documents.getProject(created.project.id);
+	edit.zoomRanges[0].depth = 3;
+	await documents.saveProject(edit);
+	await expect(
+		service.captureFrame({ projectId: created.project.id, rulerSec: 6, documentSha256: digest }),
+	).rejects.toThrow("project-changed");
+	expect(render).toHaveBeenCalledTimes(2);
 });

@@ -49,7 +49,7 @@ export async function renderLessonGuide(lesson: LessonManifest, ids: string[]) {
 	const markdown =
 		[
 			`# ${md(selected.title.replace(/[\r\n]/g, " "))}`,
-			`Lesson revision ${selected.revision}. Draft steps require review.`,
+			`Derived lesson revision ${selected.revision}; source revision ${selected.derivedFrom?.revision ?? lesson.revision}. Draft steps require review.`,
 			...selected.steps.map((step, index) => {
 				const image = selected.assets.find((asset) => asset.id === step.imageId);
 				const code = step.code ? `\n\n<pre>${html(step.code.text)}</pre>` : "";

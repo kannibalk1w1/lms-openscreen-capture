@@ -300,7 +300,7 @@
 		"opened": "Editable lesson opened.",
 		"saved": "Editable copy saved: {{path}}",
 		"inventory": "Export selection: {{steps}} of {{total}} steps, {{images}} illustrations.",
-		"privacy": "Review selected instructions, code and image pixels before sharing, and describe every illustration before export. Export includes only selected steps and referenced images; no automatic redaction. Saving an editable copy retains every step and image. Editable output also retains selected evidence IDs, source project/render fingerprints and parent lesson lineage for traceability.",
+		"privacy": "Review selected instructions, code and image pixels before sharing, and describe every illustration before export. Export includes only selected steps and referenced images; no automatic redaction. Saving an editable copy retains every step and image. Exports and editable copies also retain selected evidence IDs, source project/render fingerprints and parent lesson lineage for traceability.",
 		"export": "Export selected offline guide",
 		"exported": "Guide folder verified: {{path}}",
 		"include": "Include step {{number}}",

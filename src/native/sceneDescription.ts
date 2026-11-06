@@ -883,10 +883,13 @@ export function webcamBoxSourceSize(
 }
 
 /** Serialize a document into a {@link SceneDescription}. No per-frame math; the one side effect is
- *  handing the click cues to the preview, which has no document of its own to read them from. */
+ *  handing the click cues to the preview, which has no document of its own to read them from.
+ * Optional fragment allocation is used by lesson snapshots to keep repeated render identity stable;
+ * ordinary preview/export retain their existing allocator and authored IDs are never replaced. */
 export function buildSceneDescription(
 	document: AxcutDocument,
 	webcamSourceSize: { width: number; height: number } | null = null,
+	makeFragmentId: (kind: string) => string = createId,
 ): SceneDescription {
 	const settings = getEditorSettings(document);
 
@@ -1124,7 +1127,7 @@ export function buildSceneDescription(
 		document.zoomRanges ?? [],
 		visibleClips,
 		document.timeline.clips,
-		() => createId("zoom"),
+		() => makeFragmentId("zoom"),
 	);
 	// Same raw→source projection as the zoom regions above, for the same reason: annotations are
 	// authored in RAW document time and the compositor matches each frame's SOURCE time.
@@ -1161,13 +1164,13 @@ export function buildSceneDescription(
 		],
 		visibleClips,
 		document.timeline.clips,
-		() => createId("ann"),
+		() => makeFragmentId("ann"),
 	);
 	const projectedCameraFullscreenRegions = projectRegionsToSource(
 		legacyCameraRegions(document),
 		visibleClips,
 		document.timeline.clips,
-		() => createId("camfull"),
+		() => makeFragmentId("camfull"),
 	);
 	// Speed regions carry an extra `speed` field the standard `rangeSchema` does not, so we
 	// can't read from `document.timeline.speedRanges` today (see SceneDescription.speedRegions
@@ -1179,7 +1182,7 @@ export function buildSceneDescription(
 		readSpeedRegions<SpeedRegion>(document),
 		visibleClips,
 		document.timeline.clips,
-		() => createId("speed"),
+		() => makeFragmentId("speed"),
 	);
 
 	// Shader effects: projected like the zooms, and each fragment told where its WHOLE pill sits
@@ -1208,7 +1211,7 @@ export function buildSceneDescription(
 		})),
 		visibleClips,
 		document.timeline.clips,
-		() => createId("fxr"),
+		() => makeFragmentId("fxr"),
 	);
 	const sceneShaderEffects: SceneShaderEffect[] = projectedShaderEffects.flatMap((region) => {
 		const effect = effectsById.get(region.effectId);
@@ -1362,7 +1365,7 @@ export function buildSceneDescription(
 	const storedLayouts = materializeLayouts(document);
 	const projectedLayouts = document.layoutRegions?.length
 		? projectRegionsToSource(storedLayouts, visibleClips, document.timeline.clips, () =>
-				createId("layout"),
+				makeFragmentId("layout"),
 			)
 		: [];
 	const layoutRegions: SceneLayoutRegion[] = projectedLayouts.flatMap((region) => {

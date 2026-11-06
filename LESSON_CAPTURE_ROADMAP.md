@@ -81,6 +81,11 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
+after a subscription interruption. Both scheduled checkpoints are disabled;
+continue authorized coherent implementation/reviews under the unchanged authority
+constraints. [Current authorization and superseded schedule](lesson-capture/OVERNIGHT_PLAN.md).
+
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
 found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
 fixes delivery ownership and strengthens shared production-handler tests.

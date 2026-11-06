@@ -183,3 +183,36 @@ still, original lesson, derived guide, receipt/browser summary/screenshot).
 All prior physical/visible-UI/platform/performance skips and unsaved-draft/undo/
 recovery debt remain open. Fixes await actual exact-SHA rereview. Next: accessible
 profiles and focused lesson review/query controls after that review.
+
+## Review11 deterministic fragments (slice15)
+
+Actual [review11](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_11.md) found a new Medium:
+scene projection allocates random IDs for extra region fragments across cuts or
+clips. A canonical serialization cannot make those values stable. Slice15 injects
+a deterministic fragment allocator only into lesson scene creation, shared by the
+fingerprint and actual native still render. Original preview/export allocation,
+authored IDs and all pixel payload/order remain unchanged. Reserved authored IDs
+prevent collisions with generated ephemeral identities. Native scene/Rust ABI is
+unchanged; no native rebuild is claimed.
+
+177 focused tests/3files pass, including all seven projection families across
+trims/two clips, real saved-project captures on both sides, collision and stale
+zoom-edit checks. Two-clip layouts are already materialized per clip and therefore
+need no extra-fragment allocation; the test checks that distinction explicitly.
+A real saved recovered project with a zoom crossing a trim renders **two Vulkan
+stills at0.5s/2s**, first1280×733, then saves/reopens a derived guide. Artifacts:
+`slice-15-*` and `lesson-guide-crossing-fragment-fixture/`. Pixel input is a
+disposable MPEG4 pattern; no live desktop capture or physical timing is implied.
+
+UI disclosure now explicitly covers **exports and editable copies**. Markdown
+labels derived and source revisions separately. Leading whitespace in Markdown
+can still be interpreted as an indented code block; format debt is deferred to
+profiles, with no injection found. Title rejection/same-tick authoring notes from
+review11 remain unproven/unreachable current UI paths, not transactional guarantees.
+
+Full milestone: **5,519 tests / 416 files**,134.66s; focused177/3 overlap. BothTS,
+Vite renderer/main/preload, Biome35existing warnings, i18n1196, docs/diff pass.
+Native Rust/helpers/compositor binaries unchanged. Exact-SHA rereview is
+pending. The original time cutoffs were revoked by the user; work continues under
+the [updated authorization](lesson-capture/OVERNIGHT_PLAN.md) and
+[current handoff](lesson-capture/CURRENT_IMPLEMENTATION_HANDOFF.md).

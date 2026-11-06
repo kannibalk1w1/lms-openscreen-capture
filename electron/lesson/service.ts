@@ -11,7 +11,10 @@ import type { AxcutDocument } from "../../src/lib/ai-edition/schema";
 import { keptRawSpans } from "../../src/lib/ai-edition/timeline/programme-time";
 import { LessonOperationError } from "../../src/lib/lesson/api";
 import { renderLessonGuide } from "../../src/lib/lesson/export";
-import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import {
+	buildLessonSceneDescription,
+	lessonRenderFingerprint,
+} from "../../src/lib/lesson/frameSource";
 import {
 	decodeImage,
 	jpegDimensions,
@@ -21,7 +24,7 @@ import {
 	validateLesson,
 } from "../../src/lib/lesson/schema";
 import type { CompositorClipInput } from "../../src/native/contracts";
-import { buildNativeClipList, buildSceneDescription } from "../../src/native/sceneDescription";
+import { buildNativeClipList } from "../../src/native/sceneDescription";
 export type LessonRenderFrames = (
 	clips: CompositorClipInput[],
 	scene: string,
@@ -67,7 +70,7 @@ export class LessonService {
 			const index = Math.floor(programmeSec * 60 + 1e-6);
 			const frames = await this.renderFrames(
 				buildNativeClipList(doc),
-				JSON.stringify(buildSceneDescription(doc)),
+				JSON.stringify(buildLessonSceneDescription(doc)),
 				60,
 				[index],
 				1280,
