@@ -254,6 +254,10 @@ interface Window {
 		}>;
 		onTeachingFlagRequested: (callback: () => void) => () => void;
 		onRecordingFlagsSaveError: (callback: () => void) => () => void;
+		lessonFrame?: import("../src/lib/lesson/api").LessonApi["lessonFrame"];
+		lessonSave?: import("../src/lib/lesson/api").LessonApi["lessonSave"];
+		lessonOpen?: import("../src/lib/lesson/api").LessonApi["lessonOpen"];
+		lessonExport?: import("../src/lib/lesson/api").LessonApi["lessonExport"];
 		saveTypingExport?: (file: {
 			name: string;
 			content: string;

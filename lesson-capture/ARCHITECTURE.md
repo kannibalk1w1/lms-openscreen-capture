@@ -1,6 +1,7 @@
 # Lesson Capture architecture and integration boundaries
 
-Design direction, 5 November 2026. Existing services remain in place. The lesson
+Design direction, 5 November 2026. Existing services remain in place. The [first versioned lesson manifest/guide slice](../LESSON_CAPTURE_GUIDES.md) now supplies
+bounded editable steps and native illustrations. The broader lesson
 manifest, privacy policy and exporters described below are proposed unless linked
 to a completed implementation. See [audit](CURRENT_STATE_AUDIT.md) and
 [backlog/dependencies](PRODUCT_MAP.md). No major migration is authorized by this

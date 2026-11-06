@@ -34,7 +34,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | --- | --- | --- | --- |
 | Universal core / optional integration manager | Partial | Core media independent; Godot typing opt-in; closed producer/anchor assumptions remain | Foundation before deeper adapters; settings planned |
 | C Privacy-safe capture, storage and export | Partial | Explicit scoped pad/Godot start; input status; local journals; visual blur | Critical, phase 0; broad capture gate |
-| A Illustrated lesson guides | Planned | Flags, typing sections, editable arrows, native rendering | Very high, phase 1 |
+| A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Flags, typing sections, editable arrows, native rendering | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
 | D Offline interactive lessons | Planned | Source clips, captions, code and controlled typing recipes | High, phase 3 |
 | E Accessible differentiated outputs | Partial | Font/theme/caption/cursor controls; no unified lesson profiles | High, phase 1 defaults + phase 3 delivery |

@@ -77,6 +77,7 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
+import { LessonService } from "../lesson/service";
 import {
 	DEFAULT_RECORDINGS_DIR,
 	getRecordingsDirInfo,
@@ -175,6 +176,7 @@ import {
 } from "../windows-update";
 import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
+import { registerLessonHandlers } from "./lesson";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
@@ -5067,6 +5069,13 @@ export function registerIpcHandlers(
 		app.once("will-quit", restore);
 		return restore;
 	}
+
+	registerLessonHandlers(
+		new LessonService(
+			(id) => aiEditionDocuments.getProject(id),
+			(...args) => loudnessService.renderFrames(...args),
+		),
+	);
 
 	const mcpAppRecorder = createAppRecorder({
 		isRecording: () => appRecording,

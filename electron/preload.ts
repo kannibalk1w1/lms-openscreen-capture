@@ -55,6 +55,10 @@ sharedTexture?.setSharedTextureReceiver(async ({ importedSharedTexture }, meta) 
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
+	lessonFrame: (input: unknown) => ipcRenderer.invoke("lesson:frame", input),
+	lessonSave: (input: unknown) => ipcRenderer.invoke("lesson:save", input),
+	lessonOpen: () => ipcRenderer.invoke("lesson:open"),
+	lessonExport: (input: unknown, ids: string[]) => ipcRenderer.invoke("lesson:export", input, ids),
 	assetBaseUrl,
 
 	// The renderer's navigator.clipboard.writeText is denied by Electron's

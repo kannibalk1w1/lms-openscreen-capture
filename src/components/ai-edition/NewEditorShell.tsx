@@ -85,6 +85,7 @@ import { AddAudioLayerDialog } from "./v4/AddAudioLayerDialog";
 import v4 from "./v4/EditorShellV4.module.css";
 import { type EditorMode, EditorTopBar } from "./v4/EditorTopBar";
 import { type Facet, FloatingInspector } from "./v4/FloatingInspector";
+import { LessonGuideDialog } from "./v4/LessonGuideDialog";
 import { MediaStage } from "./v4/MediaStage";
 import { RecStage } from "./v4/RecStage";
 import { TypingCaptureDialog } from "./v4/TypingCaptureDialog";
@@ -1047,6 +1048,7 @@ export function NewEditorShell() {
 	// Voiceover recording (the one audio gesture that is not a file import). The
 	// dialog owns the mic; the shell owns the transport and the placement.
 	const [typingOpen, setTypingOpen] = useState(false);
+	const [lessonOpen, setLessonOpen] = useState(false);
 	const [typingReviewTarget, setTypingReviewTarget] = useState<TypingReviewTarget | null>(null);
 	const [voiceoverFlow, setVoiceoverFlow] = useState<{ maxDurationSec: number } | null>(null);
 	// The playhead as it was when RECORDING STARTED. Recording plays the video so
@@ -1790,6 +1792,17 @@ export function NewEditorShell() {
 								>
 									{tTimeline("typing.title")}
 								</button>
+								<button
+									type="button"
+									className={styles.secondaryBtn}
+									disabled={!hasProject}
+									onClick={() => {
+										setPlaying(false);
+										setLessonOpen(true);
+									}}
+								>
+									{tTimeline("lesson.title")}
+								</button>
 								{drawingArrow && (
 									<button
 										type="button"
@@ -2003,6 +2016,11 @@ export function NewEditorShell() {
 				}}
 				action={unsavedPrompt?.action ?? "new"}
 				onChoose={handleConfirmUnsaved}
+			/>
+			<LessonGuideDialog
+				key={`lesson-${document?.project.id ?? "none"}`}
+				open={lessonOpen && hasProject}
+				onClose={() => setLessonOpen(false)}
 			/>
 			<TypingCaptureDialog
 				key={document?.project.id ?? "none"}

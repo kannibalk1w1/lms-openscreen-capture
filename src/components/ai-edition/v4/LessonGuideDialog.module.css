@@ -1,0 +1,6 @@
+.form label { display: grid; gap: 6px; }
+.form label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.form input:not([type="checkbox"]), .form textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--fg); font: inherit; }
+.form button { padding: 7px 12px; min-height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--fg); font: inherit; }
+.form button:disabled { opacity: .5; }
+.form button:focus-visible, .form input:focus-visible, .form textarea:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
