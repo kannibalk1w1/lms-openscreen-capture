@@ -1,11 +1,15 @@
+import { z } from "zod";
 import type { LessonManifest, LessonStep } from "./schema";
 export type LessonFinding = "draft" | "empty-instructions" | "missing-alt" | "empty-title";
-export interface LessonQuery {
-	title: string;
-	status: "all" | "draft" | "reviewed";
-	source: "all" | "authored" | "recording-flag" | "typing-section";
-	problemsOnly: boolean;
-}
+export const lessonQuerySchema = z
+	.object({
+		title: z.string().max(300).default(""),
+		status: z.enum(["all", "draft", "reviewed"]).default("all"),
+		source: z.enum(["all", "authored", "recording-flag", "typing-section"]).default("all"),
+		problemsOnly: z.boolean().default(false),
+	})
+	.strict();
+export type LessonQuery = z.infer<typeof lessonQuerySchema>;
 export const emptyLessonQuery = (): LessonQuery => ({
 	title: "",
 	status: "all",

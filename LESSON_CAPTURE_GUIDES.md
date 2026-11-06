@@ -31,7 +31,8 @@ The guide dialog retains its draft while closed in the same project. It is **not
 autosaved** to the video project. Save a separate editable copy before switching
 projects or exiting. Opening another lesson replaces the dialog draft. Save uses
 exclusive new-file creation and refuses an existing path even after a native
-save-dialog overwrite confirmation. A lost/unsaved draft is not recoverable yet.
+save-dialog overwrite confirmation. Unsaved changes are not automatically recoverable; explicit manual recovery
+copies described below restore only the revision actually saved.
 The video project and original capture reports/journals are never modified.
 
 Export inventory shows selected step/image counts. Review text, optional code,
@@ -392,3 +393,13 @@ visible desktop, OS input, accessibility or platform acceptance was rerun.
 Evidence is `slice-18-*` under the preserved overnight evaluation directory.
 Next concrete item: explicit-source-file lesson query and selected guide export
 through shared CLI/MCP validators/services, without recovery store access.
+
+
+Actual review15 at414823d6 found no High/Medium and closed the state races in code.
+It also corrected review14 reachability: Chromium151's disabled fieldset already
+blocks real Restore/typing while busy; these guards are defence in depth. The
+original reports stay unchanged. LowT18-1 identified a vacuous async Restore
+assertion; slice19 waits for busy drain and mutation-confirms that the same-ID
+regression fails without the generation fence. [Disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_15.md).
+[Explicit-file CLI/MCP query/export](LESSON_CAPTURE_COMMANDS.md) now shares this
+reader/review/export workflow; it exposes no recovery-store discovery or mutation.

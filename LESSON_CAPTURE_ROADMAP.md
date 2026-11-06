@@ -116,7 +116,15 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    [Slice11](LESSON_CAPTURE_CLOCK_BRIDGE.md) adds explicit read-only Godot/native clock samples and pause state under that policy, with continuous edit mapping still open. Proceed to shared
    versioned lesson-step/asset manifest and an offline illustrated-guide vertical
    slice, with export and reopening. Expanded semantic capture waits for privacy.
-4. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
+4. [Shared lesson guide slices13–18](LESSON_CAPTURE_GUIDES.md) deliver separate
+   editable manifests, native illustrations, selected offline outputs, reading
+   profiles, source review filters and explicit manual recovery copies.
+   [Slice19](LESSON_CAPTURE_COMMANDS.md) adds explicit-file CLI/MCP query/export
+   parity without recovery-store discovery. Actual review15 accepts414823d6
+   with no High/Medium; the new command slice still requires its own review.
+   Next: learner-facing navigation/presentation debt over this portable contract,
+   with physical/native/platform acceptance still open.
+5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.
 
 ## Evidence and review ledger

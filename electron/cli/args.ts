@@ -17,6 +17,13 @@ import {
 	type GifSizePreset,
 	MP4_FRAME_RATES,
 } from "../../src/lib/exporter/types";
+import { type LessonQuery, lessonQuerySchema } from "../../src/lib/lesson/review";
+import { exportLessonFileSchema } from "../lesson/fileContracts";
+
+export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
+	| { action: "query"; query: LessonQuery }
+	| { action: "export"; outputDirectory: string; stepIds: string[] }
+);
 
 export interface CliInfoCommand {
 	kind: "info";
@@ -40,6 +47,7 @@ export interface CliMcpCommand {
 export type CliCommand = (
 	| CliRequest
 	| CliInfoCommand
+	| CliLessonCommand
 	| CliPackCommand
 	| CliMcpCommand
 	| CliHelpCommand
@@ -70,6 +78,7 @@ export type CliCommand = (
 };
 
 const SUBCOMMANDS = new Set([
+	"lesson",
 	"export",
 	"record",
 	"sources",
@@ -92,6 +101,10 @@ Usage:
   openscreen captions <project.openscreen>           Transcribe (on-device Whisper) and turn captions on
                      [--min-words <1-12>] [--max-words <1-12>]
   openscreen info <project.openscreen> [--json]      Inspect a project file
+  openscreen lesson query <lesson.json> [--title <text>] [--status <all|draft|reviewed>]
+                     [--source <all|authored|recording-flag|typing-section>] [--problems-only] [--json]
+  openscreen lesson export <lesson.json> --out <existing-dir> --step <UUID> [--step <UUID> ...] [--json]
+                            Selected file only; preserves source and creates a fresh verified guide folder
   openscreen mcp                                     Serve the agent tools over MCP on stdio
   openscreen help                                    Show this help
 
@@ -185,6 +198,7 @@ export function parseCliArgs(
 	if (sub === "help" || sub === "--help" || sub === "-h") return { kind: "help" };
 
 	try {
+		if (sub === "lesson") return parseLessonCommand(args.slice(1), cwd);
 		if (sub === "export") return parseExport(args.slice(1), cwd);
 		if (sub === "record") return parseRecord(args.slice(1), cwd);
 		if (sub === "sources") return parseSources(args.slice(1), cwd);
@@ -562,4 +576,54 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 	}
 	if (!projectPath) throw new Error("info requires a <project.openscreen> path");
 	return { kind: "info", projectPath, json };
+}
+
+function parseLessonCommand(args: string[], cwd: string): CliCommand {
+	const [action, file] = args;
+	if ((action !== "query" && action !== "export") || !file || file.startsWith("-"))
+		throw new Error(
+			"Use lesson query <lesson.json> or lesson export <lesson.json> --out <existing-dir> --step <UUID>",
+		);
+	const manifestPath = resolvePath(file, cwd);
+	let json = false;
+	const query: Record<string, unknown> = {};
+	let outputDirectory: string | undefined;
+	const stepIds: string[] = [];
+	for (let i = 2; i < args.length; i++) {
+		const flag = args[i];
+		if (flag === "--json") {
+			json = true;
+			continue;
+		}
+		if (action === "query" && flag === "--problems-only") {
+			query.problemsOnly = true;
+			continue;
+		}
+		if (action === "query" && ["--title", "--status", "--source"].includes(flag)) {
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			query[flag.slice(2)] = value;
+			continue;
+		}
+		if (action === "export" && (flag === "--out" || flag === "-o" || flag === "--step")) {
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			if (flag === "--step") stepIds.push(value);
+			else {
+				if (outputDirectory) throw new Error("Choose one output directory");
+				outputDirectory = resolvePath(value, cwd);
+			}
+			continue;
+		}
+		throw new Error("Unexpected lesson option");
+	}
+	if (action === "query") {
+		const parsed = lessonQuerySchema.safeParse(query);
+		if (!parsed.success) throw new Error("Invalid lesson query options");
+		return { kind: "lesson", action, manifestPath, query: parsed.data, json };
+	}
+	const parsed = exportLessonFileSchema.safeParse({ manifestPath, outputDirectory, stepIds });
+	if (!parsed.success)
+		throw new Error("Lesson export requires an output directory and 1–200 unique step UUIDs");
+	return { kind: "lesson", action, ...parsed.data, json };
 }

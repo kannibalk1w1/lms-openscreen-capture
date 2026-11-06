@@ -49,7 +49,7 @@ vi.mock("../install-channel", async (importOriginal) => ({
 }));
 vi.mock("../ipc/handlers", () => ({
 	getSelectedDesktopSource: () => null,
-	registerIpcHandlers: () => ({ agentServices: {} }),
+	registerIpcHandlers: vi.fn(() => ({ agentServices: {} })),
 }));
 vi.mock("../mcp/hidden-video", () => ({ openVideoInHiddenWindow: vi.fn() }));
 vi.mock("../mcp/stdio-server", () => ({ serveMcpOverStdio: mocks.serve }));
@@ -163,4 +163,32 @@ describe("openscreen mcp update notice", () => {
 		expect(mocks.serve.mock.calls[0][0].updateNotice).toBeUndefined();
 		expect(mocks.netFetch).not.toHaveBeenCalled();
 	});
+});
+it("routes a selected lesson query before media permissions, runner and application services", async () => {
+	const { app, session } = await import("electron");
+	const { createRunnerWindow } = await import("../windows");
+	const { registerIpcHandlers } = await import("../ipc/handlers");
+	const { newLesson, newStep } = await import("../../src/lib/lesson/authoring");
+	const { emptyLessonQuery } = await import("../../src/lib/lesson/review");
+	const file = path.join(mocks.userData, "explicit-lesson.json");
+	writeFileSync(file, JSON.stringify({ ...newLesson(), steps: [newStep("Selected")] }));
+	vi.mocked(app.exit).mockClear();
+	vi.mocked(session.defaultSession.setPermissionCheckHandler).mockClear();
+	vi.mocked(createRunnerWindow).mockClear();
+	vi.mocked(registerIpcHandlers).mockClear();
+	runCli({
+		kind: "lesson",
+		action: "query",
+		manifestPath: file,
+		query: emptyLessonQuery(),
+		json: true,
+	});
+	await vi.waitFor(() => expect(app.exit).toHaveBeenCalledWith(0));
+	expect(
+		stdoutWrite.mock.calls.map((call: readonly unknown[]) => String(call[0])).join(""),
+	).toContain('"format":"openscreen-lesson-query"');
+	expect(session.defaultSession.setPermissionCheckHandler).not.toHaveBeenCalled();
+	expect(createRunnerWindow).not.toHaveBeenCalled();
+	expect(registerIpcHandlers).not.toHaveBeenCalled();
+	expect(mocks.netFetch).not.toHaveBeenCalled();
 });

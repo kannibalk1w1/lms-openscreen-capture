@@ -19,6 +19,7 @@ afterEach(() => {
 	cleanup();
 	useProjectStore.getState().clear();
 	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
 });
 function show() {
 	return render(
@@ -247,6 +248,9 @@ it.each([
 	fireEvent.click(screen.getByRole("button", { name: "Restore this copy" }));
 	await waitFor(() => expect(screen.getAllByLabelText("Step title")).toHaveLength(2));
 	await act(async () => finish());
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
 	expect(
 		screen.getAllByLabelText("Step title").map((input) => (input as HTMLInputElement).value),
 	).toEqual(["Restored one", "Restored two"]);
@@ -295,6 +299,47 @@ it("refuses a pending illustration after the source document changes", async () 
 		});
 		finish();
 	});
+	await screen.findByText(
+		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+	);
+	expect(document.querySelector("img")).toBeNull();
+});
+
+it("rejects source changes while illustration integrity validation is still pending", async () => {
+	const image = await imageFixture();
+	let finishFrame: () => void = () => undefined,
+		finishDigest: () => void = () => undefined;
+	const frame = vi.fn<NonNullable<LessonApi["lessonFrame"]>>(
+		() =>
+			new Promise((resolve) => {
+				finishFrame = () => resolve({ success: true, result: image });
+			}),
+	);
+	vi.stubGlobal("electronAPI", { lessonFrame: frame });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
+	const original = webcrypto.subtle.digest.bind(webcrypto.subtle);
+	const digest = vi
+		.spyOn(webcrypto.subtle, "digest")
+		.mockImplementation(async (algorithm, data) => {
+			await new Promise<void>((resolve) => {
+				finishDigest = resolve;
+			});
+			return original(algorithm, data);
+		});
+	await act(async () => finishFrame());
+	await waitFor(() => expect(digest).toHaveBeenCalledTimes(1));
+	await act(async () => {
+		useProjectStore.setState({
+			document: createEmptyDocument({ projectId: "p", title: "Changed during validation" }),
+		});
+		finishDigest();
+	});
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
 	await screen.findByText(
 		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
 	);

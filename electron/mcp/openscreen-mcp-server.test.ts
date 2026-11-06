@@ -23,6 +23,7 @@ import {
 	documentSchema,
 } from "../../src/lib/ai-edition/schema";
 import { LAYOUT_PRESETS } from "../../src/lib/layoutTypes";
+import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { buildSceneDescription } from "../../src/native/sceneDescription";
 import { OPENSCREEN_TOOL_NAMES } from "../ai-edition/agent-tools";
 import { TOOL_DESCRIPTIONS } from "../ai-edition/deep-agent/service";
@@ -308,7 +309,7 @@ describe("the MCP tool surface", () => {
 		expect(editor.applied).toHaveLength(0);
 	});
 
-	it("is listProjects, then exactly the in-app agent's tools with its descriptions, then the checkpoints and the media tools", async () => {
+	it("serves project/document/checkpoint/media tools followed by explicit lesson file tools", async () => {
 		const mcp = await connect(new FakeEditor());
 		const { tools } = await mcp.listTools();
 		expect(tools.map((t) => t.name)).toEqual([
@@ -328,6 +329,8 @@ describe("the MCP tool surface", () => {
 			"exportAudio",
 			"getFrames",
 			"createProject",
+			"queryLessonFile",
+			"exportLessonGuide",
 		]);
 		for (const tool of tools.slice(1, 1 + OPENSCREEN_TOOL_NAMES.length)) {
 			expect(tool.description).toBe(TOOL_DESCRIPTIONS[tool.name]);
@@ -1105,4 +1108,48 @@ describe("the HTTP guard", () => {
 	it("rejects any path but the endpoint", async () => {
 		expect((await post({ Authorization: `Bearer ${TOKEN}` }, "/other")).status).toBe(404);
 	});
+});
+
+it("serves selected lesson query over authenticated HTTP with edits off and gates guide output", async () => {
+	const mcp = await connect(new FakeEditor(), { editsAllowed: false });
+	const step = { ...newStep("Selected lesson step"), instructions: "PRIVATE_LESSON_INSTRUCTIONS" };
+	const source = path.join(dir, "explicit-lesson.json");
+	writeFileSync(source, JSON.stringify({ ...newLesson(), steps: [step] }));
+	const query = await mcp.callTool({
+		name: "queryLessonFile",
+		arguments: { manifestPath: source },
+	});
+	expect(query.isError).toBeFalsy();
+	expect(JSON.parse(resultText(query))).toMatchObject({
+		matchingSteps: 1,
+		steps: [{ id: step.id }],
+	});
+	expect(resultText(query)).not.toContain("PRIVATE_LESSON_INSTRUCTIONS");
+	expect(resultText(query)).not.toContain(source);
+	const denied = await mcp.callTool({
+		name: "exportLessonGuide",
+		arguments: { manifestPath: source, outputDirectory: dir, stepIds: [step.id] },
+	});
+	expect(denied.isError).toBe(true);
+	expect(resultText(denied)).toContain("consent_required");
+	expect((await fsPromises.readdir(dir)).filter((name) => name.startsWith("lesson-"))).toEqual([]);
+	expect(mcp.getInstructions()).toContain("No lesson discovery");
+});
+it("writes a selected guide through authenticated HTTP only when MCP edits are enabled", async () => {
+	const mcp = await connect(new FakeEditor());
+	const step = newStep("Export one");
+	const source = path.join(dir, "explicit-lesson.json"),
+		bytes = JSON.stringify({ ...newLesson(), steps: [step, newStep("OMIT_THIS")] });
+	writeFileSync(source, bytes);
+	const result = await mcp.callTool({
+		name: "exportLessonGuide",
+		arguments: { manifestPath: source, outputDirectory: dir, stepIds: [step.id] },
+	});
+	expect(result.isError).toBeFalsy();
+	const guide = JSON.parse(resultText(result));
+	expect(guide).toMatchObject({ status: "exported", steps: 1 });
+	expect(await fsPromises.readFile(path.join(guide.path, "lesson.md"), "utf8")).not.toContain(
+		"OMIT_THIS",
+	);
+	expect(await fsPromises.readFile(source, "utf8")).toBe(bytes);
 });

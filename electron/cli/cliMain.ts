@@ -18,6 +18,7 @@ import { registerSttIpc, shutdownStt } from "../stt";
 import { sendUsagePing, USAGE_PING_INTERVAL_MS } from "../usage-ping";
 import { createRunnerWindow } from "../windows";
 import { CLI_USAGE, type CliCommand } from "./args";
+import { runLessonCommand } from "./lessonCommands";
 import { openGuiFromCli } from "./openGui";
 import { runInfoCommand, runPackCommand } from "./projectCommands";
 import { createRunnerHost } from "./runnerHost";
@@ -307,6 +308,13 @@ export function runCli(command: CliCommand): void {
 		.whenReady()
 		.then(async () => {
 			milestone("app ready");
+			if (command.kind === "lesson") {
+				const code = await runLessonCommand(command, writeStdout);
+				finished = true;
+				app.exit(code);
+				return;
+			}
+
 			if (command.kind === "info") {
 				const code = await runInfoCommand(command.projectPath, command.json === true, writeStdout);
 				app.exit(code);

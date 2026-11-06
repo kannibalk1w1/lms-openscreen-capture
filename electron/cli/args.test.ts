@@ -303,3 +303,81 @@ describe("parseCliArgs", () => {
 		expect(parse(["--help"])).toMatchObject({ kind: "help" });
 	});
 });
+
+describe("selected lesson commands", () => {
+	it("resolves explicit paths and shares bounded query defaults", () => {
+		expect(
+			parse([
+				"lesson",
+				"query",
+				"source.json",
+				"--title",
+				"First",
+				"--status",
+				"draft",
+				"--source",
+				"authored",
+				"--problems-only",
+				"--json",
+			]),
+		).toEqual({
+			kind: "lesson",
+			action: "query",
+			manifestPath: inCwd("source.json"),
+			query: { title: "First", status: "draft", source: "authored", problemsOnly: true },
+			json: true,
+		});
+		expect(parse(["lesson", "query", "source.json"])).toMatchObject({
+			query: { title: "", status: "all", source: "all", problemsOnly: false },
+		});
+	});
+	it("requires explicit unique step IDs and an output directory for export", () => {
+		const id = crypto.randomUUID(),
+			other = crypto.randomUUID();
+		expect(
+			parse([
+				"lesson",
+				"export",
+				"source.json",
+				"--out",
+				"guides",
+				"--step",
+				id,
+				"--step",
+				other,
+				"--json",
+			]),
+		).toEqual({
+			kind: "lesson",
+			action: "export",
+			manifestPath: inCwd("source.json"),
+			outputDirectory: inCwd("guides"),
+			stepIds: [id, other],
+			json: true,
+		});
+		for (const args of [
+			[],
+			["--out", "guides"],
+			["--step", id],
+			["--out", "guides", "--step", id, "--step", id],
+			["--out", "guides", "--step", "invalid"],
+			["--out", "one", "--out", "two", "--step", id],
+			["--title", "foo"],
+			["--all"],
+		])
+			expect(parse(["lesson", "export", "source.json", ...args])).toMatchObject({ kind: "error" });
+	});
+	it("rejects implicit discovery, malformed filters and unrecognized options", () => {
+		for (const args of [
+			[],
+			["query"],
+			["list"],
+			["query", "source.json", "--recovery"],
+			["query", "source.json", "--status", "approved"],
+			["query", "source.json", "--source", "godot"],
+			["query", "source.json", "--title", "x".repeat(301)],
+			["query", "source.json", "--out", "out"],
+		])
+			expect(parse(["lesson", ...args])).toMatchObject({ kind: "error" });
+	});
+});
