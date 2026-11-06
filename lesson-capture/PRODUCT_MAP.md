@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (through accepted slice21; bounded backend accepted at125ec5de by review20; paused for restart). **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (through accepted slice21; bounded backend accepted at125ec5de by review20; user resumed after restart). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -66,12 +66,13 @@ claims that every listed operation exists.
    are accepted within their bounds at125ec5de by actual review20 (M22-1 closed). Slice22 is a backend building block, not a GUI,
    CLI or player release. Its first native MP4 proof found a video-stream duration
    discrepancy; do not claim timed-playback readiness from native stats alone.
-2. **Pause after this current phase**, as the user requested to restart the machine.
-   Checkpoint exact commits/review/tests and preserve all artifacts. Do not start a
-   timed player, API/UI integration or another roadmap phase before resumption.
-3. After explicit resumption, resolve encoded timing, then connect bounded media
-   materialization with cancellation and existing authority controls. Timed Next/
-   Previous/Replay/loop/speed, captions and local progress remain unimplemented.
+2. The user explicitly resumed after restart. [B22-2 Linux native video timing](../LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md)
+   fixes the unknown final-sample duration with bounded rebuilt-addon proof;
+   actual exact-SHA Claude review remains pending. Preserve all earlier artifacts.
+3. After that review, source identity/availability and remaining guard coverage
+   precede user-facing materialization with cancellation and authority controls.
+   Runtime encoded timing validation is still absent. Timed Next/Previous/Replay/
+   loop/speed, captions and local progress remain unimplemented.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
    Source clocks/claims stay distinguishable; imported references must be revalidated.

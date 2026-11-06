@@ -1,3 +1,14 @@
+# Post-restart resumption — 6 November 2026
+
+The user explicitly said “continue from where we left off pre-restart”. This
+resumes the restart pause. The original time cutoffs remain revoked. The current
+slice is B22-2, Linux native final-video-sample timing, before any timed player or
+GUI/CLI/MCP integration. Work stays in the existing nested feature checkout;
+commit locally and report to the coordinator for actual Claude review of the
+exact SHA. Pushing and review dispatch belong to the coordinator for this slice.
+All source/evidence/reports/artifacts and previous authority limits remain.
+The earlier pause and schedule below are retained as history.
+
 # Current authorization update — 6 November 2026
 
 The user explicitly rescinded the original time limits after a subscription usage

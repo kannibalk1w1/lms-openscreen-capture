@@ -544,6 +544,22 @@ struct Muxer {
 // partage, d'ou `Send` sans `Sync`.
 unsafe impl Send for Muxer {}
 
+/// Linux encoders advance PTS by one codec-time-base tick per output frame.
+unsafe fn rescale_video_packet(
+    packet: *mut crate::ffi::AVPacket,
+    codec_time_base: crate::ffi::AVRational,
+    stream_time_base: crate::ffi::AVRational,
+) {
+    // Some encoders (notably libopenh264) leave duration unknown (0).
+    // MP4 can infer earlier durations from DTS differences, but has no next
+    // DTS for the last sample, shortening an N-frame video to N-1 ticks.
+    // Supply the frame tick BEFORE rescaling; retain known encoder durations.
+    if (*packet).duration == 0 {
+        (*packet).duration = 1;
+    }
+    crate::ffi::av_packet_rescale_ts(packet, codec_time_base, stream_time_base);
+}
+
 impl Muxer {
     /// Draine les paquets de l'encodeur vers le fichier. Symetrique de
     /// `pipeline_macos::drain_encoder`.
@@ -555,7 +571,7 @@ impl Muxer {
                 return Ok(());
             }
             averr(r, "receive_packet")?;
-            av_packet_rescale_ts(self.opkt, (*ectx).time_base, (*self.ostream).time_base);
+            rescale_video_packet(self.opkt, (*ectx).time_base, (*self.ostream).time_base);
             averr(
                 av_interleaved_write_frame(self.octx, self.opkt),
                 "interleaved_write_frame",
@@ -2163,5 +2179,178 @@ mod tests {
              le défaut du wrapper. extradata={:02x?}",
             &enc.extradata[..enc.extradata.len().min(12)]
         );
+    }
+}
+
+#[cfg(test)]
+mod sample_duration_tests {
+    use super::*;
+    use crate::ffi::*;
+
+    #[test]
+    fn video_packet_duration_is_rescaled_without_replacing_known_duration() {
+        unsafe {
+            let mut packet = av_packet_alloc();
+            assert!(!packet.is_null());
+            // A rational frame tick must survive conversion to MP4's timescale.
+            // The current public export API accepts integer output fps only.
+            for (num, den, duration, expected) in [
+                (1, 30, 0, 1000),
+                (1, 60, 0, 500),
+                (1001, 30000, 0, 1001),
+                (1001, 30000, 2, 2002),
+                (1, 30, 3, 3000),
+            ] {
+                (*packet).pts = 7;
+                (*packet).dts = 7;
+                (*packet).duration = duration;
+                rescale_video_packet(
+                    packet,
+                    AVRational { num, den },
+                    AVRational { num: 1, den: 30000 },
+                );
+                assert_eq!((*packet).duration, expected);
+                assert_eq!((*packet).pts, 7 * expected / duration.max(1));
+                assert_eq!((*packet).dts, (*packet).pts);
+            }
+            av_packet_free(&mut packet);
+        }
+    }
+
+    /// Real software encode -> production drain -> MP4 -> demux. No GPU,
+    /// source fixture or audio duration can mask a missing final video sample.
+    fn assert_muxed_duration(fps: i32, frames: i64) {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "openscreen-video-duration-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        struct Output(std::path::PathBuf);
+        impl Drop for Output {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _output = Output(dir.clone());
+        let path = CString::new(dir.join("video.mp4").to_str().unwrap()).unwrap();
+        unsafe {
+            // Fail if the pinned LGPL encoder is missing; do not count a silent
+            // environment skip as timing coverage.
+            let mut enc =
+                VideoEncoder::try_open("libopenh264", 64, 64, fps, 100_000).expect("libopenh264");
+            let mut octx = ptr::null_mut();
+            averr(
+                avformat_alloc_output_context2(&mut octx, ptr::null(), ptr::null(), path.as_ptr()),
+                "output context",
+            )
+            .unwrap();
+            let ostream = avformat_new_stream(octx, ptr::null());
+            assert!(!ostream.is_null());
+            averr(
+                avcodec_parameters_from_context((*ostream).codecpar, enc.ctx),
+                "codec parameters",
+            )
+            .unwrap();
+            (*ostream).time_base = (*enc.ctx).time_base;
+            let mut pb = ptr::null_mut();
+            averr(
+                avio_open(&mut pb, path.as_ptr(), AVIO_FLAG_WRITE as i32),
+                "open output",
+            )
+            .unwrap();
+            sn_fmt_set_pb(octx, pb);
+            let aac = AacEncoder::open(octx).unwrap();
+            averr(avformat_write_header(octx, ptr::null_mut()), "header").unwrap();
+            let mut mux = Muxer {
+                octx,
+                pb,
+                ostream,
+                opkt: av_packet_alloc(),
+                aac,
+            };
+            let mut frame = alloc_padded_yuv_frame(64, 64).unwrap();
+            let lay = YuvLayout::for_size(64, 64);
+            let planes = vec![128; lay.total];
+            for pts in 0..frames {
+                VideoEncoder::copy_into(frame, &planes, 64, 64, 64, 64).unwrap();
+                (*frame).pts = pts;
+                averr(avcodec_send_frame(enc.ctx, frame), "send frame").unwrap();
+                mux.drain(enc.ctx).unwrap();
+            }
+            enc.flush().unwrap();
+            mux.drain(enc.ctx).unwrap();
+            mux.finish().unwrap();
+            av_frame_free(&mut frame);
+            drop(mux); // close before readback; no AAC samples were written
+
+            let mut input = ptr::null_mut();
+            averr(
+                avformat_open_input(&mut input, path.as_ptr(), ptr::null(), ptr::null_mut()),
+                "reopen",
+            )
+            .unwrap();
+            averr(
+                avformat_find_stream_info(input, ptr::null_mut()),
+                "stream info",
+            )
+            .unwrap();
+            let video_index = av_find_best_stream(
+                input,
+                AVMediaType::AVMEDIA_TYPE_VIDEO,
+                -1,
+                -1,
+                ptr::null_mut(),
+                0,
+            );
+            assert!(video_index >= 0);
+            let video = sn_fmt_stream(input, video_index);
+            let tb = (*video).time_base;
+            let tick = av_rescale_q(1, AVRational { num: 1, den: fps }, tb);
+            assert!(tick > 0);
+            assert_eq!((*video).duration, frames * tick, "video stream duration");
+            assert_eq!((*video).nb_frames, frames, "stored video frame count");
+            let mut packet = av_packet_alloc();
+            let mut count = 0;
+            loop {
+                let ret = av_read_frame(input, packet);
+                if ret == AVERROR_EOF {
+                    break;
+                }
+                averr(ret, "read packet").unwrap();
+                if (*packet).stream_index == video_index {
+                    assert_eq!((*packet).pts, count * tick, "video PTS");
+                    assert_eq!((*packet).dts, count * tick, "video DTS");
+                    assert_eq!(
+                        (*packet).duration,
+                        tick,
+                        "every sample including the last needs a full frame duration"
+                    );
+                    count += 1;
+                }
+                av_packet_unref(packet);
+            }
+            assert_eq!(count, frames);
+            av_packet_free(&mut packet);
+            avformat_close_input(&mut input);
+        }
+    }
+
+    #[test]
+    fn mp4_single_frame_retains_its_video_duration() {
+        assert_muxed_duration(30, 1);
+    }
+
+    #[test]
+    fn mp4_two_frames_retain_both_video_durations() {
+        assert_muxed_duration(60, 2);
+    }
+
+    #[test]
+    fn mp4_45_frames_cover_one_and_a_half_seconds() {
+        assert_muxed_duration(30, 45);
     }
 }

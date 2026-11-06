@@ -1,3 +1,29 @@
+# Current post-restart checkpoint — 6 November 2026
+
+The user explicitly resumed work: “continue from where we left off pre-restart”.
+The restart pause below is historical; the original time cutoffs remain revoked.
+One implementation writer resumed from clean `3eec7805` on
+`lesson-capture/input-boundaries`; no competing writer was found in live Orca
+state. No processes were killed or user apps restarted. Existing checkout and
+all prior evidence/reports remain; main stays unchanged.
+
+Current slice: [B22-2 native Linux video sample timing](../LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md).
+The narrow packet-duration fallback is implemented with actual encode/demux and
+rational time-base regressions. Final validation and exact-SHA Claude review are
+recorded in that document; the coordinator owns review dispatch and any push.
+The selected-media backend remains experimental with runtime timing flags false.
+No GUI/CLI/MCP integration, player, physical capture, Windows/macOS, VAAPI or audio
+alignment acceptance is added. L23-1/T22-1 and the broader product backlog remain.
+
+Current disk inspection found `/tmp` largely empty (16GiB available) and about
+555GiB free on `/home`; the old tmp-full note is historical. Use pinned
+Node22.22.1/npm10.9.4. Rust tests use the unnamespaced vendored FFmpeg libraries;
+the rebuilt Node addon uses its matched namespaced ORIGIN libraries without
+LD_LIBRARY_PATH. Rust raster tests need `OPENSCREEN_FONTS_DIR=$PWD/public/fonts`,
+the same bundled-font contract the app supplies.
+
+## Historical pre-restart checkpoint (preserved)
+
 # Current phase and requested restart checkpoint — 6 November 2026
 
 **PAUSED after the current backend phase: user restart requested.**

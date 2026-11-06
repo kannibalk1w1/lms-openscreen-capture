@@ -86,14 +86,13 @@ after a subscription interruption. Both scheduled checkpoints are disabled;
 continue authorized coherent implementation/reviews under the unchanged authority
 constraints. [Current authorization and superseded schedule](lesson-capture/OVERNIGHT_PLAN.md).
 
-**Current pause boundary:** finish/review/checkpoint the in-progress materialization
-and encoded proof, then pause for the user to restart. No further roadmap phase
-begins before resumption. Actual review19 examined f7b8ed4c and found MediumM22-1 in the backend
-asset-duration clamp. A bounded programme-grid guard/regression addresses it;
-actual review20 CLOSED M22-1 and accepts125ec5de with no High/Medium/material
-blocker. The current bounded phase is complete; the user-requested restart
-checkpoint/pause is active. Historical High/Medium/pending notes below
-are snapshots of earlier stages, not a current unresolved-finding list.
+**Post-restart resumption:** the user explicitly said “continue from where we
+left off pre-restart”. The pause is resumed; original time cutoffs remain revoked.
+Review20 accepted the bounded range-media backend at125ec5de. The next coherent
+slice is [B22-2 Linux native last-video-sample duration](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md),
+with local validation and coordinator-dispatched exact-SHA Claude review before
+any timed player or GUI/CLI/MCP integration. Earlier pause/pending notes below are
+historical snapshots, not new authority to stop or claims of current approval.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
 found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
@@ -140,11 +139,10 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    boundary-test gaps are addressed in slice22.
    Current phase: backend selected-media materialization/revalidation and native
    encoded-output proof, including the bounded review19 M22-1 fix CLOSED by actual review20 at125ec5de.
-   Baseline zero-last-sample native timing and synthesized AAC attribution are
-   explicit; no timed-playback acceptance is claimed.
-   This is not GUI/API/player delivery. Pause after this phase for the requested
-   restart; do not start another roadmap phase until resumption,
-   with physical/native/platform acceptance still open.
+   Post-restart B22-2 addresses the native last-sample duration with bounded Linux
+   encoded proof; exact-SHA review is pending. Synthesized AAC remains separate
+   from video timing, and runtime validator flags stay false. This is not
+   GUI/API/player delivery; physical/native/platform acceptance remains open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.
 

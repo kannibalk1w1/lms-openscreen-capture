@@ -6,9 +6,11 @@ range through the existing native compositor callback. No listener, discovery,
 recording/input collection, recovery API, application adapter or auth/config
 change is added. Existing capture, editor export and static guides are unchanged.
 
-The current phase ends after its exact-SHA review and restart-safe checkpoint.
-The user requested a pause to restart the computer; no player or other roadmap
-phase starts before resumption.
+The user explicitly resumed after the restart. [B22-2 native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md)
+now addresses the Linux final-video-sample defect with new proof; exact-SHA review
+is pending. The slice22 evidence and paused checkpoint below are historical.
+Runtime receipt flags remain false: this backend does not decode output or prove
+audio alignment. No player or GUI/CLI/MCP materialization integration is added.
 
 ## Source, selection and output checks
 
@@ -60,7 +62,7 @@ for a future authorized caller; raw source/parser/OS error text is normalized.
 Original source/evidence is never cleaned up. No new GUI permission or public
 remote method is inferred from this backend helper.
 
-## Encoded evidence and unresolved timing
+## Historical slice22 encoded evidence and then-unresolved timing
 
 The final retained driver uses a fresh, actually probed five-second H.264 source:
 640x360,30fps,150 decoded frames. Real DocumentService saves/reopens an unchanged
