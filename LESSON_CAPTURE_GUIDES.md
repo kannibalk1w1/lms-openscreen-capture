@@ -286,3 +286,88 @@ Full UI translations, custom course/profile library, PDF, standalone interactive
 player, lesson autosave/recovery/undo, CLI/MCP parity and tutor review workflow
 remain open. Next: actual review findings, then safe editable-draft retention and
 shared review/query/export access as a bounded next slice.
+
+## Filter continuity and explicit local recovery (slice17)
+
+Actual [review13](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_13.md) found no High or
+Medium. Its LowL16-1 is fixed: editing a reviewed row can mark it draft without
+unmounting the row or losing focus/continued typing. Edited rows remain visible
+until the filters change, with a mounted live status explaining the source-label
+change. Draft→Reviewed under the Draft filter is covered too. Pure query matches
+remain distinct from these pinned visible rows; export can include a selected
+pinned row because its current content is visible. Changing filters clears pins.
+Busy/save/demotion status regions remain mounted empty before updates. This is
+DOM-level proof; real screen-reader/visible Electron acceptance stays open.
+
+Compatibility note N16-1: **every new derived guide manifest contains resolved
+output settings, even if its old source lesson has no `output` block**. All such
+new guide-manifest exports therefore require a slice16-or-newer strict reader.
+Old source files still open and roundtrip unchanged. HTML/Markdown outputs do not
+require the editor. Title matching is exactly NFKC normalization plus default
+lowercase substring matching, not full Unicode case folding or locale-specific
+search: `STRASSE` does not match `Straße`, and `istanbul` does not match `İstanbul`.
+Those cases are tested. UI additions remain English fallback in all locale files;
+key parity is not translation or linguistic acceptance.
+
+**Local recovery copies are manual snapshots, not autosave.** The dialog displays
+its app-data location and quota before Save is enabled. Only an explicit **Save
+recovery copy** retains a full source lesson: all steps, images, code and metadata,
+regardless of guide exclusions. Acknowledgements identify the copied revision;
+later edits still need an explicit save. Merely opening the dialog, viewing status
+or editing the lesson creates no recovery folder or file.
+
+Storage is fixed under `app.getPath('userData')/lesson-recovery-copies`. New folders
+are mode0700 and files0600 on tested POSIX; nonprivate existing folders refuse new
+writes without changing their permissions. UUID filenames cannot select arbitrary
+paths. The store admits at most four pending mutations and serializes saves/deletes.
+Each copy is validated and bounded to16MiB; total retention is20 recognized entries
+or64MiB of logical file sizes. Interrupted `.pending-*` entries count too. Directory
+inspection is bounded (21 recognized entries /4096 scanned directory entries);
+truncation is explicitly reported as a lower-bound inventory and prevents writes.
+There is no automatic purge or expiry. Review/delete unwanted copies explicitly;
+unpublished interrupted entries may require managing the displayed folder.
+
+Publication writes a new private temporary file, flushes it, then atomically adds
+a new hard-link name in the same folder. It cannot overwrite a prior copy; failed
+publication leaves existing copies intact and cleans only its own temporary file
+when possible. A crash/cleanup failure may leave private temporary entries. No
+power-loss/backup guarantee or directory-metadata fsync claim is made. Source video,
+projects, externally saved lessons, original capture evidence and earlier reports
+are never modified. Filesystem hard-link/permission semantics on Windows/macOS and
+network/removable filesystems remain unverified.
+
+**Show local recovery copies** reads bounded inventory/validated titles. Corrupt
+copies are labelled unreadable without returning raw payload in errors. Full
+content is read only for an explicit preview; Restore then requires a second,
+visible confirmation that it replaces the current unsaved dialog draft. Save the
+current draft first if needed. The recovery file itself remains unchanged. Delete
+has its own permanent-deletion confirmation and targets only a validated UUID file
+in the recovery folder. Source lessons/other copies remain intact. Root/file
+symlinks and nonregular/oversized lesson files are refused; deletion unlinks a
+selected leaf symlink without following it. These are filesystem guards, not an
+OS sandbox against another process with the same user's authority.
+
+Tests cover real concurrent admission/quota, interrupted sparse-file byte accounting,
+private modes, failed publication/retry, corrupt/traversal/symlink/root handling,
+real IPC fixed errors and full source roundtrip, explicit UI save/preview/restore/
+delete/limit flow, and filter focus/continued typing. Ordinary editable-open and
+recovery use the same bounded O_NOFOLLOW/O_NONBLOCK reader with post-open regular
+file and byte checks. Pending async UI results are ignored after unmount; recovery
+is explicit and never installs a late result into another project automatically.
+
+A real disposable file probe starts with no storage, explicitly saves two complete
+source copies with guide images/code excluded, reconstructs full code+image in a
+fresh store, exports the restored lesson respecting exclusions, deletes only the
+selected second copy, and verifies the source/first copy bytes unchanged. The
+removed synthetic copy is preserved separately as test evidence. Final artifacts:
+`slice-17-*` and `lesson-recovery-copies-fixture-final/`. No project read/native
+render is used by this portable recovery→export workflow.
+
+Full milestone: **5,553 tests / 419 files**,137.20s; focused80/8 overlap. BothTS,
+finalVite renderer/main/preload,Biome35existing warnings,i18n1243,docs/diff pass.
+The final full run followed the revision-acknowledgement/root-guard changes. Native capture/helper/
+compositor sources and binaries are unchanged. Shared CLI/MCP query/export access,
+autosave/crash recovery of unsaved edits, lesson undo, full UI translations, real
+screen readers, physical/visible desktop, Windows/macOS and sustained acceptance
+remain open. Next: actual review findings, then bounded shared query/export access
+using these same validators/services without new application collection.

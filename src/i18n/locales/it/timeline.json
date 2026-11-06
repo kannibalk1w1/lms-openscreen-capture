@@ -322,7 +322,9 @@
 			"project-changed": "Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
 			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
 			"render-busy": "A lesson still is already rendering. Wait for it to finish, then retry.",
-			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced."
+			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced.",
+			"local-draft-limit": "The local recovery limit is reached. Delete unwanted local copies or save a new editable file elsewhere. Existing copies are preserved.",
+			"local-draft-unavailable": "The local recovery operation could not finish. Existing source lessons remain unchanged. Check the visible storage location and retry."
 		},
 		"output": {
 			"title": "Guide output settings",
@@ -360,13 +362,42 @@
 			"hidden": "{{count}} selected steps are hidden by these filters. Select matches or clear filters before exporting.",
 			"scope": "Checks describe this source lesson; they are not tutor approval, privacy clearance or proof of achievement. Filtering does not change source steps or original evidence.",
 			"checks": "Source step checks",
-			"reorder": "Clear filters to reorder all source steps."
+			"reorder": "Clear filters to reorder all source steps.",
+			"demoted": "The edited source step is now draft and stays visible until filters change.",
+			"promoted": "The source step is marked reviewed and stays visible until filters change.",
+			"pinned": "Edited rows that no longer match stay visible until you change or clear the filters."
 		},
 		"findings": {
 			"draft": "Source step is marked draft.",
 			"empty-instructions": "Instructions are empty; review whether the title alone is sufficient.",
 			"missing-alt": "Illustration needs an alternative description if included.",
 			"empty-title": "The visible title is empty."
+		},
+		"drafts": {
+			"title": "Local recovery copies",
+			"scope": "Save a complete local snapshot only when you click Save recovery copy. This includes all source steps, code and illustrations, regardless of guide inclusion settings. This feature writes only to the app-data location shown below. This is manual recovery, not autosave or a backup guarantee.",
+			"inventory": "{{copies}} storage entries of {{max}}; {{bytes}} MiB counted toward the {{limit}} MiB limit. Interrupted temporary entries also count.",
+			"save": "Save recovery copy",
+			"show": "Show local recovery copies",
+			"saved": "Recovery copy saved at revision {{revision}}: {{path}}",
+			"empty": "No published recovery copies found.",
+			"unreadable": "Unreadable recovery copy",
+			"revision": "revision {{revision}}",
+			"preview": "Preview restore",
+			"remove": "Delete local copy",
+			"restoreTitle": "Review local restore",
+			"confirmRestore": "This copy has {{steps}} steps at revision {{revision}}. Restoring replaces the current unsaved dialog draft. Save your current draft first if needed; existing source and recovery files remain unchanged.",
+			"restore": "Restore this copy",
+			"restored": "Recovery copy restored into the dialog. Save future edits explicitly.",
+			"cancel": "Cancel",
+			"deleteTitle": "Confirm recovery copy deletion",
+			"confirmDelete": "Delete this local recovery copy permanently? Other source lessons, exports and recovery copies remain unchanged.",
+			"confirmRemove": "Delete this recovery copy",
+			"removed": "Local recovery copy deleted.",
+			"busy": "Working with local recovery copies…",
+			"limit": "The local recovery limit is reached. Delete unwanted local copies or save a new editable file elsewhere. Existing copies are preserved.",
+			"error": "The local recovery operation could not finish. Existing source lessons remain unchanged. Check the visible storage location and retry.",
+			"inventoryLimited": "Storage listing limit reached. At least {{copies}} recognized entries use {{bytes}} MiB; manage the visible recovery folder before saving more."
 		}
 	}
 }

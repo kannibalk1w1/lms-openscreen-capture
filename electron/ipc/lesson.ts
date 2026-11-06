@@ -1,6 +1,7 @@
 import path from "node:path";
 import { app, dialog, ipcMain } from "electron";
 import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
+import { LessonDraftStore } from "../lesson/draftStore";
 import { LessonService } from "../lesson/service";
 export function registerLessonHandlers(service: LessonService) {
 	const bounded = async <T>(run: () => Promise<T>) => {
@@ -16,6 +17,15 @@ export function registerLessonHandlers(service: LessonService) {
 			return { success: false as const, code };
 		}
 	};
+	const drafts = new LessonDraftStore(path.join(app.getPath("userData"), "lesson-recovery-copies"));
+	ipcMain.handle("lesson:draft-status", () => bounded(() => drafts.status()));
+	ipcMain.handle("lesson:draft-save", (_event, input: unknown) =>
+		bounded(() => drafts.save(input)),
+	);
+	ipcMain.handle("lesson:draft-list", () => bounded(() => drafts.list()));
+	ipcMain.handle("lesson:draft-read", (_event, id: unknown) => bounded(() => drafts.read(id)));
+	ipcMain.handle("lesson:draft-remove", (_event, id: unknown) => bounded(() => drafts.remove(id)));
+
 	ipcMain.handle("lesson:frame", (_event, input: unknown) =>
 		bounded(() => service.captureFrame(input)),
 	);

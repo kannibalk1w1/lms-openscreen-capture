@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -19,12 +18,12 @@ import {
 	decodeImage,
 	jpegDimensions,
 	type LessonImage,
-	parseLesson,
 	sha256,
 	validateLesson,
 } from "../../src/lib/lesson/schema";
 import type { CompositorClipInput } from "../../src/native/contracts";
 import { buildNativeClipList } from "../../src/native/sceneDescription";
+import { readLessonFile } from "./readLessonFile";
 export type LessonRenderFrames = (
 	clips: CompositorClipInput[],
 	scene: string,
@@ -116,28 +115,7 @@ export class LessonService {
 	async openEditable(pickPath: () => Promise<string | null>) {
 		const target = await pickPath();
 		if (!target) return { status: "cancelled" as const };
-		if (!(await fs.lstat(target)).isFile()) throw new Error("Choose a regular lesson file");
-		const file = await fs.open(
-			target,
-			constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
-		);
-		try {
-			const stat = await file.stat();
-			if (!stat.isFile()) throw new Error("Choose a regular lesson file");
-			if (stat.size > 16 * 1024 * 1024) throw new Error("Lesson file exceeds limit");
-			const buffer = Buffer.alloc(16 * 1024 * 1024 + 1);
-			let count = 0;
-			while (count < buffer.length) {
-				const read = await file.read(buffer, count, buffer.length - count, null);
-				if (!read.bytesRead) break;
-				count += read.bytesRead;
-			}
-			if (count > 16 * 1024 * 1024) throw new Error("Lesson file exceeds limit");
-			const lesson = await parseLesson(buffer.subarray(0, count).toString("utf8"));
-			return { status: "opened" as const, lesson };
-		} finally {
-			await file.close();
-		}
+		return { status: "opened" as const, lesson: await readLessonFile(target) };
 	}
 	async exportGuide(input: unknown, ids: unknown, pickDirectory: () => Promise<string | null>) {
 		const selection = z.array(z.string().uuid()).min(1).max(200).parse(ids);

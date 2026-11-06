@@ -130,3 +130,11 @@ it("queries existing titles/status/source kinds without altering evidence or rev
 	expect(stepFindings(flag)).toEqual(["draft", "empty-instructions"]);
 	expect(JSON.stringify(source)).toBe(before);
 });
+it("documents NFKC plus lowercase matching without claiming full Unicode case folding", () => {
+	const german = newStep("Straße"),
+		turkish = newStep("İstanbul"),
+		source = { ...newLesson(), steps: [german, turkish] };
+	expect(queryLesson(source, { ...emptyLessonQuery(), title: "STRASSE" })).toEqual([]);
+	expect(queryLesson(source, { ...emptyLessonQuery(), title: "istanbul" })).toEqual([]);
+	expect(queryLesson(source, { ...emptyLessonQuery(), title: "STRAßE" })).toEqual([german]);
+});

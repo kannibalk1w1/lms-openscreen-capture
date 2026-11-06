@@ -31,8 +31,11 @@ not a new full suite. Its Medium found a random fragment identity in scenes
 crossing cuts/clips. Actual review12 CLOSED MediumM14-1 at553bd9ca with no new High/Medium. It ran
 191focused/4, one independent scratch probe and bothTS. Slice16 now adds reading
 profiles/language/direction and bounded source review/title queries, with exact
-coverage in the guide doc. Next: its actual review, then safe draft retention and
-shared query/export access; standalone learner/player remains later. No extra application adapters are authorized.
+coverage in the guide doc. Actual review13 found no High/Medium atbef8b6e9. Slice17 fixes filtered edit focus
+and adds explicit manual recovery copies (not autosave), with fixed app-data
+location/quota, preview-confirmed restore and confirmed delete. Its exact SHA
+comes from git/next review request. Next: actual review, then shared CLI/MCP
+query/export access; standalone learner/player and autosave remain later. No extra application adapters are authorized.
 
 Native helper/Rust source unchanged since slice11:134Rust pass/1existing ignored,
 helper SHA f7c5055fb322ebc201a01ef0122d0222b56d354dfee5ce2b9b2bbfe1a37b4d3c.

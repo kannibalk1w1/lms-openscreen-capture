@@ -55,6 +55,11 @@ sharedTexture?.setSharedTextureReceiver(async ({ importedSharedTexture }, meta) 
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
+	lessonDraftStatus: () => ipcRenderer.invoke("lesson:draft-status"),
+	lessonDraftSave: (lesson: unknown) => ipcRenderer.invoke("lesson:draft-save", lesson),
+	lessonDraftList: () => ipcRenderer.invoke("lesson:draft-list"),
+	lessonDraftRead: (id: string) => ipcRenderer.invoke("lesson:draft-read", id),
+	lessonDraftRemove: (id: string) => ipcRenderer.invoke("lesson:draft-remove", id),
 	lessonFrame: (input: unknown) => ipcRenderer.invoke("lesson:frame", input),
 	lessonSave: (input: unknown) => ipcRenderer.invoke("lesson:save", input),
 	lessonOpen: () => ipcRenderer.invoke("lesson:open"),

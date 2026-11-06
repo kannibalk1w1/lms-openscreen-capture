@@ -254,6 +254,11 @@ interface Window {
 		}>;
 		onTeachingFlagRequested: (callback: () => void) => () => void;
 		onRecordingFlagsSaveError: (callback: () => void) => () => void;
+		lessonDraftStatus?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftStatus"];
+		lessonDraftSave?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftSave"];
+		lessonDraftList?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftList"];
+		lessonDraftRead?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftRead"];
+		lessonDraftRemove?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftRemove"];
 		lessonFrame?: import("../src/lib/lesson/api").LessonApi["lessonFrame"];
 		lessonSave?: import("../src/lib/lesson/api").LessonApi["lessonSave"];
 		lessonOpen?: import("../src/lib/lesson/api").LessonApi["lessonOpen"];

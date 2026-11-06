@@ -24,12 +24,20 @@ import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
 import { LessonReviewControls } from "./LessonReviewControls";
 import { LessonTitleInput } from "./LessonTitleInput";
+import { LocalLessonDraftControls } from "./LocalLessonDraftControls";
 export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const t = useScopedT("timeline");
 	const document = useProjectStore((s) => s.document),
 		projectId = useProjectStore((s) => s.projectId);
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
-	const [query, setQuery] = useState(emptyLessonQuery);
+	const [query, setQueryValue] = useState(emptyLessonQuery);
+	const [pinned, setPinned] = useState<string[]>([]);
+	const [editNotice, setEditNotice] = useState("");
+	const setQuery = (query: ReturnType<typeof emptyLessonQuery>) => {
+		setPinned([]);
+		setEditNotice("");
+		setQueryValue(query);
+	};
 	const [selected, setSelected] = useState<string[]>([]),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState<LessonErrorCode | null>(null),
@@ -46,18 +54,28 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		try {
 			setLesson(operation());
 			setError(null);
+			return true;
 		} catch {
 			setError("lesson-operation-failed");
+			return false;
 		}
 	};
-	const update = (id: string, change: Partial<LessonStep>) =>
-		author(() =>
+	const update = (id: string, change: Partial<LessonStep>) => {
+		const previous = lesson.steps.find((step) => step.id === id)?.status,
+			next = change.status ?? "draft";
+		const saved = author(() =>
 			reviseLesson(lesson, {
 				steps: lesson.steps.map((step) =>
-					step.id === id ? { ...step, ...change, status: change.status ?? "draft" } : step,
+					step.id === id ? { ...step, ...change, status: next } : step,
 				),
 			}),
 		);
+		if (saved) {
+			setPinned((values) => (values.includes(id) ? values : [...values, id]));
+			if (previous !== next)
+				setEditNotice(t(next === "draft" ? "lesson.query.demoted" : "lesson.query.promoted"));
+		}
+	};
 	const run = async (action: (current: object) => Promise<void>) => {
 		if (busyRef.current) return;
 		busyRef.current = true;
@@ -78,7 +96,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 	const active = selected.filter((id) => lesson.steps.some((step) => step.id === id));
 	const output = lessonOutput(lesson),
 		matches = queryLesson(lesson, query).map((step) => step.id);
-	const hidden = active.filter((id) => !matches.includes(id)).length;
+	const visible = new Set([
+		...matches,
+		...pinned.filter((id) => lesson.steps.some((step) => step.id === id)),
+	]);
+	const hidden = active.filter((id) => !visible.has(id)).length;
 	return (
 		<Dialog
 			open={open}
@@ -167,6 +189,17 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							{t("lesson.save")}
 						</button>
 					</div>
+					<LocalLessonDraftControls
+						key={lesson.id}
+						lesson={lesson}
+						onRestore={(valid) => {
+							setLesson(valid);
+							setSelected(valid.steps.map((step) => step.id));
+							setQuery(emptyLessonQuery());
+							setNotice(t("lesson.drafts.restored"));
+						}}
+					/>
+
 					<LessonOutputControls
 						output={output}
 						onChange={(output) => author(() => reviseLesson(lesson, { output }))}
@@ -179,6 +212,10 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						matches={matches}
 						onSelect={setSelected}
 					/>
+					<p role="status" aria-live="polite">
+						{editNotice}
+					</p>
+					{pinned.some((id) => !matches.includes(id)) && <p>{t("lesson.query.pinned")}</p>}
 					{hidden > 0 && <p role="status">{t("lesson.query.hidden", { count: hidden })}</p>}
 					{matches.length !== lesson.steps.length && <p>{t("lesson.query.reorder")}</p>}
 
@@ -221,7 +258,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						{t("lesson.export")}
 					</button>
 					{lesson.steps.map((step, index) => {
-						if (!matches.includes(step.id)) return null;
+						if (!visible.has(step.id)) return null;
 						const image = lesson.assets.find((image) => image.id === step.imageId);
 						return (
 							<section
@@ -347,6 +384,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										}
 										onClick={() =>
 											void run(async (current) => {
+												setPinned((values) =>
+													values.includes(step.id) ? values : [...values, step.id],
+												);
 												const store = useProjectStore.getState();
 												const snapshot = store.document;
 												if (!snapshot || !store.projectId || store.dirty)
@@ -411,13 +451,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						);
 					})}
 				</fieldset>
-				{busy && <p role="status">{t("lesson.busy")}</p>}
+				<p role="status">{busy ? t("lesson.busy") : ""}</p>
 				{error && <p role="alert">{t(`lesson.errors.${error}`)}</p>}
-				{notice && (
-					<p role="status" style={{ overflowWrap: "anywhere" }}>
-						{notice}
-					</p>
-				)}
+				<p role="status" style={{ overflowWrap: "anywhere" }}>
+					{notice}
+				</p>
 			</DialogContent>
 		</Dialog>
 	);

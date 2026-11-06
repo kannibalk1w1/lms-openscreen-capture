@@ -151,3 +151,36 @@ it("persists reading settings and filters source steps without exporting hidden 
 	await waitFor(() => expect(lessonExport).toHaveBeenCalledTimes(1));
 	expect(lessonExport.mock.calls[0][1]).toEqual([lessonExport.mock.calls[0][0].steps[0].id]);
 });
+it("keeps a reviewed row focused and accepts continued typing after it becomes draft", async () => {
+	vi.stubGlobal("electronAPI", undefined);
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByLabelText("I have reviewed this step"));
+	fireEvent.change(screen.getByLabelText("Source review label"), { target: { value: "reviewed" } });
+	const instructions = screen.getByLabelText("Instructions");
+	instructions.focus();
+	fireEvent.change(instructions, { target: { value: "First" } });
+	expect(document.activeElement).toBe(instructions);
+	fireEvent.change(instructions, { target: { value: "First and more typing" } });
+	expect(screen.getByLabelText("Instructions")).toBe(instructions);
+	expect((instructions as HTMLTextAreaElement).value).toBe("First and more typing");
+	expect(
+		screen.getByText("The edited source step is now draft and stays visible until filters change."),
+	).toBeTruthy();
+	fireEvent.change(screen.getByLabelText("Find by step title"), { target: { value: "no-match" } });
+	expect(screen.queryByLabelText("Instructions")).toBeNull();
+});
+it("keeps a newly reviewed draft row visible until filters change", () => {
+	vi.stubGlobal("electronAPI", undefined);
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getByLabelText("Source review label"), { target: { value: "draft" } });
+	const reviewed = screen.getByLabelText("I have reviewed this step");
+	reviewed.focus();
+	fireEvent.click(reviewed);
+	expect(screen.getByLabelText("I have reviewed this step")).toBe(reviewed);
+	expect(document.activeElement).toBe(reviewed);
+	expect(
+		screen.getByText("The source step is marked reviewed and stays visible until filters change."),
+	).toBeTruthy();
+});

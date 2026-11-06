@@ -61,7 +61,7 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
   [stop/recovery](LESSON_CAPTURE_INPUT_STOP.md): Linux journal, interval identity,
   historical reader projection, bounded stop drain/audio admission and explicit
   device/kernel gaps. Global driver scope and physical/Windows acceptance remain open.
-- [Editable lesson guides](LESSON_CAPTURE_GUIDES.md): separate bounded manifest, stable step IDs, metadata-only drafts, composed stills, selected offline HTML/Markdown, reading/language/direction profiles, source review/title queries and real editable reopen. No automatic semantic interpretation or complete project/media packaging.
+- [Editable lesson guides](LESSON_CAPTURE_GUIDES.md): separate bounded manifest, stable step IDs, metadata-only drafts, composed stills, selected offline HTML/Markdown, reading/language/direction profiles, source review/title queries, explicit bounded local recovery snapshots and real editable reopen. No automatic semantic interpretation or complete project/media packaging.
 - [Explicit clock link](LESSON_CAPTURE_CLOCK_BRIDGE.md): optional same-project Godot native-clock samples, pause state and portable bounded journal inspection. Read-only round-trip brackets; no automatic edit mapping, typing pause control or physical timing acceptance.
 - [Flags](LESSON_CAPTURE_FLAGS.md), [scoped typing](LESSON_CAPTURE_TYPING.md) and
   [Godot onset association](LESSON_CAPTURE_ASSOCIATION.md): human-calibrated source

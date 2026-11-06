@@ -4,7 +4,9 @@ export type LessonErrorCode =
 	| "project-changed"
 	| "frame-unavailable"
 	| "render-busy"
-	| "destination-exists";
+	| "destination-exists"
+	| "local-draft-limit"
+	| "local-draft-unavailable";
 export class LessonOperationError extends Error {
 	constructor(readonly code: LessonErrorCode) {
 		super(code);
