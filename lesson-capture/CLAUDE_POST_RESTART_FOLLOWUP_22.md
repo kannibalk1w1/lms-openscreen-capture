@@ -1,5 +1,12 @@
 # Implementation follow-up to actual Claude review22
 
+Coordinator update after actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md):
+361fde51 is accepted with no High/Medium; prior findings are closed within scope.
+The original worker account below is preserved. Its mutation tally is corrected
+to50assertion kills plus2test-timeout kills and1redundant lstat survivor.
+New LowL25-1 descendant-pipe settlement and T25-1 provenance guard coverage remain
+for the next slice; the kill deadline is not an overall settlement deadline.
+
 Review22 accepts91b59b1d with no High/Medium for Linux synthetic/offscreen software
 video validation. Its original report is included verbatim, SHA256
 `66322a535af413e237e56f6fb550ac2c9f06adc30e82486eb6357bfc1f2e9de6`.

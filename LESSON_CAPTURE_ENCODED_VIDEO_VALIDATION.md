@@ -6,7 +6,9 @@ accepts the Linux software native timing fix at2c29d268 with no High/Medium.
 Actual [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts
 91b59b1d with no High/Medium. The
 [review22 follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md) strengthens
-guards and decoder provenance; its exact-SHA review remains pending. Existing source and
+guards and decoder provenance. Actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
+accepts361fde51 with no High/Medium and closes the review22 findings within scope.
+Existing source and
 destination authority, explicit folder cancellation, native-stat checks and
 incomplete-artifact retention remain. No player or GUI/CLI/MCP entry point exists.
 
@@ -61,6 +63,10 @@ FFmpeg has a30s kill deadline,1MiB stdout and64KiB stderr limits, one decoding/
 encoding/filter thread, a64MiB per-allocation limit and1280×1280 max decoded pixels.
 These are bounded work/per-allocation controls, not an OS-wide memory quota or a
 hard deadline on kernel filesystem IO. A valid but slow output can be refused.
+Review23 LowL25-1: these deadlines send SIGKILL to the direct child; inherited
+pipes held by descendants can delay promise settlement indefinitely. The shipped
+FFmpeg does not fork in these proofs. Fixing settlement is next-slice work;
+the current process timeout is not an overall wall-clock bound.
 
 `videoEvidence.decoded.decoder` now records the resolved executable's SHA256,
 a bounded FFmpeg self-reported version token and `trust:same-user-local-executable`.
@@ -157,9 +163,13 @@ original fixtures, reports and external evidence remain unchanged.
 
 Follow-up validation:139focused tests/5files and the single justified full rerun
 5711tests/427files pass,0skip; root/test TS, lint35existing warnings, docs/i18n and
-changed lesson links pass. Mutation controls:52killed by failed test assertions,
+changed lesson links pass. Review23 corrects the mutation tally:50assertion kills
+plus2test-timeout kills,
 1expected defense-in-depth survivor (pre-open lstat), source restored byte-for-byte.
 The original retained bad45-frame output still passes real decoded-list inspection
 but fails the full validator, while all four rebuilt outputs pass with path-free
 decoder provenance. Full follow-up details and initial corrected diagnostics are
 in the linked report and its uniquely named evidence directory.
+
+Review23 also records LowT25-1 for unpinned decoder provenance guards; these and
+LowL25-1 settlement behavior accompany the next authored-source identity slice.

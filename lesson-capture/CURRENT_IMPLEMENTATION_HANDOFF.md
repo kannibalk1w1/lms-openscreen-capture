@@ -1,4 +1,21 @@
-# Review22 follow-up checkpoint — 6 November 2026
+# Accepted review23 checkpoint — 6 November 2026
+
+Actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md) accepts exact361fde51 with
+no High/Medium. L24-1/L24-2, identified independent T24-1 guards, the three
+T22-1 limits and N24-1/N24-3 are closed within the documented Linux scope.
+Reviewer independently ran112focused tests/3files,0skip, real-process provenance
+probes and11own mutants (6killed/5survived), and rehashed111prior files unchanged.
+Its inspection corrects the worker mutation tally:50assertion kills plus2test-
+timeout kills, with1redundant lstat survivor. Original reports remain preserved.
+
+New LowL25-1: direct-child kill deadlines do not bound settlement when descendants
+retain pipes; no false acceptance was found. New LowT25-1: canonical tool paths,
+executable hash size/inode/byte bounds and path-like version tokens need tests.
+Address those with the next historical authored-source identity/availability slice.
+N24-2 slower-host refusal, L23-1/L23-W1, audio/platform/hardware/physical/player
+acceptance remain open. Coordinator owns reviewed feature pushes; main unchanged.
+
+## Historical review22 follow-up account
 
 Actual [review22](CLAUDE_POST_RESTART_REVIEW_22.md) accepts91b59b1d with no
 High/Medium for the bounded Linux video backend; its original report is preserved

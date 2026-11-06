@@ -75,7 +75,10 @@ claims that every listed operation exists.
    checks stored MP4 video samples and actual decoded frames with shipped FFmpeg,
    under bounded Linux-only limits; actual [review22](CLAUDE_POST_RESTART_REVIEW_22.md)
    accepts91b59b1d with no High/Medium. Its
-   [guard/provenance follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) awaits review. Historical
+   [guard/provenance follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) is accepted at361fde51
+   by actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md), no High/Medium.
+   LowL25-1 descendant-pipe settlement and T25-1 provenance tests accompany the
+   next source-identity slice. Historical
    authored source identity/availability and remaining guard coverage still precede
    user-facing materialization with cancellation and authority controls. Timed Next/Previous/Replay/
    loop/speed, captions and local progress remain unimplemented.
