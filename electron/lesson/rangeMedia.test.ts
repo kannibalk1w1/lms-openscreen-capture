@@ -1,9 +1,11 @@
+import { Hash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
 import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import * as nativeScene from "../../src/native/sceneDescription";
 import { validateRangeVideo } from "./encodedVideo";
 import {
 	materializeLessonRange,
@@ -27,6 +29,7 @@ beforeEach(async () => {
 	root = await fs.mkdtemp(path.join(os.tmpdir(), "range-media-"));
 });
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await fs.rm(root, { recursive: true, force: true });
 });
 async function fixture() {
@@ -367,4 +370,121 @@ it.each([1 / 30, 120, 0.03, 120.001])("pins programme duration boundary %s", asy
 		await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow(
 			"range-media-unsupported",
 		);
+});
+
+async function manySources(count: number) {
+	const f = await fixture();
+	f.doc.timeline.trimRanges = [];
+	f.doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
+	const asset = f.doc.assets[0],
+		clip = f.doc.timeline.clips[0];
+	f.doc.assets = [];
+	f.doc.timeline.clips = [];
+	const sources: string[] = [];
+	for (let i = 0; i < count; i++) {
+		const source = path.join(root, `source-${i}.mp4`);
+		sources.push(source);
+		await fs.writeFile(source, "bounded source fixture");
+		f.doc.assets.push({ ...asset, id: `a${i}`, originalPath: source, durationSec: 1 });
+		f.doc.timeline.clips.push({
+			...clip,
+			id: `c${i}`,
+			assetId: `a${i}`,
+			sourceEndSec: 1,
+			timelineStartSec: i,
+			timelineEndSec: i + 1,
+		});
+	}
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 0,
+		endSec: count,
+	});
+	const render = vi.fn<RangeMediaRenderer>(async (_clips, file) => {
+		await fs.writeFile(file, "bounded output fixture");
+		return { frames: count * 30, wallS: 1, fps: count * 30, videoDurationS: count };
+	});
+	return { ...f, sources, options: { ...f.options, selection, render } };
+}
+it.each([8, 9])("pins the independent %s-source materialization boundary", async (count) => {
+	const f = await manySources(count);
+	if (count === 8) expect((await materializeLessonRange(f.options)).status).toBe("materialized");
+	else {
+		await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
+		expect(f.options.render).not.toHaveBeenCalled();
+		expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
+	}
+});
+it.each([
+	32, 33,
+])("pins the early %s-kept-span boundary independently of the later native-clip limit", async (count) => {
+	const f = await fixture(),
+		end = count * 2 - 1;
+	f.doc.assets[0].durationSec = end;
+	f.doc.timeline.clips[0].sourceEndSec = end;
+	f.doc.timeline.clips[0].timelineEndSec = end;
+	f.doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
+	f.doc.timeline.trimRanges = Array.from({ length: count - 1 }, (_, i) => ({
+		id: `cut${i}`,
+		assetId: "a",
+		clipId: "c",
+		startSec: i * 2 + 1,
+		endSec: i * 2 + 2,
+		origin: "user",
+		reason: "fixture",
+	}));
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 0,
+		endSec: end,
+	});
+	expect(selection.keptSpans).toHaveLength(count);
+	const builder = vi.spyOn(nativeScene, "buildNativeClipList");
+	if (count === 32)
+		expect((await prepareLessonRangeMedia(f.doc, selection)).clips).toHaveLength(32);
+	else {
+		await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow(
+			"range-media-unsupported",
+		);
+		// Replanning fingerprints read original inputs. No derived/native projection
+		// may happen after the independent kept-span refusal.
+		expect(builder.mock.calls.every(([doc]) => doc === f.doc)).toBe(true);
+	}
+});
+it.each([
+	0, 1,
+])("pins total source byte boundary at 8GiB + %s using bounded stream/hash doubles", async (extra) => {
+	const f = await manySources(2),
+		open = fs.open.bind(fs);
+	// Model exact-length regular-file streams without allocating, writing, reading
+	// or hashing gigabytes. Every reported read still obeys the 1MiB buffer bound.
+	vi.spyOn(Hash.prototype, "update").mockReturnThis();
+	const bytesRead = new Map<string, number>();
+	vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+		const source = String(args[0]);
+		if (!f.sources.includes(source)) return open(...args);
+		const length = 4 * 1024 ** 3 + (source === f.sources[1] ? extra : 0);
+		let position = 0;
+		return {
+			stat: async () => ({ isFile: () => true, size: length, mtimeMs: 1 }),
+			close: async () => {
+				/* Virtual stream owns no OS descriptor. */
+			},
+			read: async (buffer: Buffer, _offset: number, requested: number) => {
+				const n = Math.min(requested, length - position);
+				position += n;
+				bytesRead.set(source, (bytesRead.get(source) ?? 0) + n);
+				return { bytesRead: n, buffer };
+			},
+		} as unknown as Awaited<ReturnType<typeof fs.open>>;
+	});
+	if (extra === 0) expect((await materializeLessonRange(f.options)).status).toBe("materialized");
+	else {
+		await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
+		expect(f.options.render).not.toHaveBeenCalled();
+		expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
+	}
+	expect(bytesRead.get(f.sources[1])).toBe((4 * 1024 ** 3 + extra) * (extra ? 1 : 2));
 });

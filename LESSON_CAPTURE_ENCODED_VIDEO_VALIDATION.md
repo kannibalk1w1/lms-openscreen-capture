@@ -3,7 +3,10 @@
 This backend slice adds runtime evidence before `range-export.json` is written.
 It follows actual [review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md), which
 accepts the Linux software native timing fix at2c29d268 with no High/Medium.
-Slice24 itself awaits coordinator-dispatched exact-SHA review. Existing source and
+Actual [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts
+91b59b1d with no High/Medium. The
+[review22 follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md) strengthens
+guards and decoder provenance; its exact-SHA review remains pending. Existing source and
 destination authority, explicit folder cancellation, native-stat checks and
 incomplete-artifact retention remain. No player or GUI/CLI/MCP entry point exists.
 
@@ -28,17 +31,25 @@ unchanged native drains. VAAPI/reordered output is not accepted by these proofs.
   Fragmented, reordered/composition-offset, encrypted, extended-size and other
   unsupported layouts are refused. A zero-duration final sample fails here.
 - Actual decoded frames: FFmpeg decodes the video to raw YUV420P frame checksums,
-  preserving timestamps with passthrough frame mode. Every expected frame must
-  appear at the expected zero-based timestamp, duration, size and dimensions.
-  Metadata/sample tables alone never set the decoded flag. Decoder errors,
+  using passthrough frame mode. Every expected frame must exist in the expected
+  order/size/dimensions on FFmpeg's output grid. FFmpeg rounds/re-times output
+  timestamps to1/fps and supplies the duration column; this listing does not
+  independently prove exact stored timestamps, sub-frame jitter or final-sample
+  duration. Exact duration comes exclusively from the stored `stts` deltas.
+  Real decoded listings accept the zero-last-sample regression while the complete
+  validator rejects it. Metadata/sample tables alone never set the decoded flag. Decoder errors,
   shortened output, missing/extra frames or malformed evidence refuse completion.
 
 Successful receipts say `validation:mp4-video-samples-and-full-frame-decode`,
 `mediaDecodedByValidator:true` and `encodedTimingVerified:true`, with separate
-`videoEvidence.samples` and `videoEvidence.decoded` records and a SHA256 of the
-frame checksum listing. These flags concern **video only**. Source/synthesized AAC
+`videoEvidence.samples` (`timingBasis:stored-mp4-stts-deltas`) and
+`videoEvidence.decoded` (`evidence:decoded-frame-existence-order-size`,
+`timestampBasis:ffmpeg-rounded-output-grid`) records and a SHA256 of the frame
+checksum listing. These flags concern **video only**. Source/synthesized AAC
 may still exist; `audio.streamMetadataVerified` and `audio.timingVerified` stay
-false. No audio/AV alignment, source visual equivalence, or timed-player readiness
+false. The audio track's structure and data references are not inspected; malformed
+audio or external-reference audio can be skipped by FFmpeg without refusing the
+video proof. No audio/AV alignment, source visual equivalence, or timed-player readiness
 is implied. Pixel similarity remains separately demonstrated by slice23 evidence.
 
 ## Bounds, authority and failure behavior
@@ -50,6 +61,24 @@ FFmpeg has a30s kill deadline,1MiB stdout and64KiB stderr limits, one decoding/
 encoding/filter thread, a64MiB per-allocation limit and1280×1280 max decoded pixels.
 These are bounded work/per-allocation controls, not an OS-wide memory quota or a
 hard deadline on kernel filesystem IO. A valid but slow output can be refused.
+
+`videoEvidence.decoded.decoder` now records the resolved executable's SHA256,
+a bounded FFmpeg self-reported version token and `trust:same-user-local-executable`.
+It contains no local executable path, full configuration/build line, inode or
+filesystem timestamps. The canonical executable is hashed before and after the
+version/decode processes, with regular-file/no-follow checks,256MiB per-read-pass
+byte limits and size/inode/mtime/ctime stability checks. The `-version` process has
+a3s kill deadline and16KiB stdout/stderr caps; any stderr/failure/malformed version
+refuses completion with fixed errors. The decode limit remains30s and can refuse
+valid output on slower hosts (N24-2); no deadline was relaxed.
+
+This is provenance within the existing same-user tool trust boundary, not signed
+or authenticated decoder attestation or a sandbox. The hash covers the executable
+file, not its loaded libraries, delegated tools or runtime environment. `OPENSCREEN_FFMPEG_PATH` still
+selects a local tool. A malicious same-user executable can forge both its version
+and frame listing; before/after hashes identify observed executable bytes and
+catch ordinary replacement, but do not prevent adversarial swaps between those
+checks. No absolute machine paths are copied into portable receipts.
 
 Spawn uses no shell, a resolved absolute executable and fixed argument slots.
 Only local file protocol is enabled; external MP4 data references are disabled
@@ -65,8 +94,9 @@ source reads, rendering or decode.
 Per-operation source hashes establish stability during this operation; they do
 **not** establish historical identity at range authoring time. Authored source
 attestation/availability remains the next separate backend prerequisite before
-user-facing integration. L23-1 and remaining T22-1 limits/dependencies remain open;
-this slice additionally pins programme duration edges and validation-time races.
+user-facing integration. L23-1 and broader dependency/refusal coverage remain open. The review22 follow-up
+pins the three specifically remaining T22-1 span/source/total-byte limits, in
+addition to the existing programme duration edges and validation-time races.
 
 ## Validation and evidence
 
@@ -115,3 +145,21 @@ Final runtime records: `retained-fixture-results-complete.json`,
 `native-evidence-complete.log`, `evidence-result-complete.json` and the fresh
 `native-fixture-complete/` receipt, plus tool identities/version, prior-file hashes,
 focused/full/type/lint/docs/i18n/link logs and the complete disposable driver/bundle.
+
+
+## Review22 follow-up coverage
+
+The original review22 report is preserved verbatim. The follow-up report separates
+independent guards from defense in depth, records mutation controls, and describes
+the real FFmpeg zero-last regression plus path-free provenance. Its validation
+results supersede the earlier slice24 counts above only for this follow-up; all
+original fixtures, reports and external evidence remain unchanged.
+
+Follow-up validation:139focused tests/5files and the single justified full rerun
+5711tests/427files pass,0skip; root/test TS, lint35existing warnings, docs/i18n and
+changed lesson links pass. Mutation controls:52killed by failed test assertions,
+1expected defense-in-depth survivor (pre-open lstat), source restored byte-for-byte.
+The original retained bad45-frame output still passes real decoded-list inspection
+but fails the full validator, while all four rebuilt outputs pass with path-free
+decoder provenance. Full follow-up details and initial corrected diagnostics are
+in the linked report and its uniquely named evidence directory.

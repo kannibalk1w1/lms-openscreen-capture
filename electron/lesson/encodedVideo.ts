@@ -210,6 +210,7 @@ export function inspectRangeVideo(bytes: Buffer, expected: VideoExpectation) {
 	if (sample !== samples) throw fail();
 	return {
 		codec: "h264" as const,
+		timingBasis: "stored-mp4-stts-deltas" as const,
 		sampleCount: samples,
 		timeScale: scale,
 		sampleDurationTicks: tick,
@@ -218,7 +219,10 @@ export function inspectRangeVideo(bytes: Buffer, expected: VideoExpectation) {
 	};
 }
 
-/** Actual raw decoded frames, with timestamps preserved rather than fps synthesized. */
+/** Real decoded frame existence/order/size on FFmpeg's rounded output grid.
+ * framemd5 supplies output durations and retimes timestamps: exact stored video
+ * timing is established exclusively by inspectRangeVideo's sample tables.
+ */
 export function inspectDecodedFrames(output: string, expected: VideoExpectation) {
 	const lines = output.trim().split(/\r?\n/);
 	if (!lines.includes(`#dimensions 0: ${expected.width}x${expected.height}`)) throw fail();
@@ -241,9 +245,106 @@ export function inspectDecodedFrames(output: string, expected: VideoExpectation)
 	}
 	return {
 		frames: rows.length,
+		evidence: "decoded-frame-existence-order-size" as const,
+		timestampBasis: "ffmpeg-rounded-output-grid" as const,
 		pixelFormat: "yuv420p" as const,
 		frameMd5ListingSha256: createHash("sha256").update(output).digest("hex"),
 	};
+}
+
+// This records a same-user tool identity, not authenticated decoder attestation.
+// Hash before/after the version and decode subprocesses; no executable path is
+// exported. Filesystem IO is byte-bounded, not given a kernel-level deadline.
+async function hashDecoderExecutable(executable: string) {
+	const file = await fs.open(
+		executable,
+		constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+	);
+	try {
+		const before = await file.stat();
+		const limit = 256 * 1024 * 1024;
+		if (!before.isFile() || before.size < 1 || before.size > limit) throw fail();
+		const hash = createHash("sha256"),
+			buffer = Buffer.alloc(1024 * 1024);
+		let bytes = 0;
+		for (;;) {
+			const read = await file.read(buffer, 0, buffer.length, null);
+			if (!read.bytesRead) break;
+			bytes += read.bytesRead;
+			if (bytes > limit) throw fail();
+			hash.update(buffer.subarray(0, read.bytesRead));
+		}
+		const after = await file.stat(),
+			named = await fs.lstat(executable);
+		if (
+			bytes !== before.size ||
+			!named.isFile() ||
+			named.dev !== before.dev ||
+			named.ino !== before.ino ||
+			after.size !== before.size ||
+			after.mtimeMs !== before.mtimeMs ||
+			after.ctimeMs !== before.ctimeMs
+		)
+			throw fail();
+		return {
+			sha256: hash.digest("hex"),
+			dev: before.dev,
+			ino: before.ino,
+			size: before.size,
+			mtimeMs: before.mtimeMs,
+			ctimeMs: before.ctimeMs,
+		};
+	} finally {
+		await file.close();
+	}
+}
+
+function runDecoder(
+	executable: string,
+	args: string[],
+	bounds: {
+		fd?: number;
+		timeoutMs: number;
+		stdoutBytes: number;
+		stderrBytes: number;
+	},
+) {
+	return new Promise<string>((resolve, reject) => {
+		const child = spawn(executable, args, {
+			stdio:
+				bounds.fd === undefined
+					? ["ignore", "pipe", "pipe"]
+					: ["ignore", "pipe", "pipe", bounds.fd],
+			windowsHide: true,
+		});
+		let output = "",
+			outBytes = 0,
+			errBytes = 0,
+			failed = false;
+		const stop = () => {
+			failed = true;
+			child.kill("SIGKILL");
+		};
+		const timer = setTimeout(stop, bounds.timeoutMs);
+		child.stdout!.on("data", (chunk: Buffer) => {
+			outBytes += chunk.length;
+			if (outBytes > bounds.stdoutBytes) stop();
+			else output += chunk.toString("utf8");
+		});
+		child.stderr!.on("data", (chunk: Buffer) => {
+			errBytes += chunk.length;
+			if (errBytes > bounds.stderrBytes) stop();
+		});
+		child.once("error", () => {
+			clearTimeout(timer);
+			reject(fail());
+		});
+		child.once("close", (code) => {
+			clearTimeout(timer);
+			if (failed || code !== 0 || errBytes) reject(fail());
+			else resolve(output);
+		});
+	});
 }
 
 async function validateLocalVideo(filePath: string, expected: VideoExpectation) {
@@ -255,8 +356,9 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 		!(await fs.lstat(filePath)).isFile()
 	)
 		throw fail();
-	const executable = resolveFfmpeg();
-	if (!executable || !path.isAbsolute(executable)) throw fail();
+	const resolved = resolveFfmpeg();
+	if (!resolved || !path.isAbsolute(resolved)) throw fail();
+	const executable = await fs.realpath(resolved);
 	const file = await fs.open(
 		filePath,
 		constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
@@ -272,88 +374,77 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 			at += read.bytesRead;
 		}
 		const samples = inspectRangeVideo(bytes, expected);
-		const stdout = await new Promise<string>((resolve, reject) => {
-			const child = spawn(
-				executable,
-				[
-					"-nostdin",
-					"-hide_banner",
-					"-v",
-					"error",
-					"-xerror",
-					"-max_alloc",
-					"67108864",
-					"-threads",
-					"1",
-					"-filter_threads",
-					"1",
-					"-max_pixels",
-					"1638400",
-					"-hwaccel",
-					"none",
-					"-protocol_whitelist",
-					"file",
-					"-probesize",
-					"4194304",
-					"-analyzeduration",
-					"5000000",
-					"-err_detect",
-					"explode",
-					"-enable_drefs",
-					"0",
-					"-use_absolute_path",
-					"0",
-					"-f",
-					"mov",
-					"-i",
-					"/proc/self/fd/3",
-					"-map",
-					"0:v:0",
-					"-an",
-					"-sn",
-					"-dn",
-					"-threads",
-					"1",
-					"-fps_mode",
-					"passthrough",
-					"-frames:v",
-					String(expected.frames + 1),
-					"-pix_fmt",
-					"yuv420p",
-					"-f",
-					"framemd5",
-					"pipe:1",
-				],
-				{ stdio: ["ignore", "pipe", "pipe", file.fd], windowsHide: true },
-			);
-			let output = "",
-				outBytes = 0,
-				errBytes = 0,
-				failed = false;
-			const stop = () => {
-				failed = true;
-				child.kill("SIGKILL");
-			};
-			const timer = setTimeout(stop, TIMEOUT_MS);
-			child.stdout!.on("data", (chunk: Buffer) => {
-				outBytes += chunk.length;
-				if (outBytes > MAX_STDOUT) stop();
-				else output += chunk.toString("utf8");
-			});
-			child.stderr!.on("data", (chunk: Buffer) => {
-				errBytes += chunk.length;
-				if (errBytes > MAX_STDERR) stop();
-			});
-			child.once("error", () => {
-				clearTimeout(timer);
-				reject(fail());
-			});
-			child.once("close", (code) => {
-				clearTimeout(timer);
-				if (failed || code !== 0 || errBytes) reject(fail());
-				else resolve(output);
-			});
+		const decoderBefore = await hashDecoderExecutable(executable);
+		const versionOutput = await runDecoder(executable, ["-version"], {
+			timeoutMs: 3000,
+			stdoutBytes: 16384,
+			stderrBytes: 16384,
 		});
+		// Retain only the bounded version token, never configuration/build paths.
+		const version = /^ffmpeg version ([A-Za-z0-9][A-Za-z0-9._+~:-]{0,159})(?:[ \t]|$)/.exec(
+			versionOutput.split(/\r?\n/, 1)[0],
+		)?.[1];
+		if (!version) throw fail();
+		const stdout = await runDecoder(
+			executable,
+			[
+				"-nostdin",
+				"-hide_banner",
+				"-v",
+				"error",
+				"-xerror",
+				"-max_alloc",
+				"67108864",
+				"-threads",
+				"1",
+				"-filter_threads",
+				"1",
+				"-max_pixels",
+				"1638400",
+				"-hwaccel",
+				"none",
+				"-protocol_whitelist",
+				"file",
+				"-probesize",
+				"4194304",
+				"-analyzeduration",
+				"5000000",
+				"-err_detect",
+				"explode",
+				"-enable_drefs",
+				"0",
+				"-use_absolute_path",
+				"0",
+				"-f",
+				"mov",
+				"-i",
+				"/proc/self/fd/3",
+				"-map",
+				"0:v:0",
+				"-an",
+				"-sn",
+				"-dn",
+				"-threads",
+				"1",
+				"-fps_mode",
+				"passthrough",
+				"-frames:v",
+				String(expected.frames + 1),
+				"-pix_fmt",
+				"yuv420p",
+				"-f",
+				"framemd5",
+				"pipe:1",
+			],
+			{
+				fd: file.fd,
+				timeoutMs: TIMEOUT_MS,
+				stdoutBytes: MAX_STDOUT,
+				stderrBytes: MAX_STDERR,
+			},
+		);
+		const decoderAfter = await hashDecoderExecutable(executable);
+		if (JSON.stringify(decoderAfter) !== JSON.stringify(decoderBefore)) throw fail();
 		const decoded = inspectDecodedFrames(stdout, expected);
 		const after = await file.stat(),
 			named = await fs.lstat(filePath);
@@ -369,7 +460,14 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 		return {
 			container: "nonfragmented-mp4" as const,
 			samples,
-			decoded,
+			decoded: {
+				...decoded,
+				decoder: {
+					sha256: decoderBefore.sha256,
+					version,
+					trust: "same-user-local-executable" as const,
+				},
+			},
 			bytes: bytes.length,
 			sha256: createHash("sha256").update(bytes).digest("hex"),
 		};

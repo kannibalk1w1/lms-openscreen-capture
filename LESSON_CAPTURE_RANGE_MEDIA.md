@@ -11,7 +11,11 @@ Actual [review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md) accepts
 software synthetic/offscreen output. [Slice24 runtime validation](LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
 now verifies stored video sample timing and fully decoded video frames before
 completion, enabling video flags only on success; audio flags remain false.
-Slice24 exact-SHA review is pending. The slice22 account below is preserved as
+Actual [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts
+91b59b1d with no High/Medium; its
+[guard/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md)
+awaits exact-SHA review. Stored sample timing supplies exact duration; FFmpeg
+rounds the decoded frame listing, which proves frame existence/order/size. The slice22 account below is preserved as
 history, including its then-false flags and original limitations. No player or
 GUI/CLI/MCP materialization integration is added.
 

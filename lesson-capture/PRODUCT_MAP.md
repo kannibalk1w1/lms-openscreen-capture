@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (review21 accepts native timing at2c29d268; slice24 runtime video validation awaits exact-SHA review). **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (review22 accepts runtime video validation at91b59b1d; guard/provenance follow-up awaits review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -73,7 +73,9 @@ claims that every listed operation exists.
    macOS/Windows drains. Preserve all earlier artifacts.
 3. [Slice24 runtime video validation](../LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
    checks stored MP4 video samples and actual decoded frames with shipped FFmpeg,
-   under bounded Linux-only limits; exact-SHA review remains pending. Historical
+   under bounded Linux-only limits; actual [review22](CLAUDE_POST_RESTART_REVIEW_22.md)
+   accepts91b59b1d with no High/Medium. Its
+   [guard/provenance follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) awaits review. Historical
    authored source identity/availability and remaining guard coverage still precede
    user-facing materialization with cancellation and authority controls. Timed Next/Previous/Replay/
    loop/speed, captions and local progress remain unimplemented.
@@ -243,7 +245,8 @@ model and broad undo/mapping acceptance remain; arbitrary authored text is not r
 **Delivered:** strict bounded source/image validation, dependency-minimal static
 projection and SHA256 readback receipts. Authored range plans retain source pins,
 not playable media. Reviews20/21 accept the bounded backend and Linux native
-timing; slice24 runtime sample/decode proof awaits review. Historical authored
+timing; review22 accepts slice24 runtime sample/decode proof at91b59b1d. Its
+guard/provenance follow-up awaits review. Historical authored
 source identity, full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current

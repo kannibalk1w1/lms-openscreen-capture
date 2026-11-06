@@ -1,12 +1,15 @@
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
 import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
 import { resolveFfmpeg } from "../media/audioPeaks";
-import { validateRangeVideo } from "./encodedVideo";
+import { inspectDecodedFrames, inspectRangeVideo, validateRangeVideo } from "./encodedVideo";
 import { materializeLessonRange, RangeMediaError } from "./rangeMedia";
 import { planLessonRange } from "./rangePlan";
 
@@ -30,27 +33,30 @@ it.skipIf(!supported)(
 		});
 	},
 );
-it
-	.skipIf(!supported)
-	.each(["truncated", "shortened", "dimensions", "corrupt-bitstream", "zero-timing"])(
-	"runtime decoder refuses %s output",
-	async (kind) => {
-		let bytes = await fs.readFile(fixture);
-		const wanted = { ...expected };
-		if (kind === "truncated") bytes = bytes.subarray(0, bytes.length - 10);
-		if (kind === "shortened") wanted.frames = 3;
-		if (kind === "dimensions") wanted.width = 128;
-		if (kind === "zero-timing") bytes.writeUInt32BE(0, bytes.indexOf(Buffer.from("stts")) + 16);
-		if (kind === "corrupt-bitstream") {
-			const start = bytes.indexOf(Buffer.from("mdat"));
-			const size = bytes.readUInt32BE(start - 4);
-			bytes.fill(0, start + 4, start - 4 + size);
-		}
-		const file = path.join(root, "bad.mp4");
-		await fs.writeFile(file, bytes);
-		await expect(validateRangeVideo(file, wanted)).rejects.toThrow();
-	},
-);
+it.skipIf(!supported).each([
+	["truncated", "container parser"],
+	["shortened", "container parser"],
+	["dimensions", "container parser"],
+	["corrupt-bitstream", "real decoder"],
+	["zero-timing", "container parser"],
+])("%s output is refused by the %s", async (kind, stage) => {
+	let bytes = await fs.readFile(fixture);
+	const wanted = { ...expected };
+	if (kind === "truncated") bytes = bytes.subarray(0, bytes.length - 10);
+	if (kind === "shortened") wanted.frames = 3;
+	if (kind === "dimensions") wanted.width = 128;
+	if (kind === "zero-timing") bytes.writeUInt32BE(0, bytes.indexOf(Buffer.from("stts")) + 16);
+	if (kind === "corrupt-bitstream") {
+		const start = bytes.indexOf(Buffer.from("mdat"));
+		const size = bytes.readUInt32BE(start - 4);
+		bytes.fill(0, start + 4, start - 4 + size);
+	}
+	if (stage === "container parser") expect(() => inspectRangeVideo(bytes, wanted)).toThrow();
+	else expect(inspectRangeVideo(bytes, wanted).sampleCount).toBe(2);
+	const file = path.join(root, "bad.mp4");
+	await fs.writeFile(file, bytes);
+	await expect(validateRangeVideo(file, wanted)).rejects.toThrow();
+});
 async function options(invalid = false) {
 	const doc = createEmptyDocument({ projectId: "p", title: "Synthetic runtime proof" });
 	doc.assets = [
@@ -123,5 +129,67 @@ it.skipIf(!supported)(
 			expect(failure.code).toBe("range-media-incomplete");
 			expect(await fs.readdir(failure.artifactPath!)).toEqual(["range.mp4"]);
 		}
+	},
+);
+
+it.skipIf(!supported)(
+	"real decoded listings accept a zero-last-sample file: only stored sample timing proves the duration",
+	async () => {
+		const bad = fileURLToPath(new URL("./__fixtures__/range-video-zero-last.mp4", import.meta.url));
+		const bytes = await fs.readFile(bad);
+		// Expected mdhd/tkhd/edit metadata is intact; only stts has a zero last delta.
+		expect(bytes.readUInt32BE(bytes.indexOf(Buffer.from("mdhd")) + 20)).toBe(1024);
+		expect(() => inspectRangeVideo(bytes, expected)).toThrow();
+		const { stdout, stderr } = await promisify(execFile)(
+			resolveFfmpeg()!,
+			[
+				"-nostdin",
+				"-hide_banner",
+				"-v",
+				"error",
+				"-xerror",
+				"-threads",
+				"1",
+				"-protocol_whitelist",
+				"file",
+				"-enable_drefs",
+				"0",
+				"-i",
+				bad,
+				"-map",
+				"0:v:0",
+				"-an",
+				"-sn",
+				"-dn",
+				"-threads",
+				"1",
+				"-fps_mode",
+				"passthrough",
+				"-frames:v",
+				"3",
+				"-pix_fmt",
+				"yuv420p",
+				"-f",
+				"framemd5",
+				"pipe:1",
+			],
+			{ timeout: 5000, killSignal: "SIGKILL", maxBuffer: 65536, encoding: "utf8" },
+		);
+		expect(stderr).toBe("");
+		expect(inspectDecodedFrames(stdout, expected).frames).toBe(2);
+		await expect(validateRangeVideo(bad, expected)).rejects.toThrow();
+	},
+);
+it.skipIf(!supported)(
+	"runtime receipts identify the real decoder without exporting its local path",
+	async () => {
+		const proof = await validateRangeVideo(fixture, expected);
+		expect(proof.decoded.decoder.sha256).toBe(
+			createHash("sha256")
+				.update(await fs.readFile(await fs.realpath(resolveFfmpeg()!)))
+				.digest("hex"),
+		);
+		expect(proof.decoded.decoder.version).toMatch(/^[A-Za-z0-9][A-Za-z0-9._+~:-]*$/);
+		expect(JSON.stringify(proof)).not.toContain(resolveFfmpeg());
 	},
 );

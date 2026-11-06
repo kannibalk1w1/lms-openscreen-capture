@@ -1,3 +1,27 @@
+# Review22 follow-up checkpoint — 6 November 2026
+
+Actual [review22](CLAUDE_POST_RESTART_REVIEW_22.md) accepts91b59b1d with no
+High/Medium for the bounded Linux video backend; its original report is preserved
+verbatim. This [follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) separates exact
+stored-stts timing from decoded-frame existence/order/size on FFmpeg's rounded
+output grid, adds path-free decoder SHA256/version provenance under same-user
+trust, and strengthens reported parser/process/race and T22-1 limit coverage.
+Validation:139focused/5files and5711full/427files pass,0skip; both TS,
+lint35existing warnings, docs/i18n/lesson links pass.53mutants yield52test-assertion
+kills and1expected redundant lstat survivor; restored source hashes match.
+All four rebuilt outputs pass with decoder provenance, old zero-last video fails
+full validation while its rounded decoded listing passes, and111prior files plus
+review22 remain byte-identical. Details and corrected initial diagnostics are in
+the follow-up report. The follow-up itself awaits coordinator-dispatched exact-SHA
+Claude review.
+
+No authored-source identity, GUI/API/player, audio or macOS/Windows native scope
+is added. Historical source-file identity/availability remains the next backend
+prerequisite after this review cycle. L23-1, L23-W1, broader dependency coverage,
+audio/AV alignment and physical/platform/product acceptance remain open.
+Private pushes belong to the coordinator after review; main stays unchanged.
+The earlier slice24 account below is retained as historical validation evidence.
+
 # Runtime video validation checkpoint — 6 November 2026
 
 The user authorized pushing and continuing the roadmap. The coordinator verified

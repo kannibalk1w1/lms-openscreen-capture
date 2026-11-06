@@ -93,8 +93,10 @@ Review20 accepted the bounded range-media backend at125ec5de. Actual
 [B22-2 Linux native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md) at2c29d268
 with no High/Medium, within Linux software synthetic/offscreen scope.
 [Slice24 runtime video validation](LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
-adds bounded stored-sample timing and actual decoded-frame evidence; exact-SHA
-review of this new slice remains pending. Historical authored source identity
+adds bounded stored-sample timing and actual decoded-frame evidence; actual
+[review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts91b59b1d with
+no High/Medium. Its [guard/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md)
+awaits exact-SHA review. Historical authored source identity
 remains the next prerequisite before user-facing materialization or timed delivery. Earlier pause/pending notes below are
 historical snapshots, not new authority to stop or claims of current approval.
 
@@ -145,7 +147,8 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    encoded-output proof, including the bounded review19 M22-1 fix CLOSED by actual review20 at125ec5de.
    Actual review21 accepts the post-restart B22-2 Linux software timing fix.
    Slice24 adds runtime sample/decode validation for a narrow Linux MP4 subset,
-   with video flags true only on success; its exact-SHA review remains pending.
+   with video flags true only on success; review22 accepts91b59b1d. Its
+   guard/provenance follow-up awaits exact-SHA review.
    Synthesized AAC stays separate from video checks; audio flags remain false. This is not
    GUI/API/player delivery; physical/native/platform acceptance remains open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
