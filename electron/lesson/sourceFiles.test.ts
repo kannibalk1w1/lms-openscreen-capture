@@ -4,12 +4,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
 import { MAX_LESSON_SOURCE_BYTES } from "../../src/lib/lesson/mediaSelection";
 import {
 	hashRegularFile,
 	observeRangeSources,
 	requireMatchingSourceContent,
 	requireSourceCoverage,
+	resolveRangeSources,
 } from "./sourceFiles";
 
 let root: string, source: string;
@@ -171,4 +173,20 @@ it("compares opaque binding groups and byte hashes independently of ordering", (
 		{ ...a, bindings: ["e".repeat(64)] },
 	])
 		expect(() => requireMatchingSourceContent([a], [changed])).toThrow("range-media-changed");
+});
+
+it("refuses a native selected path without any visible asset binding", () => {
+	const document = createEmptyDocument({ projectId: "p", title: "Binding refusal" });
+	expect(() =>
+		resolveRangeSources(document, [
+			{
+				screenPath: source,
+				webcamPath: "",
+				sourceStartSec: 0,
+				sourceEndSec: 1,
+				webcamOffsetSec: 0,
+				hasAudio: false,
+			},
+		]),
+	).toThrow("range-media-unsupported");
 });

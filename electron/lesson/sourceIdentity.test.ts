@@ -385,3 +385,100 @@ it("retains legacy references in source and recovery without accessing missing m
 	});
 	expect(f.readDocument).not.toHaveBeenCalled();
 });
+it.each([
+	"legacy",
+	"pinned",
+])("refuses cross-project refresh of %s before any project read", async (kind) => {
+	const f = await fixture(),
+		pin = await f.capture(),
+		other = structuredClone(f.doc);
+	other.project.id = "q";
+	const replacement = {
+			...f.request,
+			projectId: "q",
+			documentSha256: await lessonRenderFingerprint(other),
+		},
+		readDocument = vi.fn(async (id: string) => (id === "q" ? other : f.doc));
+	await expect(
+		captureLessonSourceIdentity({
+			selection: kind === "legacy" ? f.reference : pin,
+			intent: "refresh-current",
+			replacement,
+			readDocument,
+		}),
+	).rejects.toThrow("range-media-unsupported");
+	expect(readDocument).not.toHaveBeenCalled();
+});
+it.each([
+	"darwin",
+	"win32",
+] as const)("refuses %s materialization before project, picker or media access", async (platform) => {
+	const f = await fixture(),
+		pin = await f.capture(),
+		pickDirectory = vi.fn(async () => root),
+		render = vi.fn();
+	f.readDocument.mockClear();
+	vi.spyOn(process, "platform", "get").mockReturnValue(platform);
+	await expect(
+		materializeLessonRange({ selection: pin, readDocument: f.readDocument, render, pickDirectory }),
+	).rejects.toThrow("range-media-unsupported");
+	expect(f.readDocument).not.toHaveBeenCalled();
+	expect(pickDirectory).not.toHaveBeenCalled();
+	expect(render).not.toHaveBeenCalled();
+});
+it("honors abort immediately after a cancelled picker before returning cancellation status", async () => {
+	const f = await fixture(),
+		pin = await f.capture(),
+		controller = new AbortController(),
+		render = vi.fn(),
+		open = vi.spyOn(fs, "open");
+	await expect(
+		materializeLessonRange({
+			selection: pin,
+			readDocument: f.readDocument,
+			render,
+			signal: controller.signal,
+			pickDirectory: async () => {
+				controller.abort();
+				return null;
+			},
+		}),
+	).rejects.toThrow("range-media-cancelled");
+	expect(open).not.toHaveBeenCalled();
+	expect(render).not.toHaveBeenCalled();
+	expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
+});
+it("enforces combined schema bytes independently of each individually bounded pin", async () => {
+	const f = await fixture(),
+		pin = await f.capture(),
+		source = pin.identity.sources[0];
+	const sources = [
+		{ ...source, bytes: 4 * 1024 ** 3 },
+		{ ...source, bindings: ["e".repeat(64)], bytes: 4 * 1024 ** 3 },
+	];
+	expect(
+		lessonMediaSelectionSchema.safeParse({ ...pin, identity: { ...pin.identity, sources } })
+			.success,
+	).toBe(true);
+	sources[1].bytes++;
+	expect(
+		lessonMediaSelectionSchema.safeParse({ ...pin, identity: { ...pin.identity, sources } })
+			.success,
+	).toBe(false);
+});
+it("enforces imported schema history at eight snapshots independently of capture limits", async () => {
+	const f = await fixture(),
+		pin = await f.capture();
+	expect(
+		lessonMediaSelectionSchema.safeParse({
+			...pin,
+			previousSelections: Array.from({ length: 8 }, () => f.reference),
+		}).success,
+	).toBe(true);
+	expect(
+		lessonMediaSelectionSchema.safeParse({
+			...pin,
+			previousSelections: Array.from({ length: 9 }, () => f.reference),
+		}).success,
+	).toBe(false);
+});

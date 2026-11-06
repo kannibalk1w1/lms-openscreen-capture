@@ -17,6 +17,7 @@ export interface ResolvedRangeSource {
 	path: string;
 	bindings: string[];
 }
+// Binding hashes omit paths/labels; known asset IDs allow recomputation and linkage.
 export function resolveRangeSources(
 	document: AxcutDocument,
 	clips: CompositorClipInput[],

@@ -44,6 +44,8 @@ export async function captureLessonSourceIdentity(options: {
 		const replacement = options.replacement
 			? lessonRangeRequestSchema.parse(options.replacement)
 			: undefined;
+		if (replacement && replacement.projectId !== previous.projectId)
+			throw new RangeMediaError("range-media-unsupported");
 		const id = replacement?.projectId ?? previous.projectId;
 		const document = await options.readDocument(id);
 		checkSourceCancellation(options.signal);

@@ -1,3 +1,18 @@
+# Slice26 review25 follow-up — confined completion scope
+
+Actual [review25](CLAUDE_POST_RESTART_REVIEW_25.md) accepts93518c36 with no
+High/Medium/material blocker. Coordinator requests bounded L26-3/T26-2/N26-5
+follow-ups before private push: refresh stays in the same project, six independent
+guard regressions and honest deterministic binding-linkability wording. This
+follow-up is locally validated and requires actual exact-SHA Claude review.
+Worker evidence:97focused/7 and97restored-snapshot positive tests pass,0skip;
+7single-guard mutations are assertion kills,0timeouts/load failures. Both TS,
+lint35baseline/docs37/82relative lesson links pass; no full/build/native repeat.
+The prior52reports, review25 itself,111evidence files and original MP4 proof are
+unchanged. No owned processes remain; no other/user process is killed.
+The sole implementation writer commits locally; coordinator owns review/push.
+No further roadmap phase starts. See [follow-up evidence](CLAUDE_POST_RESTART_FOLLOWUP_25.md).
+
 # Resumed slice26 — authored source content pins
 
 The user explicitly said “continue”, resuming the accepted ec125e08 checkpoint.

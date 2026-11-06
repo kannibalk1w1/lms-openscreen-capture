@@ -1,6 +1,8 @@
 # Authored source content pins — slice26
 
-Status: locally validated; actual exact-SHA Claude review is pending.
+Status: actual [Claude review25](CLAUDE_POST_RESTART_REVIEW_25.md) accepts exact
+93518c36916492c67b52f95d783bda19d35e8446 with no High/Medium/material blocker.
+Its bounded follow-up is locally in progress, awaiting separate exact-SHA review.
 This is a bounded Linux backend prerequisite, without a GUI/IPC/CLI/MCP capture or
 materialization entry point. Ordinary application adapters remain optional.
 
@@ -15,11 +17,15 @@ destination or source access. They require explicit current-content capture.
 
 `captureLessonSourceIdentity` takes explicit `author-current` intent for a version1
 reference, or `refresh-current` intent plus a fresh range request for the currently
-authorized saved project. It resolves only selected sources through shared
+authorized saved project. Refresh requires the same project ID as the previous
+reference and refuses another project before reading it; cross-project rebinding
+requires a separate future explicit intent. It resolves only selected sources through shared
 visible-segment/native-clip readers and ephemeral cuts. It records strict version2
 geometry plus a version1 identity containing a new UUID observation ID, explicit
 basis, opaque SHA256 asset/role binding IDs, full-file SHA256 and byte counts.
 Identity records contain no source path, filename, label, inode or filesystem time.
+Binding hashes are deterministic and recomputable/linkable given asset IDs; they
+are not unlinkable or secret identifiers.
 No time or UTC-based encoder-clock relationship is inferred.
 
 Capture observes sources twice and revalidates saved project/render geometry
@@ -111,7 +117,9 @@ The fresh backend bundle passes the retained native proof; no app/server is
 started, and its owned Node/native render process exits successfully. No user
 process is killed or shared cache purged. Remote private feature was verified at
 pre-sliceec125e08, local/private main remainsfd2775e2; worker performs no push.
-Actual review/acceptance is pending and cannot be inferred from worker checks.
+These are worker checks of93518c36, independently accepted in review25. Its
+follow-up tightens refresh project identity and independently pins the six T26-2
+guards; follow-up validation/review is recorded separately.
 
 Physical capture/portal/input/device-loss, visible Electron flows, screen-reader,
 Windows/macOS, broader dependencies, audio alignment, timed player and user-facing

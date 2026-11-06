@@ -128,6 +128,8 @@ it("verifies source and output bytes before writing a path-minimal completion re
 			basis: "selected-programme-seconds",
 		},
 	});
+	expect(f.selection.previousSelections).not.toHaveLength(0);
+	expect(receipt.selection.previousSelections).toEqual([]);
 	expect(JSON.stringify(receipt)).not.toContain(f.source);
 	expect(receipt.sources[0].sha256).toHaveLength(64);
 	expect(receipt.output.sha256).toHaveLength(64);

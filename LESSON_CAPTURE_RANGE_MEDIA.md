@@ -4,7 +4,8 @@
 explicit Linux backend capture/refresh alongside preserved version1 plans.
 Materialization requires version2 content pins and compares current bytes before
 output creation; valid pinned destination cancellation still precedes media reads.
-Worker validation passes; actual exact-SHA Claude review is pending. The earlier per-operation-only
+Actual Claude review25 accepts93518c36. Its bounded same-project/guard-coverage
+follow-up awaits separate exact-SHA review. The earlier per-operation-only
 accounts below are preserved as history. No GUI/CLI/MCP materialization or player
 entry point is added.
 

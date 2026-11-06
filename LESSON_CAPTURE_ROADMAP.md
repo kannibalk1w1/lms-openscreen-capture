@@ -103,7 +103,9 @@ is accepted at fd749b82 by actual [review24](lesson-capture/CLAUDE_POST_RESTART_
 with no High/Medium or material blocker. The user explicitly resumed with “continue”.
 [Slice26 authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY.md) adds
 explicit bounded Linux content capture/refresh and stored-pin materialization
-enforcement, locally validated with actual exact-SHA review pending. It remains backend-only;
+enforcement, accepted at93518c36 by actual [review25](lesson-capture/CLAUDE_POST_RESTART_REVIEW_25.md).
+Its [bounded follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_25.md) tightens
+same-project refresh and pins six guards, awaiting its own exact-SHA review. It remains backend-only;
 user-facing materialization and timed delivery are separate remaining work.
 Earlier pause/pending notes below are historical snapshots.
 
