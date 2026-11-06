@@ -319,7 +319,7 @@
 		"code": "Optional code (plain text, included in selected exports)",
 		"errors": {
 			"lesson-operation-failed": "The lesson operation could not finish. Check the selected lesson or destination and retry. Existing files are preserved.",
-			"project-changed": "Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+			"project-changed": "Save and reload the current video project, then retry the lesson operation. Its render inputs changed or edits are unsaved.",
 			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
 			"render-busy": "A lesson still is already rendering. Wait for it to finish, then retry.",
 			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced.",

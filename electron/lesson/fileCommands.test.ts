@@ -57,6 +57,7 @@ it("queries only the explicit file with bounded filters and a content-minimal su
 		sources: ["authored"],
 		findings: ["draft"],
 	});
+	expect(result.steps[0].hasMediaSelection).toBe(false);
 	const json = JSON.stringify(result);
 	for (const value of [
 		source.manifestPath,

@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 5 November 2026. **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (through accepted slice21; slice22 backend under review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -30,53 +30,54 @@ when dependencies and privacy requirements are satisfied; phases are not release
 
 ## Feature-status matrix
 
-| Feature | Status at audit | Existing foundation | Delivery order |
+| Feature | Current bounded status | Delivered foundation and remaining limit | Delivery order |
 | --- | --- | --- | --- |
-| Universal core / optional integration manager | Partial | Core media independent; Godot typing opt-in; closed producer/anchor assumptions remain | Foundation before deeper adapters; settings planned |
-| C Privacy-safe capture, storage and export | Partial | Explicit scoped pad/Godot start; input status; local journals; visual blur | Critical, phase 0; broad capture gate |
-| A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Flags, typing sections, editable arrows, native rendering | Very high, phase 1 |
+| Universal core / optional integration manager | Partial | Core media independent; selected-file integration controls and explicit read-only Godot clock bridge; deeper adapter capabilities remain | Foundation before deeper adapters; settings planned |
+| C Privacy-safe capture, storage and export | Partial | Default-off Linux button gates, scope suppression, source-bound receipts/recovery exclusions; full redaction/allowlists remain | Critical, phase 0; broad capture gate |
+| A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Manual steps, neutral flag/typing drafts, native stills, editable source, selected HTML/Markdown and bounded print proof; semantic generation remains | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
-| D Offline interactive lessons | Planned | Source clips, captions, code and controlled typing recipes | High, phase 3 |
-| E Accessible differentiated outputs | Partial | Font/theme/caption/cursor controls; no unified lesson profiles | High, phase 1 defaults + phase 3 delivery |
+| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print and authored range references; no timed controls/progress | High, phase 3 |
+| E Accessible differentiated outputs | Partial | Unified lesson Standard/Large print/High contrast, language/direction and image/code exclusions; reviewed simplification/narration/slow profiles remain | High, phase 1 defaults + phase 3 delivery |
 | F Recording script/checklist | Planned | Notes and flags; no source-linked recording checklist established | Medium-high, phase 4; small earlier slice allowed |
-| G Quality review | Partial | Probes, health/errors, media validation, caption state | High, preflight now; unified report phase 4 |
+| G Quality review | Partial | Probes/health plus source review labels/findings and bounded title/status/source queries; unified media QC remains | High, preflight now; unified report phase 4 |
 | H Teaching-asset library | Planned | Project assets/relinking, typing bundles, local appearance presets | Medium-high, phase 4 |
-| I Tutor review/approval | Planned | Undo/checkpoint services; no lesson review state machine | Medium, phase 5 |
+| I Tutor review/approval | Partial source labels; tutor workflow planned | Draft/reviewed step labels and findings; no multi-user approval/comments/audit workflow | Medium, phase 5 |
 | J Assessment evidence packs | Planned | Source provenance and original lesson mapping requirements | Future/experimental, phase 5 |
 | K Troubleshooting branches | Planned | No linked step graph/player yet | Medium, phase 3 |
-| Automatic step renumbering | Partial | Add step box chooses next maximum number; text remains manual | S/M, phase 1 |
+| Automatic step renumbering | Partial | Stable lesson step IDs, reorder/selection and derived consecutive guide numbering; legacy annotation labels remain manual | S/M, phase 1 |
 | Object-attached arrows | Partial | Editable normalized connector geometry, no object bindings | M, phase 1/4 |
 | Idle-cut suggestions | Planned | Existing trims/speed edits and transcript/cursor signals | M, phase 4 |
 | Portable course visual presets | Partial | Existing style-preset service and arrow styles | M, phase 1 |
 | Recording preflight | Partial | Platform/helper checks and live journal health | M, phase 0 |
-| Export manifest integrity | Partial | Legacy pack sidecars, relinker; current-editor pack unsupported | L, phase 1 prerequisite |
+| Export manifest integrity | Partial | Validated lesson assets, selected projection and verified output receipts; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
 | Rolling buffer/save recent | Planned | Full recording, clips and source ranges | L/XL, preserved phase 0 reliability work |
 | Retakes/checkpoints/handoff | Partial | Existing editor checkpoints/CLI/MCP; no complete lesson retake workflow | L, phases 1–2/acceptance |
 
 ## Dependency plan and next work
 
-1. Finish the active native timing/cursor slice and integrate its actual Claude
-   review. Do not interrupt existing capture, journaling, typing or timeline work.
-2. Implement **P0.2 privacy collection gating** as the next new coherent vertical
-   slice: explicit suppression and truthful capability/scope reporting at a real
-   producer-to-storage path, persisted/reopened policy and tests. If the platform
-   cannot attest the selected application, report that and suppress restricted
-   collection rather than labelling global evidence application-scoped. This
-   changes privacy behavior and must be explained before enabling it. Do not
-   present this first slice as complete redaction/allowlist protection.
-3. Explicit live Godot/video clock bridge remains important, but must respect
-   collection policy. Measure bounds; independent control/encoder/Godot clocks
-   and human cue anchors must remain distinguishable.
-   First establish the [minimal capability boundary](APPLICATION_INTEGRATIONS.md),
-   per-instance isolation, graceful failure and disabled-adapter reopen tests before
-   deep expansion. Keep old Godot files compatible; presets never enable adapters.
-4. Build **P1.1 versioned lesson-step contract + adapter + manifest validator**,
-   then a useful A1 offline guide slice: select existing flags/typing evidence,
-   review steps, extract source-linked screenshots, export HTML/Markdown and
-   reopen the editable lesson. PDF follows a tested offline print path.
-5. Layer opt-in semantic Godot capture onto that contract, then standalone player,
-   differentiated profiles and troubleshooting. QC, preflight and accessibility
-   improvements may ship sooner when independently useful.
+Current delivery: [guides](../LESSON_CAPTURE_GUIDES.md),
+[commands](../LESSON_CAPTURE_COMMANDS.md), [clock bridge](../LESSON_CAPTURE_CLOCK_BRIDGE.md)
+and [authored ranges](../LESSON_CAPTURE_RANGES.md) have bounded implementations.
+Actual reviews through18 accept their exact SHAs; original reports retain limits.
+The expanded requirement descriptions below remain future acceptance targets, not
+claims that every listed operation exists.
+
+1. Complete/review the current selected-media materialization/revalidation backend
+   and actual encoded-output proof. Slice22 is a backend building block, not a GUI,
+   CLI or player release. Its first native MP4 proof found a video-stream duration
+   discrepancy; do not claim timed-playback readiness from native stats alone.
+2. **Pause after this current phase**, as the user requested to restart the machine.
+   Checkpoint exact commits/review/tests and preserve all artifacts. Do not start a
+   timed player, API/UI integration or another roadmap phase before resumption.
+3. After explicit resumption, resolve encoded timing, then connect bounded media
+   materialization with cancellation and existing authority controls. Timed Next/
+   Previous/Replay/loop/speed, captions and local progress remain unimplemented.
+4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
+   rolling buffer, retakes/handoff and physical/platform acceptance separately.
+   Source clocks/claims stay distinguishable; imported references must be revalidated.
+5. Preserve the full dependency backlog below: automatic semantic guide generation,
+   course mapping/slide/outcome references, differentiated authored alternatives,
+   troubleshooting, QC, library, tutor review and optional evidence packs remain.
 
 ```mermaid
 flowchart TD
@@ -169,7 +170,12 @@ flowchart TD
 
 ## Phase 1 — common lesson structure and illustrated resources
 
-### P1.1 Shared lesson steps, mappings and editable packages — Planned; next foundation; L
+### P1.1 Shared lesson steps, mappings and editable packages — Partial; bounded source/guide contract delivered; L
+
+**Delivered:** stable versioned lesson/step IDs, editable save/reopen, selected
+image dependencies, lineage, explicit manual recovery copies and authored saved-
+project range references (slice21). Source plans are not packaged video. Full
+merge/split, course/slide/outcome/checkpoint mappings and full media packages remain.
 
 - **Purpose/reuse:** one set of editable steps for every output; reuse source flags,
   typing IDs, annotations, source timeline, media relinker and editor persistence.
@@ -185,7 +191,13 @@ flowchart TD
   through revisions. Unit transforms, real disk roundtrips, legacy migration and
   Windows/Linux path tests. Human and agent call the same service.
 
-### P1.2 A — automatic illustrated guides — Planned; very high/after P1.1 + privacy; L
+### P1.2 A — illustrated guides — Partial manual delivery; automatic generation planned; L
+
+**Delivered:** manual editable steps and neutral metadata-only flag/typing drafts,
+explicit native composed stills, selected HTML/Markdown/manifest/asset outputs,
+script-free navigation and bounded offline print/PDF proof. **Outstanding:**
+automatic evidenced screenshot/candidate selection, semantic descriptions, step
+grouping and the disposable Enemy automatic-guide acceptance sequence.
 
 - **Purpose/reuse:** reduce screenshot/tutorial assembly; reuse flags, clicks,
   typing, annotations, captions/context and native screenshot/render facilities.
@@ -209,6 +221,10 @@ flowchart TD
 
 ### P1.3 Automatic step renumbering — Partial; early independent slice; S/M
 
+**Delivered:** lesson-step numbering follows stable source order and selected
+output order after reorder/exclusion. Linking legacy numbered annotations to that
+model and broad undo/mapping acceptance remain; arbitrary authored text is not rewritten.
+
 - **Purpose/reuse:** keep teaching numbers consistent; extend existing numbered
   text boxes and stable step order, not pattern-based rewriting of arbitrary text.
 - **Approach/dependencies:** explicit auto/manual numbering mode referencing step
@@ -218,6 +234,11 @@ flowchart TD
   manual labels unchanged; model, persistence, preview/export and keyboard tests.
 
 ### P1.4 Export manifest integrity and portability — Partial; early prerequisite; L
+
+**Delivered:** strict bounded source/image validation, dependency-minimal static
+projection and SHA256 readback receipts. Authored range plans retain source pins,
+not playable media. Slice22 backend media proof remains experimental until review;
+full editor/course dependency packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.
@@ -290,7 +311,12 @@ flowchart TD
 
 ## Phase 3 — learner-facing delivery and differentiation
 
-### P3.1 D — standalone follow-along player — Planned; high/after steps + packages; L
+### P3.1 D — standalone follow-along player — Partial prerequisites; timed player planned; L
+
+**Delivered prerequisites:** independent static HTML reading/navigation/print and
+explicit source-bound ranges. **Not delivered:** timed video player, segment auto-
+pause, Replay/loop/speed, caption packaging or local progress. A backend native
+MP4 proof is not a user-facing standalone player or complete portable course.
 
 - **Purpose/reuse:** practice one demonstration at a time; reuse source ranges,
   native MP4 exports, captions/code/screenshots and lesson manifest.
@@ -305,6 +331,12 @@ flowchart TD
   file:// package trials. No LMS/user-management scope.
 
 ### P3.2 E — accessible alternative presentations — Partial; high/continuous; L
+
+**Delivered:** shared lesson output presets Standard/Large print/High contrast,
+canonical language/direction, image/code exclusions and source-preserving selected
+outputs. **Outstanding:** reviewed simplification, slow/smaller-step/caption-first
+profiles, optional narration, full locale/keyboard/screen-reader and human usability
+acceptance. English fallback UI keys are not completed translations.
 
 - **Purpose/reuse:** SEND-friendly, age-neutral differentiation from one source;
   reuse captions, font/theme/code/cursor/annotation controls and P1.5 profile service.
@@ -406,7 +438,11 @@ flowchart TD
 
 ## Phase 5 — tutor review and optional assessment evidence
 
-### P5.1 I — tutor review and approval — Planned; medium; M/L
+### P5.1 I — tutor review and approval — Partial source labels; full workflow planned; M/L
+
+**Delivered:** source step draft/reviewed labels, advisory findings and query
+filters. These are not tutor approval, multi-user comments, assessment or verified
+learning outcomes; that workflow and its audit/transfer tests remain planned.
 
 - **Purpose/reuse:** identify unfinished work and retakes; reuse step IDs,
   revisions/checkpoints and source-linked timeline.

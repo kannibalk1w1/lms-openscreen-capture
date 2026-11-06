@@ -450,11 +450,11 @@ it("refuses stale range sources, removed/outside boundaries, unprobed and overla
 	).rejects.toThrow("range-unavailable");
 	expect(f.render).not.toHaveBeenCalled();
 });
-it("bounds range-plan fragmentation before retaining more than 128 spans", async () => {
+it("accepts exactly128 selected spans and refuses129", async () => {
 	const f = fixture();
 	f.doc.timeline.clips[0].sourceEndSec = 300;
 	f.doc.timeline.clips[0].timelineEndSec = 300;
-	f.doc.timeline.trimRanges = Array.from({ length: 129 }, (_, index) => ({
+	f.doc.timeline.trimRanges = Array.from({ length: 128 }, (_, index) => ({
 		id: `cut-${index}`,
 		assetId: "a",
 		clipId: "c",
@@ -463,13 +463,31 @@ it("bounds range-plan fragmentation before retaining more than 128 spans", async
 		reason: "cut",
 		origin: "user" as const,
 	}));
-	await expect(
-		f.service.planRange({
-			projectId: "p",
-			documentSha256: await f.digest(),
-			startSec: 0,
-			endSec: 260,
-		}),
-	).rejects.toThrow("range-unavailable");
+	const request = { projectId: "p", documentSha256: await f.digest(), startSec: 0, endSec: 255 };
+	expect((await f.service.planRange(request)).keptSpans).toHaveLength(128);
+	await expect(f.service.planRange({ ...request, endSec: 258 })).rejects.toThrow(
+		"range-unavailable",
+	);
 	expect(f.render).not.toHaveBeenCalled();
+});
+it.each([
+	[0, 3],
+	[5, 10],
+	[0, 10],
+	[2, 3],
+	[5, 8],
+])("accepts exact kept boundaries %s to %s", async (startSec, endSec) => {
+	const f = fixture();
+	f.doc.timeline.trimRanges = [
+		{ id: "cut", assetId: "a", clipId: "c", startSec: 3, endSec: 5, reason: "cut", origin: "user" },
+	];
+	const range = await f.service.planRange({
+		projectId: "p",
+		documentSha256: await f.digest(),
+		startSec,
+		endSec,
+	});
+	expect(range.startSec).toBe(startSec);
+	expect(range.keptSpans[0].startSec).toBe(startSec);
+	expect(range.keptSpans.at(-1)?.endSec).toBe(endSec);
 });

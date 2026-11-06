@@ -1,0 +1,198 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
+import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import {
+	materializeLessonRange,
+	prepareLessonRangeMedia,
+	RangeMediaError,
+	type RangeMediaRenderer,
+} from "./rangeMedia";
+import { planLessonRange } from "./rangePlan";
+
+let root: string;
+beforeEach(async () => {
+	root = await fs.mkdtemp(path.join(os.tmpdir(), "range-media-"));
+});
+afterEach(async () => {
+	await fs.rm(root, { recursive: true, force: true });
+});
+async function fixture() {
+	const source = path.join(root, "source.mp4");
+	await fs.writeFile(source, "fixture-source-bytes");
+	const doc = createEmptyDocument({ projectId: "p", title: "Range media" });
+	doc.assets = [
+		{
+			id: "a",
+			kind: "video",
+			label: "Source",
+			originalPath: source,
+			cameraTrack: null,
+			durationSec: 5,
+			video: { codec: "h264", fps: 30, width: 640, height: 360 },
+		},
+	];
+	doc.timeline.clips = [
+		{
+			id: "c",
+			assetId: "a",
+			sourceStartSec: 0,
+			sourceEndSec: 5,
+			timelineStartSec: 0,
+			timelineEndSec: 5,
+			origin: "user",
+			reason: "fixture",
+			wordRefs: [],
+		},
+	];
+	doc.timeline.trimRanges = [
+		{ id: "cut", assetId: "a", clipId: "c", startSec: 1, endSec: 2, origin: "user", reason: "cut" },
+	];
+	doc.legacyEditor = {
+		aspectRatio: "16:9",
+		wallpaper: "#ffffff",
+		speedRegions: [{ id: "speed", startMs: 2000, endMs: 4000, speed: 2 }],
+	};
+	const selection = await planLessonRange(doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(doc),
+		startSec: 0.5,
+		endSec: 4,
+	});
+	const render = vi.fn<RangeMediaRenderer>(async (_clips, file, _scene, params) => {
+		await fs.writeFile(file, "MOCK_ENCODED_OUTPUT");
+		return { frames: 45, wallS: 1, fps: 45, videoDurationS: 45 / params.fps! };
+	});
+	return {
+		source,
+		doc,
+		selection,
+		render,
+		options: { selection, readDocument: async () => doc, render, pickDirectory: async () => root },
+	};
+}
+it("narrows source windows through ephemeral trims and shared scene/frame readers without changing the original", async () => {
+	const f = await fixture(),
+		before = JSON.stringify(f.doc),
+		prepared = await prepareLessonRangeMedia(f.doc, f.selection);
+	expect(prepared.clips.map((clip) => [clip.sourceStartSec, clip.sourceEndSec])).toEqual([
+		[0.5, 1],
+		[2, 4],
+	]);
+	expect(prepared.scene.clips.map((clip) => [clip.sourceStartSec, clip.sourceEndSec])).toEqual([
+		[0.5, 1],
+		[2, 4],
+	]);
+	expect(prepared.expectedFrames).toBe(45);
+	expect(JSON.stringify(f.doc)).toBe(before);
+	expect(prepared.params).toMatchObject({ width: 640, height: 360, fps: 30, codec: "h264" });
+});
+it("verifies source and output bytes before writing a path-minimal completion receipt in a new private folder", async () => {
+	const f = await fixture(),
+		before = await fs.readFile(f.source),
+		result = await materializeLessonRange(f.options);
+	if (result.status !== "materialized") throw new Error("Expected output");
+	const receipt = JSON.parse(
+		await fs.readFile(path.join(result.path, "range-export.json"), "utf8"),
+	);
+	expect(receipt).toMatchObject({
+		format: "openscreen-lesson-range-media",
+		validation: "native-reported-stats-and-file-hashes",
+		mediaDecodedByValidator: false,
+		output: {
+			path: "range.mp4",
+			frames: 45,
+			nativeReportedDurationSec: 1.5,
+			basis: "selected-programme-seconds",
+		},
+	});
+	expect(JSON.stringify(receipt)).not.toContain(f.source);
+	expect(receipt.sources[0].sha256).toHaveLength(64);
+	expect(receipt.output.sha256).toHaveLength(64);
+	expect(await fs.readFile(f.source)).toEqual(before);
+	expect(f.render).toHaveBeenCalledTimes(1);
+	const again = await materializeLessonRange(f.options);
+	expect(again.status).toBe("materialized");
+	if (again.status === "materialized") expect(again.path).not.toBe(result.path);
+});
+it("rejects forged or stale plans and external scene dependencies before choosing an output folder", async () => {
+	const f = await fixture(),
+		pick = vi.fn(async () => root);
+	for (const selection of [
+		{ ...f.selection, programme: { ...f.selection.programme, endSec: 3 } },
+		{ ...f.selection, documentSha256: "0".repeat(64) },
+	])
+		await expect(
+			materializeLessonRange({ ...f.options, selection, pickDirectory: pick }),
+		).rejects.toThrow();
+	f.doc.legacyEditor = { ...f.doc.legacyEditor, wallpaper: "/private/background.png" };
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 0.5,
+		endSec: 4,
+	});
+	await expect(
+		materializeLessonRange({ ...f.options, selection, pickDirectory: pick }),
+	).rejects.toThrow("range-media-unsupported");
+	expect(pick).not.toHaveBeenCalled();
+	expect(f.render).not.toHaveBeenCalled();
+});
+it("refuses cursor sidecars without creating output, and handles explicit cancellation", async () => {
+	const f = await fixture();
+	expect(await materializeLessonRange({ ...f.options, pickDirectory: async () => null })).toEqual({
+		status: "cancelled",
+	});
+	await fs.writeFile(`${f.source}.cursor.json`, "PRIVATE_CURSOR_PAYLOAD");
+	await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
+	expect(f.render).not.toHaveBeenCalled();
+	expect((await fs.readdir(root)).filter((name) => name.startsWith("lesson-range-"))).toEqual([]);
+});
+it.each([
+	"source",
+	"project",
+	"stats",
+	"render",
+])("preserves incomplete %s output without a completion receipt", async (kind) => {
+	const f = await fixture();
+	const render: RangeMediaRenderer = async (clips, file, scene, params) => {
+		const result = await f.render(clips, file, scene, params);
+		if (kind === "source") await fs.writeFile(f.source, "changed-source-bytes");
+		if (kind === "project") f.doc.timeline.clips[0].sourceStartSec = 0.25;
+		if (kind === "render") throw new Error("PRIVATE_NATIVE_ERROR");
+		return kind === "stats" ? { ...result!, frames: 99 } : result;
+	};
+	let failed: unknown;
+	try {
+		await materializeLessonRange({ ...f.options, render });
+	} catch (error) {
+		failed = error;
+	}
+	expect(failed).toBeInstanceOf(RangeMediaError);
+	const error = failed as RangeMediaError;
+	expect(error.artifactPath).toBeTruthy();
+	expect(error.message).not.toContain("PRIVATE");
+	expect(await fs.readdir(error.artifactPath!)).toEqual(["range.mp4"]);
+});
+
+it.skipIf(process.platform === "win32")(
+	"rejects a selected source symlink (POSIX guard)",
+	async () => {
+		const f = await fixture(),
+			real = path.join(root, "real.mp4");
+		await fs.rename(f.source, real);
+		await fs.symlink(real, f.source);
+		await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
+		expect(f.render).not.toHaveBeenCalled();
+		expect(await fs.readFile(real, "utf8")).toBe("fixture-source-bytes");
+	},
+);
+
+it("normalizes missing-source filesystem errors without exposing private paths", async () => {
+	const f = await fixture();
+	await fs.unlink(f.source);
+	await expect(materializeLessonRange(f.options)).rejects.toThrow(/^range-media-unsupported$/);
+	expect(f.render).not.toHaveBeenCalled();
+});

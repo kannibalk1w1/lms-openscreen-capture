@@ -114,3 +114,11 @@ or linguistic acceptance. No Rust/helper/compositor source or binary changed and
 no native/physical test or build was rerun. Actual review18 must assess the exact
 committed SHA. Next concrete item: selected-media materialization/revalidation and
 encoded-output proof, before claiming offline timed-player behavior.
+
+
+Actual review18 accepted8e0316ab with no High/Medium. Slice22 strengthens its
+boundary/test gaps and adds a separate [backend media proof](LESSON_CAPTURE_RANGE_MEDIA.md),
+not GUI/CLI/player delivery. Its native video-stream timing discrepancy remains
+explicitly open; source plans do not certify encoded playback. Prior fixture
+post-mutation state is preserved rather than rewritten. The user requested a
+pause after the current phase/review for a restart; no further phase starts.

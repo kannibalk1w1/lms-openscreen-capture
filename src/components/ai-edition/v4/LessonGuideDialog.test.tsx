@@ -300,7 +300,7 @@ it("refuses a pending illustration after the source document changes", async () 
 		finish();
 	});
 	await screen.findByText(
-		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+		"Save and reload the current video project, then retry the lesson operation. Its render inputs changed or edits are unsaved.",
 	);
 	expect(document.querySelector("img")).toBeNull();
 });
@@ -341,7 +341,7 @@ it("rejects source changes while illustration integrity validation is still pend
 		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
 	);
 	await screen.findByText(
-		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+		"Save and reload the current video project, then retry the lesson operation. Its render inputs changed or edits are unsaved.",
 	);
 	expect(document.querySelector("img")).toBeNull();
 });
@@ -440,6 +440,47 @@ it("ignores a pending range plan when the source document changes", async () => 
 	);
 	expect(screen.queryByText(/Stored reference:/)).toBeNull();
 	await screen.findByText(
-		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+		"Save and reload the current video project, then retry the lesson operation. Its render inputs changed or edits are unsaved.",
 	);
+});
+
+it("refuses a dirty non-render edit before calling the range planner", async () => {
+	const plan = vi.fn();
+	vi.stubGlobal("electronAPI", { lessonPlanRange: plan });
+	useProjectStore.setState({ dirty: true });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getByLabelText("Ruler end (seconds)"), { target: { value: "2" } });
+	fireEvent.click(screen.getByRole("button", { name: "Attach range from saved project" }));
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
+	expect(plan).not.toHaveBeenCalled();
+	expect(screen.queryByText(/Stored reference:/)).toBeNull();
+});
+it("rejects a structurally valid range response that does not echo the requested interval", async () => {
+	const plan = vi.fn<NonNullable<LessonApi["lessonPlanRange"]>>(async (input) => ({
+		success: true,
+		result: {
+			...input,
+			version: 1,
+			provenance: "authored-selection",
+			basis: "editor-ruler-seconds",
+			fingerprintKind: "render-inputs-v1",
+			startSec: 1,
+			endSec: 3,
+			keptSpans: [{ startSec: 1, endSec: 3 }],
+			programme: { basis: "editor-programme-seconds", startSec: 1, endSec: 3 },
+		},
+	}));
+	vi.stubGlobal("electronAPI", { lessonPlanRange: plan });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getByLabelText("Ruler end (seconds)"), { target: { value: "2" } });
+	fireEvent.click(screen.getByRole("button", { name: "Attach range from saved project" }));
+	await waitFor(() => expect(plan).toHaveBeenCalledTimes(1));
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
+	expect(screen.queryByText(/Stored reference:/)).toBeNull();
 });

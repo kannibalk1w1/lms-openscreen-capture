@@ -1,64 +1,89 @@
-# Active implementation handoff — 6 November 2026
+# Current phase and requested restart checkpoint — 6 November 2026
 
-**Run active.** The user explicitly revoked the original07:30/08:00 time limits
-following a subscription interruption. Both scheduled checkpoint automations are
-disabled. [Current authority and superseded schedule](OVERNIGHT_PLAN.md) applies.
-Do not stop or report worker_done solely at the original clock times. Do not
-bypass subscription limits with paid API use or authentication changes.
+**Finish current materialization phase, review/fix it, checkpoint and pause.**
+The user requested a pause to restart the computer after the selected-media
+materialization/revalidation and actual encoded-output proof already in progress.
+Do not start a timed player, API/UI integration or another roadmap phase before
+resumption. Original07:30/08:00 cutoffs remain revoked; both old scheduled
+checkpoints are disabled. [Authority](OVERNIGHT_PLAN.md) remains unchanged.
 
-Existing checkout only; branch lesson-capture/input-boundaries, private feature
-pushes only. Local/private main must stay fd2775e2dbc540306b46085eb0301fa06a6a3aaa.
-One implementation writer; coordinator launches real read-only Claude reviewers,
-one at a time, because nested worker depth forbids this worker's own launches.
-No reset/stash/discard/new checkout/upstream/release/publication/real project edits.
-Original evidence/reports remain intact; disposable fixtures are allowed.
+Existing checkout only; private feature `lesson-capture/input-boundaries` only.
+Local/private main must stay `fd2775e2dbc540306b46085eb0301fa06a6a3aaa`.
+No reset/stash/discard/new checkout/upstream/release/publication/real lesson edits.
+One implementation writer; root launches actual read-only Claude reviewers, one
+at a time, report-only. No paid API/auth/config changes or subscription bypass.
 
-Recent sequence:
-- 56e6fc2c: durable recovery exclusions and disabled-import feedback.
-- 1e2ddea3: explicit read-only Godot/native clock link and portable clock journal.
-- 98413e49: clock pairing/source lifecycle follow-ups, accepted by actual review10.
-- 1bd83d66: separate editable lesson and selected offline illustrated HTML/Markdown.
-- f801837a: canonical render-input fingerprint for recovered projects, derived
-  subset lineage, Markdown/error/title/clock-limit corrections.
-- 553bd9ca: deterministic ephemeral scene-fragment allocation
-  fixes review11 MediumM14-1, accepted by actual review12.
-- Slice16: reading profiles/language/direction and source review/query controls;
-  exact new SHA comes from git/next review request, and its actual review is pending.
+## Delivered bounds and latest review
 
-[Guide coverage](../LESSON_CAPTURE_GUIDES.md) and [review11 follow-up](CLAUDE_OVERNIGHT_FOLLOWUP_11.md)
-carry current details. Actual review11 independently ran203focused/7 and bothTS,
-not a new full suite. Its Medium found a random fragment identity in scenes
-crossing cuts/clips. Actual review12 CLOSED MediumM14-1 at553bd9ca with no new High/Medium. It ran
-191focused/4, one independent scratch probe and bothTS. Slice16 now adds reading
-profiles/language/direction and bounded source review/title queries, with exact
-coverage in the guide doc. Actual review13 found no High/Medium atbef8b6e9. Slice17 fixes filtered edit focus
-and adds explicit manual recovery copies (not autosave), with fixed app-data
-location/quota, preview-confirmed restore and confirmed delete. Its SHA is13f7d723. Actual review14 found no High/Medium; slice18 fixes its
-Low illustration/restore race and baseline late-text overwrite, with focused
-state regression coverage. Actual review15 accepts414823d6 with no High/Medium; slice19 fixes its Low async
-regression gap and records the disabled-fieldset reachability correction. Slice19
-adds shared explicit-file CLI/MCP query/export with no recovery-store API. Exact
-coverage is in ../LESSON_CAPTURE_COMMANDS.md. Actual review16 accepts74d58a5a with no High/Medium. Slice20 addresses its Low
-HTTP authority wording/boundary by gating arbitrary-path lesson queries before
-file access; explicit CLI/stdio/app-channel authority stays. It adds static
-offline guide navigation, heading focus and print flow, with bounded browser/PDF
-proof (not a timed media player). Actual review17 accepts d0949f9f with no High/Medium and closes the HTTP gate
-finding. Slice21 addresses transport-propagation/empty-heading nits and adds
-explicit saved-project range references with cut/speed planning, full-source
-roundtrip and static-guide exclusion. No video is copied/decoded/encoded.
-See ../LESSON_CAPTURE_RANGES.md for exact limits/evidence. Next: actual review18,
-then selected media materialization/revalidation prerequisites or independent
-roadmap items; standalone learner/player and autosave remain later. No extra application adapters are authorized.
+- Native observation/media projection, pause/stop/gap handling and Linux input
+  policy have bounded implementation/tests; physical/platform acceptance is open.
+- Explicit optional read-only Godot/native clock link is present; continuous edit
+  mapping/application attestation are not delivered.
+- Separate editable lesson steps/images, native stills, neutral flag/typing drafts,
+  selected static HTML/Markdown, source lineage, reading profiles, review filters,
+  explicit manual recovery and file CLI/MCP query/export are delivered within
+  [guide](../LESSON_CAPTURE_GUIDES.md)/[command](../LESSON_CAPTURE_COMMANDS.md) limits.
+- Static guide keyboard navigation/print is not timed playback. HTTP arbitrary-path
+  lesson reads require MCP edits before filesystem access; no recovery discovery.
+- Authored saved-project range references and cut/speed plans at8e0316ab are
+  accepted by actual review18 with no High/Medium. Full source/recovery retain
+  references; static guides strip them; queries expose only presence.
 
-Native helper/Rust source unchanged since slice11:134Rust pass/1existing ignored,
-helper SHA f7c5055fb322ebc201a01ef0122d0222b56d354dfee5ce2b9b2bbfe1a37b4d3c.
-Reused compositor SHA a66dbe748a1d8129292e6099cd34ed875bf5ef17eddad5cf082541831e72f446.
-Staged binaries are not source-controlled. Direct Node compositor uses its staged
-ORIGIN libraries; do not override it with the unnamespaced FFmpeg LD_LIBRARY_PATH
-needed for native helper Rust tests.
+Actual review13 acceptsbef8b6e9,14 accepts13f7d723,15 accepts414823d6,16 accepts
+74d58a5a,17 acceptsd0949f9f,18 accepts8e0316ab within each exact reported scope.
+Review14's jsdom reachability overstatement is corrected in review15; state races
+were defence in depth because real disabled fieldsets already block input.
+Review11 MediumM14-1 was closed at553bd9ca by actual review12. Original reports
+and all follow-ups remain preserved; old pending labels are historical.
 
-Physical portal/OS input/native timing/device loss, visible Electron/Godot/a11y,
-Windows/macOS and sustained acceptance remain open. The computer provider lacks
-screenshot/hotkey/focus. Actual Vulkan/headless browser/Godot fixture evidence is
-bounded output/transport proof, never desktop-input acceptance. Preserve artifacts
-outsidecheckout in ../openscreen-evaluation/overnight-2026-11-06/.
+## Current phase — slice22, review19 pending
+
+[Range media backend](../LESSON_CAPTURE_RANGE_MEDIA.md) materializes a limited
+selected interval through injected native export, with ephemeral cuts, source/
+render-input revalidation, bounded regular-file hashes and completion receipt.
+It is **not wired to GUI/CLI/MCP** and is not a timed player/course package.
+Review18 boundary-test gaps are strengthened; stale-project guidance is neutral.
+[Consolidated current matrix/backlog](PRODUCT_MAP.md) now distinguishes delivered
+manual/reference features from automatic generation and full future requirements.
+
+Actual staged-addon proof produces45 H.264 frames,640x360, nominal30fps. Three
+encoded samples match original-project native references at RGB MAE about2.
+Source/project/original evidence remain unchanged. **Open timing discrepancy:**
+native and format duration1.5s, video-stream duration1.466667s/avg675/22. Receipts
+say nativeReportedDurationSec and encodedTimingVerified:false. Do not claim timed-
+playback readiness; resolving/validating this remains before later integration.
+The initial three-second-file/five-second-metadata encode failed and has no receipt.
+Final clean baseline and complete driver/decoder scripts are preserved separately.
+
+A resumed Orca dispatch changed worker identity. Old endpoint incarnation is
+stale; OS inspection found0 old-handle processes and exactly1 resumed worker
+session under the new handle. No duplicate writer was found before further edits.
+Evidence: `slice-22-writer-identity.json`. Interrupted pre-resume build/full logs
+have no completion summaries and are not counted; final reruns own their results.
+
+## Toolchain, artifacts and cleanup
+
+Pinned Node22.22.1/npm10.9.4 first on PATH. `/tmp` tmpfs is full; use a short
+private `/home` cache TMPDIR for tests (long paths exceed Unix socket limits).
+Do not purge shared caches or remove other processes' files. Required root/test
+TS, Vite, lint/i18n/docs/diff and final suite evidence are recorded with the slice.
+
+Native Rust/helper source unchanged since slice11:134pass/1existing ignored is
+historical, not a new run. Helper SHA
+`f7c5055fb322ebc201a01ef0122d0222b56d354dfee5ce2b9b2bbfe1a37b4d3c`.
+Reused compositor SHA
+`a66dbe748a1d8129292e6099cd34ed875bf5ef17eddad5cf082541831e72f446`.
+No native source/binary change in slice22. Direct Node addon uses staged ORIGIN
+libraries; do not set the unnamespaced FFmpeg LD_LIBRARY_PATH needed for Rust tests.
+
+Artifacts: `../openscreen-evaluation/overnight-2026-11-06/`, including
+`lesson-range-native-fixture-verified/`, failed/final earlier fixtures and
+`slice-22-*`. Preserve every source/report/probe/WIP file. After review/fixes,
+checkpoint exact code/review/test/remote SHAs and stop only this worker's temporary
+app/server/render processes. Root confirms all workers settled before saying the
+computer is safe to restart. No next phase starts automatically.
+
+Open acceptance/backlog: physical portal/OS input/timing/device-loss, actual
+Electron/stdio/screen-reader, Windows/macOS, sustained use, full privacy/redaction,
+rolling buffer, retakes/handoff, automatic semantic guides, full media/course
+packaging, timed controls/captions/progress, autosave and remaining product map.

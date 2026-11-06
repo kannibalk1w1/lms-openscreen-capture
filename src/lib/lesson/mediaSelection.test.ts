@@ -40,6 +40,7 @@ it("refuses malformed, unordered and out-of-bounds plans without silently repair
 		{ endSec: 5 },
 		{ programme: { basis: "editor-programme-seconds", startSec: 4, endSec: 3 } },
 		{ keptSpans: [] },
+		{ keptSpans: [{ startSec: 3, endSec: 8 }] },
 		{
 			keptSpans: [
 				{ startSec: 2, endSec: 6 },

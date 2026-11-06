@@ -86,6 +86,12 @@ after a subscription interruption. Both scheduled checkpoints are disabled;
 continue authorized coherent implementation/reviews under the unchanged authority
 constraints. [Current authorization and superseded schedule](lesson-capture/OVERNIGHT_PLAN.md).
 
+**Current pause boundary:** finish/review/checkpoint the in-progress materialization
+and encoded proof, then pause for the user to restart. No further roadmap phase
+begins before resumption. Latest reviewed code8e0316ab has no High/Medium in actual
+review18; slice22 remains unreviewed. Historical High/Medium/pending notes below
+are snapshots of earlier stages, not a current unresolved-finding list.
+
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
 found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
 fixes delivery ownership and strengthens shared production-handler tests.
@@ -95,8 +101,8 @@ with separate validation/review and explicit remaining privacy gaps. Actual revi
 are preserved; ordinary capture remains adapter-free while privacy coverage expands.
 
 1. Actual Claude review 4 confirms the cursor bitmap Medium finding resolved at
-   `a58f56d9`; minor retry/pending-clear and documentation regressions are included
-   in the next slice. Reviews 1–4 retain their exact SHA and test boundaries.
+   `a58f56d9`; minor retry/pending-clear and documentation follow-ups were included
+   in subsequent validated slices. Reviews 1–4 retain their exact SHA and test boundaries.
 2. The [Linux button collection policy](LESSON_CAPTURE_PRIVACY.md) now provides
    default-off/explicit global consent, fail-closed unknown application scope,
    producer/storage gates, live suppression, durable receipts and canary tests.
@@ -105,7 +111,8 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    asynchronous consent and adds real source-bound import/reopen inspection,
    reviewed at `d6fd5302`: all review-5 findings fixed, with a new High countdown
    ownership and Medium optional metadata failure. The [recovery follow-up](LESSON_CAPTURE_PRIVACY_RECOVERY.md)
-   addresses those and packaging/metadata limits, awaiting its own exact-SHA review.
+   addresses those and packaging/metadata limits; actual reviews7/8 and later
+   follow-ups are preserved in the review ledger.
    It is a bounded collection gate, not complete
    text/media redaction, retention exclusions or pre-export privacy inspection.
 3. The [first optional boundary](LESSON_CAPTURE_INTEGRATIONS.md) adapts selected-file
@@ -113,9 +120,9 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    scope/capability routing and disabled/failure/isolation/offline-reopen tests.
    Live application/project attestation and integration CLI/MCP commands remain open.
    Actual review8 reports no High/Medium on slices8/9; bounded Low followups are in slice10.
-   [Slice11](LESSON_CAPTURE_CLOCK_BRIDGE.md) adds explicit read-only Godot/native clock samples and pause state under that policy, with continuous edit mapping still open. Proceed to shared
-   versioned lesson-step/asset manifest and an offline illustrated-guide vertical
-   slice, with export and reopening. Expanded semantic capture waits for privacy.
+   [Slice11](LESSON_CAPTURE_CLOCK_BRIDGE.md) adds explicit read-only Godot/native clock samples and pause state under that policy, with continuous edit mapping still open. The shared
+   lesson manifest and offline illustrated-guide slices described below are now
+   implemented within their bounded manual workflows. Expanded semantic capture waits for privacy.
 4. [Shared lesson guide slices13–18](LESSON_CAPTURE_GUIDES.md) deliver separate
    editable manifests, native illustrations, selected offline outputs, reading
    profiles, source review filters and explicit manual recovery copies.
@@ -126,8 +133,12 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    navigation/print flow; actual review17 accepts d0949f9f with no High/Medium.
    [Slice21](LESSON_CAPTURE_RANGES.md) adds explicit authored range references
    bound to saved render inputs and existing trim/speed mapping, with no media
-   copying/playback. It needs its own review.
-   Next: selected media materialization/revalidation prerequisites over this portable contract,
+   copying/playback. Actual review18 accepts8e0316ab with no High/Medium; its
+   boundary-test gaps are addressed in slice22.
+   Current phase: backend selected-media materialization/revalidation and native
+   encoded-output proof, with native stream-duration discrepancy explicitly open.
+   This is not GUI/API/player delivery. Pause after this phase for the requested
+   restart; do not start another roadmap phase until resumption,
    with physical/native/platform acceptance still open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.
@@ -144,10 +155,12 @@ environment skip. No High/Medium finding; the audio-stop Low is addressed by
 slice 2. Claude [review 2](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_2.md) is now complete
 for `249a09da`: the audio fix and stop/recovery handling check out, with no High/
 Medium defect; one Low warning-code issue plus documentation/test-strength notes
-remain to disposition. Independent checks: 124 Rust passed/one ignored, 80 focused
+were recorded at that historical stage; subsequent follow-ups supersede that
+pending disposition. Independent checks: 124 Rust passed/one ignored, 80 focused
 Vitest/seven files, both TS configurations. Cursor slice `43c2f91d` has implementer
 results of 5,336 full Vitest/398 files, 124 Rust/one ignored and 88 focused Vitest/
-eight files, plus both TS and native/Vite builds; its review is separately pending.
+eight files, plus both TS and native/Vite builds; actual review3 and its
+follow-ups are completed as recorded above (the original pending note is historical).
 See [cursor evidence](LESSON_CAPTURE_CURSOR_TIMING.md) and
 [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_1.md) and dated audit.
 Later worker implementation documents carry newer slice evidence; never extend
