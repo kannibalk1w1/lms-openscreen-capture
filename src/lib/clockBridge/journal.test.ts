@@ -90,3 +90,29 @@ it.each([
 it("bounds input bytes before parsing any unknown payload", () => {
 	expect(() => inspectClockJournal("x".repeat(8 * 1024 * 1024 + 1))).toThrow("8 MiB");
 });
+
+it.each([
+	"observedMonotonicMs",
+	"mediaTimeMs",
+	"intervalStartMonotonicMs",
+	"intervalMediaStartMs",
+])("rejects same-clock %s corruption while keeping independent clocks separate", (field) => {
+	const [header, sample] = rows();
+	const original = { ...sample, nativeClock: { ...sample.nativeClock } };
+	const next = {
+		...sample,
+		sequence: 2,
+		atMs: 40,
+		clientSendMs: 30,
+		clientReceiveMs: 40,
+		requestSequence: 1,
+		nativeClock: { ...sample.nativeClock },
+	};
+	Object.assign(next.nativeClock!, {
+		[field]: field === "intervalStartMonotonicMs" ? 1 : field === "intervalMediaStartMs" ? 1 : 0,
+	});
+	expect(() => inspectClockJournal(text([header, original, next]))).toThrow();
+	Object.assign(next.nativeClock!, { clockId: "97bc493e-0cd7-40f9-a27a-9d836169371d" });
+	if (field !== "observedMonotonicMs")
+		expect(inspectClockJournal(text([header, original, next])).samples).toBe(2);
+});

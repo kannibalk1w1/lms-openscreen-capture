@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { nativeClockSnapshotSchema } from "./schema";
+import { type NativeClockSnapshot, nativeClockSnapshotSchema } from "./schema";
 
 const tick = z.number().int().nonnegative().max(86400000);
 const base = {
@@ -45,6 +45,7 @@ const record = z.discriminatedUnion("event", [
 				"native-unavailable",
 				"source-changed",
 				"source-ended",
+				"revoked",
 			]),
 		})
 		.strict(),
@@ -92,6 +93,7 @@ export function inspectClockJournal(source: string): ClockJournalSummary {
 	let previous = first.atMs,
 		lastRequest = -1;
 	const ids = new Set<string>();
+	const nativePoints = new Map<string, NativeClockSnapshot>();
 	for (let i = 1; i < lines.length; i++) {
 		if (result.closed) throw new Error("Clock journal contains records after closure");
 		const item = record.parse(JSON.parse(lines[i]));
@@ -111,6 +113,38 @@ export function inspectClockJournal(source: string): ClockJournalSummary {
 		}
 		if (item.clientReceiveMs !== item.atMs || item.clientSendMs > item.clientReceiveMs)
 			throw new Error("Invalid clock round trip");
+		const point = item.nativeClock;
+		const prior = nativePoints.get(point.clockId);
+		if (prior) {
+			if (
+				point.observedMonotonicMs < prior.observedMonotonicMs ||
+				(prior.mediaTimeMs !== null &&
+					(point.mediaTimeMs === null || point.mediaTimeMs < prior.mediaTimeMs)) ||
+				(prior.intervalId !== null &&
+					(point.intervalId === null || point.intervalId < prior.intervalId)) ||
+				(prior.state === "stopped" && point.state !== "stopped")
+			)
+				throw new Error("Native clock moved backwards");
+			if (
+				point.intervalId !== null &&
+				point.intervalId === prior.intervalId &&
+				(point.intervalStartMonotonicMs !== prior.intervalStartMonotonicMs ||
+					point.intervalMediaStartMs !== prior.intervalMediaStartMs ||
+					(prior.intervalEndMonotonicMs !== null &&
+						point.intervalEndMonotonicMs !== prior.intervalEndMonotonicMs))
+			)
+				throw new Error("Native interval changed identity");
+			if (
+				point.intervalId !== null &&
+				prior.intervalId !== null &&
+				point.intervalId > prior.intervalId &&
+				((prior.intervalEndMonotonicMs !== null &&
+					point.intervalStartMonotonicMs! < prior.intervalEndMonotonicMs) ||
+					point.intervalMediaStartMs! < prior.mediaTimeMs!)
+			)
+				throw new Error("Native interval moved backwards");
+		}
+		nativePoints.set(point.clockId, point);
 		result.samples++;
 		if (item.nativeClock.state === "paused") result.pausedSamples++;
 		result.maxRoundTripMs = Math.max(

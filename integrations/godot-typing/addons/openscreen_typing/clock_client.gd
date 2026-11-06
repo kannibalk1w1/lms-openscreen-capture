@@ -99,6 +99,7 @@ func _process(_delta: float) -> void:
 		return
 	if _request_sequence > 50000 or Time.get_ticks_msec() - _started_ms > 86400000:
 		_record_gap("limit")
+		stop_journal("limit")
 		disconnect_clock()
 		_set_state("limit")
 		return
@@ -150,6 +151,11 @@ func _completed(result: int, response_code: int, _headers: PackedStringArray, by
 		_invalid_response()
 		return
 	var response: Dictionary = parsed
+	if response_code in [403, 410] and response.get("success") == false and response.get("code") in ["unauthorized", "scope-mismatch", "revoked", "expired"]:
+		_record_gap("revoked")
+		disconnect_clock()
+		_set_state("expired" if response.get("code") == "expired" else "revoked")
+		return
 	if response_code == 429:
 		_record_gap("request-limit")
 		_set_state("stale")

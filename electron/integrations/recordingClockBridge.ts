@@ -257,6 +257,7 @@ export class RecordingClockBridge {
 			request.method !== "POST" ||
 			request.url !== "/clock" ||
 			request.headers.origin ||
+			request.headers.host !== `127.0.0.1:${request.socket.localPort}` ||
 			typeof auth !== "string" ||
 			!/^Bearer [0-9a-f]{64}$/.test(auth) ||
 			!timingSafeEqual(Buffer.from(auth.slice(7)), Buffer.from(grant.token))
@@ -346,7 +347,7 @@ export class RecordingClockBridge {
 					sourceEnded = true;
 				} else grant.sourceClockId = point.clockId;
 			} catch (error) {
-				if (error instanceof NativeClockSourceEndedError) sourceEnded = true;
+				if (error instanceof NativeClockSourceEndedError && grant.sourceClockId) sourceEnded = true;
 				/* Unavailable is an explicit gap; never create a media timestamp. */
 			}
 			if (this.grant !== grant || !peer.emit) {
@@ -373,7 +374,6 @@ export class RecordingClockBridge {
 					if (closed) return;
 					closed = true;
 					if (this.grant !== grant) return;
-					this.operation++;
 					void this.closeGrant(false, true);
 				};
 				if (response.destroyed) close();

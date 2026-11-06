@@ -29,13 +29,19 @@ OS-selected port, rejects browser Origin requests and requires a random bearer
 secret in a private new file. UI/diagnostic/sample records omit that secret. The
 link contains the selected project path for client scope verification; keep it
 private. Links expire after one monotonic hour or explicit Stop/application exit.
+On Linux the monotonic TTL does not advance during suspend. Projects opened
+through a symlink alias can fail the client path comparison; open the canonical
+project path. Before the native session is assigned, production normally reports
+an unavailable gap rather than a waiting sample.
 An expired/revoked file is preserved, but cannot authorize a new listener. A grant
 binds to its first native capture identity and ends when that source ends or
 changes; it cannot silently follow another take. Create a fresh link for a new
 take. Unsupported helpers fail pairing explicitly without blocking capture.
 
 Requests, sockets, peers, native queries, timeouts and journal sizes are bounded.
-Malformed/replayed/wrong-project requests cannot reach the native source. Stop
+Malformed/replayed/mismatched project-ID fields cannot reach the native source. Possession of the
+private bearer link authorizes any same-user process that can read it; the project
+hash and client path check are advisory scope checks, not OS attestation. Stop
 invalidates in-flight pairing/query results before they can expose another take.
 The project selection grants clock access only; the separate Godot file decoder
 checkbox grants no live clock or text monitoring permission. No paid service,
@@ -111,3 +117,31 @@ and remaining physical/platform acceptance stay open.
 
 Primary API references: [Godot HTTPRequest](https://docs.godotengine.org/en/stable/classes/class_httprequest.html)
 and [FileAccess](https://docs.godotengine.org/en/4.5/classes/class_fileaccess.html).
+
+## Review 9 and bounded follow-up (slice 12)
+
+Actual [Claude review 9](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_9.md) found no
+High/Medium findings at `1e2ddea3` and accepted all slice10 dispositions. Its two
+Low lifecycle findings are addressed: an unbound grant treats an older stopping
+source as an unavailable gap, while an already-bound source still ends its grant;
+an old source's deferred close no longer invalidates a new pairing operation.
+Tests hold the new pairing in filesystem validation across that exact overlap.
+Host validation and same-native-clock monotonic/interval corruption checks are
+added without comparing independent clocks. Godot now recognizes bounded
+revocation/expiry responses and preserves a limit footer.
+
+Follow-up validation: **27 focused tests / three files pass**; both TypeScript
+configs, Vite, Biome35 and docs/diff pass. An actual disposable Godot4.7.1 client
+fixture asserts limit footer and revoked response handling (exit0), with no live
+network source. Rust/native helper source and binaries are unchanged. Full suite
+is deferred to the next guide milestone; 5465 remains the prior slice11 count.
+
+The optional journal is opened then chmod600 before its first content write; an
+empty file can briefly inherit the process umask. No token is ever journaled.
+Exclusive creation is coordinated by a lock directory, not an OS-level sandbox;
+same-user filesystem tampering is outside this scope. Stronger platform-private
+file creation remains open. Recovery exclusions remain conservative until a
+manual review path is implemented; no such path exists yet. Future incompatible
+embedded privacy metadata can lose recovery markers (baseline schema debt).
+All physical/platform/visible-UI skips above remain open. Material fixes await
+the next actual exact-SHA review.

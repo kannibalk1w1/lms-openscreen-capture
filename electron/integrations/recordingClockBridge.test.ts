@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ import {
 	type ClockLink,
 	clockLinkSchema,
 	type NativeClockSnapshot,
+	NativeClockSourceEndedError,
 } from "../../src/lib/clockBridge/schema";
 import { RecordingClockBridge } from "./recordingClockBridge";
 
@@ -210,4 +212,75 @@ it("binds a grant to its first native take and never returns a different take's 
 	expect(query.mock.calls[1][0]).toBe(first.clockId);
 	await vi.waitFor(() => expect(f.bridge.snapshot().state).toBe("ended"));
 	expect(f.host.statuses()[0].enabled).toBe(false);
+});
+
+it("keeps an unbound link waiting through a previous native session teardown", async () => {
+	const stable = point();
+	const query = vi
+		.fn<() => Promise<NativeClockSnapshot>>()
+		.mockRejectedValueOnce(new NativeClockSourceEndedError())
+		.mockResolvedValue(stable);
+	const f = await fixture(query);
+	const link = await f.pair();
+	const waiting = await request(link);
+	expect(waiting.status).toBe(503);
+	expect((await waiting.json()).code).toBe("native-unavailable");
+	expect(f.bridge.snapshot().state).toBe("waiting");
+	f.advance(101);
+	expect((await request(link, body(link, 1))).status).toBe(200);
+	expect(f.bridge.snapshot().state).toBe("recording");
+});
+it("old source completion cannot cancel a fresh pair paused in filesystem validation", async () => {
+	const first = point();
+	const query = vi
+		.fn<() => Promise<NativeClockSnapshot>>()
+		.mockResolvedValueOnce(first)
+		.mockRejectedValueOnce(new NativeClockSourceEndedError())
+		.mockResolvedValue(point());
+	const f = await fixture(query);
+	const old = await f.pair();
+	expect((await request(old)).status).toBe(200);
+	f.advance(101);
+	let release: (value: string) => void = () => undefined;
+	const spy = vi.spyOn(fs, "realpath").mockImplementationOnce(
+		() =>
+			new Promise<string>((resolve) => {
+				release = resolve;
+			}),
+	);
+	const file = path.join(f.root, "new-private-link.json");
+	const creating = f.bridge.createPair(f.project, file);
+	try {
+		const ended = await request(old, body(old, 1));
+		expect(ended.status).toBe(410);
+		await ended.text();
+		await vi.waitFor(() => expect(f.bridge.snapshot().state).toBe("ended"));
+		release(f.project);
+		expect((await creating).state).toBe("paired");
+		const fresh = clockLinkSchema.parse(JSON.parse(await fs.readFile(file, "utf8")));
+		expect((await request(fresh)).status).toBe(200);
+		expect(query.mock.calls[2]).toEqual([undefined]);
+	} finally {
+		spy.mockRestore();
+		release(f.project);
+		await creating.catch(() => undefined);
+	}
+});
+it("rejects a non-loopback Host even with the bearer secret", async () => {
+	const f = await fixture();
+	const link = await f.pair();
+	const status = await new Promise<number | undefined>((resolve, reject) => {
+		const outgoing = http.request(
+			link.endpoint,
+			{ method: "POST", headers: { Authorization: `Bearer ${link.token}`, Host: "evil.example" } },
+			(response) => {
+				response.resume();
+				resolve(response.statusCode);
+			},
+		);
+		outgoing.on("error", reject);
+		outgoing.end(JSON.stringify(body(link)));
+	});
+	expect(status).toBe(403);
+	expect(f.query).not.toHaveBeenCalled();
 });
