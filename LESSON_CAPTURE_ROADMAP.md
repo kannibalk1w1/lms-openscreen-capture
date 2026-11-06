@@ -99,12 +99,13 @@ no High/Medium. Its [guard/provenance follow-up](lesson-capture/CLAUDE_POST_REST
 is accepted by actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
 at361fde51, no High/Medium. The
 [settlement/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_23.md)
-addresses L25-1/T25-1 and awaits its own exact-SHA review.
-[Historical authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY_PLAN.md)
-remains the next prerequisite before user-facing materialization or timed delivery.
-The user requested a new pause after this current task; finish review/checkpoint,
-then pause before any next roadmap item. Earlier pause/pending notes below are
-historical snapshots, not new authority to stop or claims of current approval.
+is accepted at fd749b82 by actual [review24](lesson-capture/CLAUDE_POST_RESTART_REVIEW_24.md),
+with no High/Medium or material blocker. The user explicitly resumed with “continue”.
+[Slice26 authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY.md) adds
+explicit bounded Linux content capture/refresh and stored-pin materialization
+enforcement, locally validated with actual exact-SHA review pending. It remains backend-only;
+user-facing materialization and timed delivery are separate remaining work.
+Earlier pause/pending notes below are historical snapshots.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
 found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)

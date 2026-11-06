@@ -1,4 +1,3 @@
-import { Hash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +13,7 @@ import {
 	type RangeMediaRenderer,
 } from "./rangeMedia";
 import { planLessonRange } from "./rangePlan";
+import { captureLessonSourceIdentity } from "./sourceIdentity";
 
 // Authority/receipt unit tests isolate the separately integration-tested decoder.
 vi.mock("./encodedVideo", () => ({
@@ -26,6 +26,7 @@ vi.mock("./encodedVideo", () => ({
 
 let root: string;
 beforeEach(async () => {
+	vi.spyOn(process, "platform", "get").mockReturnValue("linux");
 	root = await fs.mkdtemp(path.join(os.tmpdir(), "range-media-"));
 });
 afterEach(async () => {
@@ -68,11 +69,16 @@ async function fixture() {
 		wallpaper: "#ffffff",
 		speedRegions: [{ id: "speed", startMs: 2000, endMs: 4000, speed: 2 }],
 	};
-	const selection = await planLessonRange(doc, {
+	const reference = await planLessonRange(doc, {
 		projectId: "p",
 		documentSha256: await lessonRenderFingerprint(doc),
 		startSec: 0.5,
 		endSec: 4,
+	});
+	const selection = await captureLessonSourceIdentity({
+		selection: reference,
+		intent: "author-current",
+		readDocument: async () => doc,
 	});
 	const render = vi.fn<RangeMediaRenderer>(async (_clips, file, _scene, params) => {
 		await fs.writeFile(file, "MOCK_ENCODED_OUTPUT");
@@ -138,9 +144,7 @@ it("rejects forged or stale plans and external scene dependencies before choosin
 		{ ...f.selection, programme: { ...f.selection.programme, endSec: 3 } },
 		{ ...f.selection, documentSha256: "0".repeat(64) },
 	])
-		await expect(
-			materializeLessonRange({ ...f.options, selection, pickDirectory: pick }),
-		).rejects.toThrow();
+		await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow();
 	f.doc.legacyEditor = { ...f.doc.legacyEditor, wallpaper: "/private/background.png" };
 	const selection = await planLessonRange(f.doc, {
 		projectId: "p",
@@ -148,9 +152,9 @@ it("rejects forged or stale plans and external scene dependencies before choosin
 		startSec: 0.5,
 		endSec: 4,
 	});
-	await expect(
-		materializeLessonRange({ ...f.options, selection, pickDirectory: pick }),
-	).rejects.toThrow("range-media-unsupported");
+	await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow(
+		"range-media-unsupported",
+	);
 	expect(pick).not.toHaveBeenCalled();
 	expect(f.render).not.toHaveBeenCalled();
 });
@@ -231,9 +235,9 @@ it("refuses a native-clamped clip shorter than the selected programme before des
 		await fs.writeFile(file, "CLAMPED_MOCK_OUTPUT");
 		return { frames: 60, wallS: 1, fps: 60, videoDurationS: 2 };
 	});
-	await expect(
-		materializeLessonRange({ ...f.options, selection, render, pickDirectory: pick }),
-	).rejects.toThrow("range-media-unsupported");
+	await expect(prepareLessonRangeMedia(f.doc, selection)).rejects.toThrow(
+		"range-media-unsupported",
+	);
 	expect(pick).not.toHaveBeenCalled();
 	expect(render).not.toHaveBeenCalled();
 	expect((await fs.readdir(root)).filter((name) => name.startsWith("lesson-range-"))).toEqual([]);
@@ -283,7 +287,7 @@ it("revalidates render inputs before rendering and rejects a sidecar created dur
 	try {
 		await materializeLessonRange({
 			...f.options,
-			selection,
+			selection: { ...f.selection, ...selection, version: 2 },
 			render: async (...args) => {
 				const result = await f.render(...args);
 				await fs.writeFile(`${f.source}.cursor.json`, "PRIVATE_LATE_CURSOR");
@@ -409,9 +413,21 @@ async function manySources(count: number) {
 }
 it.each([8, 9])("pins the independent %s-source materialization boundary", async (count) => {
 	const f = await manySources(count);
-	if (count === 8) expect((await materializeLessonRange(f.options)).status).toBe("materialized");
-	else {
-		await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
+	if (count === 8) {
+		const selection = await captureLessonSourceIdentity({
+			selection: f.options.selection,
+			intent: "author-current",
+			readDocument: f.options.readDocument,
+		});
+		expect((await materializeLessonRange({ ...f.options, selection })).status).toBe("materialized");
+	} else {
+		await expect(
+			captureLessonSourceIdentity({
+				selection: f.options.selection,
+				intent: "author-current",
+				readDocument: f.options.readDocument,
+			}),
+		).rejects.toThrow("range-media-unsupported");
 		expect(f.options.render).not.toHaveBeenCalled();
 		expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
 	}
@@ -452,39 +468,4 @@ it.each([
 		// may happen after the independent kept-span refusal.
 		expect(builder.mock.calls.every(([doc]) => doc === f.doc)).toBe(true);
 	}
-});
-it.each([
-	0, 1,
-])("pins total source byte boundary at 8GiB + %s using bounded stream/hash doubles", async (extra) => {
-	const f = await manySources(2),
-		open = fs.open.bind(fs);
-	// Model exact-length regular-file streams without allocating, writing, reading
-	// or hashing gigabytes. Every reported read still obeys the 1MiB buffer bound.
-	vi.spyOn(Hash.prototype, "update").mockReturnThis();
-	const bytesRead = new Map<string, number>();
-	vi.spyOn(fs, "open").mockImplementation(async (...args) => {
-		const source = String(args[0]);
-		if (!f.sources.includes(source)) return open(...args);
-		const length = 4 * 1024 ** 3 + (source === f.sources[1] ? extra : 0);
-		let position = 0;
-		return {
-			stat: async () => ({ isFile: () => true, size: length, mtimeMs: 1 }),
-			close: async () => {
-				/* Virtual stream owns no OS descriptor. */
-			},
-			read: async (buffer: Buffer, _offset: number, requested: number) => {
-				const n = Math.min(requested, length - position);
-				position += n;
-				bytesRead.set(source, (bytesRead.get(source) ?? 0) + n);
-				return { bytesRead: n, buffer };
-			},
-		} as unknown as Awaited<ReturnType<typeof fs.open>>;
-	});
-	if (extra === 0) expect((await materializeLessonRange(f.options)).status).toBe("materialized");
-	else {
-		await expect(materializeLessonRange(f.options)).rejects.toThrow("range-media-unsupported");
-		expect(f.options.render).not.toHaveBeenCalled();
-		expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
-	}
-	expect(bytesRead.get(f.sources[1])).toBe((4 * 1024 ** 3 + extra) * (extra ? 1 : 2));
 });

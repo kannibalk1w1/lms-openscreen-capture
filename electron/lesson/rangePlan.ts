@@ -7,7 +7,7 @@ import { keptRawSpans } from "../../src/lib/ai-edition/timeline/programme-time";
 import { LessonOperationError } from "../../src/lib/lesson/api";
 import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
 import {
-	lessonMediaSelectionSchema,
+	lessonMediaSelectionV1Schema,
 	lessonRangeRequestSchema,
 } from "../../src/lib/lesson/mediaSelection";
 
@@ -43,7 +43,7 @@ export async function planLessonRange(doc: AxcutDocument, input: unknown) {
 		.filter((span) => span.endSec > span.startSec);
 	if (!spans.length || spans.length > 128) throw new LessonOperationError("range-unavailable");
 	const speed = readSpeedRegions(doc);
-	return lessonMediaSelectionSchema.parse({
+	return lessonMediaSelectionV1Schema.parse({
 		...request,
 		version: 1,
 		provenance: "authored-selection",

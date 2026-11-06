@@ -1,5 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AxcutDocument } from "../../src/lib/ai-edition/schema";
@@ -9,7 +8,10 @@ import {
 	buildLessonSceneDescription,
 	lessonRenderFingerprint,
 } from "../../src/lib/lesson/frameSource";
-import { lessonMediaSelectionSchema } from "../../src/lib/lesson/mediaSelection";
+import {
+	lessonMediaSelectionSchema,
+	mediaSelectionReference,
+} from "../../src/lib/lesson/mediaSelection";
 import type {
 	CompositorClipInput,
 	CompositorExportParams,
@@ -17,16 +19,19 @@ import type {
 } from "../../src/native/contracts";
 import { buildNativeClipList } from "../../src/native/sceneDescription";
 import { validateRangeVideo } from "./encodedVideo";
+import { RangeMediaError } from "./rangeErrors";
 import { planLessonRange } from "./rangePlan";
+import {
+	checkSourceCancellation,
+	hashRegularFile,
+	observeRangeSources,
+	requireMatchingSourceContent,
+	requireSourceCoverage,
+	resolveRangeSources,
+} from "./sourceFiles";
 
-export class RangeMediaError extends Error {
-	constructor(
-		readonly code: "range-media-unsupported" | "range-media-changed" | "range-media-incomplete",
-		readonly artifactPath?: string,
-	) {
-		super(code);
-	}
-}
+export { RangeMediaError } from "./rangeErrors";
+
 export type RangeMediaRenderer = (
 	clips: CompositorClipInput[],
 	outPath: string,
@@ -42,7 +47,7 @@ export async function prepareLessonRangeMedia(document: AxcutDocument, input: un
 			throw new RangeMediaError("range-media-changed");
 		throw error;
 	});
-	if (JSON.stringify(current) !== JSON.stringify(selection))
+	if (JSON.stringify(current) !== JSON.stringify(mediaSelectionReference(selection)))
 		throw new RangeMediaError("range-media-changed");
 	const duration = selection.programme.endSec - selection.programme.startSec;
 	if (duration < 1 / 30 || duration > 120 || selection.keptSpans.length > 32)
@@ -129,76 +134,40 @@ function selectionRequest(selection: ReturnType<typeof lessonMediaSelectionSchem
 		endSec: selection.endSec,
 	};
 }
-const MAX_BYTES = 8 * 1024 * 1024 * 1024;
-async function hashRegularFile(target: string) {
-	if (!(await fs.lstat(target)).isFile()) throw new RangeMediaError("range-media-unsupported");
-	const file = await fs.open(
-		target,
-		constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
-	);
-	try {
-		const before = await file.stat();
-		if (!before.isFile() || before.size <= 0 || before.size > MAX_BYTES)
-			throw new RangeMediaError("range-media-unsupported");
-		const hash = createHash("sha256"),
-			buffer = Buffer.alloc(1024 * 1024);
-		let bytes = 0;
-		for (;;) {
-			const read = await file.read(buffer, 0, buffer.length, null);
-			if (!read.bytesRead) break;
-			bytes += read.bytesRead;
-			if (bytes > MAX_BYTES) throw new RangeMediaError("range-media-unsupported");
-			hash.update(buffer.subarray(0, read.bytesRead));
-		}
-		const after = await file.stat();
-		if (bytes !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
-			throw new RangeMediaError("range-media-changed");
-		return { bytes, sha256: hash.digest("hex") };
-	} finally {
-		await file.close();
-	}
-}
-async function requireNoCursorSidecar(source: string) {
-	try {
-		await fs.lstat(`${source}.cursor.json`);
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-		throw error;
-	}
-	throw new RangeMediaError("range-media-unsupported");
-}
 /** Backend building block only. A caller must supply explicit selection/destination authority. */
 export async function materializeLessonRange(options: {
 	selection: unknown;
 	readDocument: (id: string) => Promise<AxcutDocument>;
 	render: RangeMediaRenderer;
 	pickDirectory: () => Promise<string | null>;
+	signal?: AbortSignal;
 }) {
 	try {
 		const selection = lessonMediaSelectionSchema.parse(options.selection);
+		if (selection.version !== 2) throw new RangeMediaError("range-media-unattested");
+		checkSourceCancellation(options.signal);
+		if (process.platform !== "linux") throw new RangeMediaError("range-media-unsupported");
 		const prepared = await prepareLessonRangeMedia(
 			await options.readDocument(selection.projectId),
 			selection,
 		);
+		const sourcesBeforePick = resolveRangeSources(prepared.derived, prepared.clips);
+		requireSourceCoverage(selection.identity, sourcesBeforePick);
 		const parent = await options.pickDirectory();
+		checkSourceCancellation(options.signal);
 		if (!parent) return { status: "cancelled" as const };
 		if (!path.isAbsolute(parent) || !(await fs.stat(parent)).isDirectory())
 			throw new RangeMediaError("range-media-unsupported");
-		const sources = [...new Set(prepared.clips.map((clip) => clip.screenPath))];
-		if (sources.length > 8) throw new RangeMediaError("range-media-unsupported");
-		const before = [];
-		let totalBytes = 0;
-		for (const source of sources) {
-			await requireNoCursorSidecar(source);
-			const hash = await hashRegularFile(source);
-			totalBytes += hash.bytes;
-			if (totalBytes > MAX_BYTES) throw new RangeMediaError("range-media-unsupported");
-			before.push(hash);
-		}
+		const sources = resolveRangeSources(prepared.derived, prepared.clips);
+		requireSourceCoverage(selection.identity, sources);
+		const before = await observeRangeSources(sources, options.signal);
+		requireMatchingSourceContent(selection.identity.sources, before);
 		await prepareLessonRangeMedia(await options.readDocument(selection.projectId), selection);
+		checkSourceCancellation(options.signal);
 		const directory = path.join(parent, `lesson-range-${randomUUID()}`);
 		await fs.mkdir(directory, { mode: 0o700 });
 		try {
+			checkSourceCancellation(options.signal);
 			const file = path.join(directory, "range.mp4");
 			const stats = await options.render(
 				prepared.clips,
@@ -218,19 +187,17 @@ export async function materializeLessonRange(options: {
 				frames: prepared.expectedFrames,
 			});
 			await prepareLessonRangeMedia(await options.readDocument(selection.projectId), selection);
-			for (let index = 0; index < sources.length; index++) {
-				await requireNoCursorSidecar(sources[index]);
-				if (JSON.stringify(await hashRegularFile(sources[index])) !== JSON.stringify(before[index]))
-					throw new RangeMediaError("range-media-changed");
-			}
-			const output = await hashRegularFile(file);
+			const after = await observeRangeSources(sources, options.signal);
+			requireMatchingSourceContent(before, after);
+			requireMatchingSourceContent(selection.identity.sources, after);
+			const output = await hashRegularFile(file, { signal: options.signal });
 			if (output.bytes !== videoEvidence.bytes || output.sha256 !== videoEvidence.sha256)
 				throw new RangeMediaError("range-media-changed");
 			await fs.chmod(file, 0o600);
 			const receipt = {
 				format: "openscreen-lesson-range-media",
 				version: 1,
-				selection,
+				selection: { ...selection, previousSelections: [] },
 				renderInputsSha256: await lessonRenderFingerprint(prepared.derived),
 				output: {
 					path: "range.mp4",
@@ -253,6 +220,7 @@ export async function materializeLessonRange(options: {
 					timingVerified: false,
 				},
 			};
+			checkSourceCancellation(options.signal);
 			await fs.writeFile(
 				path.join(directory, "range-export.json"),
 				JSON.stringify(receipt, null, 2) + "\n",
@@ -266,8 +234,9 @@ export async function materializeLessonRange(options: {
 			};
 		} catch (error) {
 			throw new RangeMediaError(
-				error instanceof RangeMediaError && error.code === "range-media-changed"
-					? "range-media-changed"
+				error instanceof RangeMediaError &&
+					(error.code === "range-media-changed" || error.code === "range-media-cancelled")
+					? error.code
 					: "range-media-incomplete",
 				directory,
 			);

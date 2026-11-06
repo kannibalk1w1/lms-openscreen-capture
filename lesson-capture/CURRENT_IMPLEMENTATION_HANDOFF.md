@@ -1,3 +1,17 @@
+# Resumed slice26 — authored source content pins
+
+The user explicitly said “continue”, resuming the accepted ec125e08 checkpoint.
+The bounded backend source-identity slice and real native MP4 edit/revert proof
+are locally validated; actual exact-SHA Claude review is pending.
+Worker checks:5,763full/430 and89focused/7 pass,0skip; both TS, production
+Vite build, lint35baseline/docs/i18n/77lesson links pass. Native proof refuses
+changed bytes before output/native invocation; exact revert renders/decodes45frames.
+All111prior evidence files and52original reports remain unchanged. Current work
+and evidence: [AUTHORED_SOURCE_IDENTITY.md](AUTHORED_SOURCE_IDENTITY.md).
+No user-facing materialization or timed-player entry point is introduced.
+Coordinator retains review dispatch/private push ownership; main stays fd2775e2.
+The prior accepted pause below is history, superseded by explicit resumption.
+
 # PAUSED after accepted slice25 — 6 November 2026
 
 The user requested a pause after the current task. Actual

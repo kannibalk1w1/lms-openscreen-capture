@@ -1,3 +1,11 @@
+# Explicit resumption — slice26, 6 November 2026
+
+The user said “continue” after the accepted slice25 pause. Implement the planned
+[bounded authored source identity](AUTHORED_SOURCE_IDENTITY_PLAN.md), preserving
+all existing authority limits and evidence. Validate and commit locally, then
+request actual exact-SHA Claude review and coordinator-owned private feature push.
+The original schedule remains revoked. Earlier pause records below are historical.
+
 # Current user-requested pause — 6 November 2026
 
 The user requested: “after this next task we will need to pause for a while again”.

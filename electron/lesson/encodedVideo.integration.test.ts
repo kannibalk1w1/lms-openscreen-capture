@@ -12,6 +12,7 @@ import { resolveFfmpeg } from "../media/audioPeaks";
 import { inspectDecodedFrames, inspectRangeVideo, validateRangeVideo } from "./encodedVideo";
 import { materializeLessonRange, RangeMediaError } from "./rangeMedia";
 import { planLessonRange } from "./rangePlan";
+import { captureLessonSourceIdentity } from "./sourceIdentity";
 
 const fixture = fileURLToPath(new URL("./__fixtures__/range-video.mp4", import.meta.url));
 const supported = process.platform === "linux" && !!resolveFfmpeg();
@@ -84,11 +85,16 @@ async function options(invalid = false) {
 		},
 	];
 	doc.legacyEditor = { aspectRatio: "2:1", wallpaper: "#ffffff" };
-	const selection = await planLessonRange(doc, {
+	const reference = await planLessonRange(doc, {
 		projectId: "p",
 		documentSha256: await lessonRenderFingerprint(doc),
 		startSec: 0,
 		endSec: 2 / 30,
+	});
+	const selection = await captureLessonSourceIdentity({
+		selection: reference,
+		intent: "author-current",
+		readDocument: async () => doc,
 	});
 	return {
 		selection,

@@ -1,3 +1,13 @@
+# Slice26 source-identity update
+
+[Authored source content pins](lesson-capture/AUTHORED_SOURCE_IDENTITY.md) now add
+explicit Linux backend capture/refresh alongside preserved version1 plans.
+Materialization requires version2 content pins and compares current bytes before
+output creation; valid pinned destination cancellation still precedes media reads.
+Worker validation passes; actual exact-SHA Claude review is pending. The earlier per-operation-only
+accounts below are preserved as history. No GUI/CLI/MCP materialization or player
+entry point is added.
+
 # Selected-range media backend and encoded proof — slice22
 
 This is a bounded backend building block, not a GUI/CLI/MCP export feature or a
