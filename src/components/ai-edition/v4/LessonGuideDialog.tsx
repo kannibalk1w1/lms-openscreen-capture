@@ -17,14 +17,19 @@ import {
 	reviseLesson,
 } from "@/lib/lesson/authoring";
 import { lessonRenderFingerprint } from "@/lib/lesson/frameSource";
+import { lessonOutput } from "@/lib/lesson/output";
+import { emptyLessonQuery, queryLesson, stepFindings } from "@/lib/lesson/review";
 import { type LessonManifest, type LessonStep, validateLesson } from "@/lib/lesson/schema";
 import styles from "./LessonGuideDialog.module.css";
+import { LessonOutputControls } from "./LessonOutputControls";
+import { LessonReviewControls } from "./LessonReviewControls";
 import { LessonTitleInput } from "./LessonTitleInput";
 export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const t = useScopedT("timeline");
 	const document = useProjectStore((s) => s.document),
 		projectId = useProjectStore((s) => s.projectId);
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
+	const [query, setQuery] = useState(emptyLessonQuery);
 	const [selected, setSelected] = useState<string[]>([]),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState<LessonErrorCode | null>(null),
@@ -71,6 +76,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		}
 	};
 	const active = selected.filter((id) => lesson.steps.some((step) => step.id === id));
+	const output = lessonOutput(lesson),
+		matches = queryLesson(lesson, query).map((step) => step.id);
+	const hidden = active.filter((id) => !matches.includes(id)).length;
 	return (
 		<Dialog
 			open={open}
@@ -104,6 +112,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								const step = newStep(t("lesson.newStep"));
 								author(() => reviseLesson(lesson, { steps: [...lesson.steps, step] }));
 								setSelected([...active, step.id]);
+								setQuery(emptyLessonQuery());
 							}}
 						>
 							{t("lesson.add")}
@@ -116,6 +125,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								const steps = draftLessonSteps(document).slice(0, 200 - lesson.steps.length);
 								author(() => reviseLesson(lesson, { steps: [...lesson.steps, ...steps] }));
 								setSelected([...active, ...steps.map((step) => step.id)]);
+								setQuery(emptyLessonQuery());
 							}}
 						>
 							{t("lesson.draft")}
@@ -133,6 +143,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										if (epoch.current !== current) return;
 										setLesson(valid);
 										setSelected(valid.steps.map((step) => step.id));
+										setQuery(emptyLessonQuery());
 										setNotice(t("lesson.opened"));
 									}
 								})
@@ -156,13 +167,32 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							{t("lesson.save")}
 						</button>
 					</div>
+					<LessonOutputControls
+						output={output}
+						onChange={(output) => author(() => reviseLesson(lesson, { output }))}
+						sample={lesson.steps.find((step) => active.includes(step.id))?.title ?? lesson.title}
+					/>
+					<LessonReviewControls
+						lesson={lesson}
+						query={query}
+						onQuery={setQuery}
+						matches={matches}
+						onSelect={setSelected}
+					/>
+					{hidden > 0 && <p role="status">{t("lesson.query.hidden", { count: hidden })}</p>}
+					{matches.length !== lesson.steps.length && <p>{t("lesson.query.reorder")}</p>}
+
 					<p>
 						{t("lesson.inventory", {
 							steps: active.length,
 							total: lesson.steps.length,
-							images: lesson.assets.filter((image) =>
-								lesson.steps.some((step) => active.includes(step.id) && step.imageId === image.id),
-							).length,
+							images: !output.includeImages
+								? 0
+								: lesson.assets.filter((image) =>
+										lesson.steps.some(
+											(step) => active.includes(step.id) && step.imageId === image.id,
+										),
+									).length,
 						})}
 					</p>
 					<p>{t("lesson.privacy")}</p>
@@ -170,9 +200,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						type="button"
 						disabled={
 							!active.length ||
-							lesson.steps.some(
-								(step) => active.includes(step.id) && step.imageId && !step.imageAlt.trim(),
-							) ||
+							hidden > 0 ||
+							(output.includeImages &&
+								lesson.steps.some(
+									(step) => active.includes(step.id) && step.imageId && !step.imageAlt.trim(),
+								)) ||
 							!window.electronAPI?.lessonExport
 						}
 						onClick={() =>
@@ -189,6 +221,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						{t("lesson.export")}
 					</button>
 					{lesson.steps.map((step, index) => {
+						if (!matches.includes(step.id)) return null;
 						const image = lesson.assets.find((image) => image.id === step.imageId);
 						return (
 							<section
@@ -256,6 +289,13 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										}
 									/>
 								</label>
+								{stepFindings(step).length > 0 && (
+									<ul aria-label={t("lesson.query.checks")}>
+										{stepFindings(step).map((kind) => (
+											<li key={kind}>{t(`lesson.findings.${kind}`)}</li>
+										))}
+									</ul>
+								)}
 								{step.evidence.map((evidence, n) => (
 									<p key={`${evidence.kind}-${n}`}>
 										<small>
@@ -266,14 +306,16 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 									<button
 										type="button"
-										disabled={index === 0}
+										disabled={index === 0 || matches.length !== lesson.steps.length}
 										onClick={() => author(() => moveStep(lesson, step.id, -1))}
 									>
 										{t("lesson.up")}
 									</button>
 									<button
 										type="button"
-										disabled={index === lesson.steps.length - 1}
+										disabled={
+											index === lesson.steps.length - 1 || matches.length !== lesson.steps.length
+										}
 										onClick={() => author(() => moveStep(lesson, step.id, 1))}
 									>
 										{t("lesson.down")}

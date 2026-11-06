@@ -175,6 +175,11 @@ export class LessonService {
 			lessonId: output.lesson.id,
 			revision: output.lesson.revision,
 			derivedFrom: output.lesson.derivedFrom,
+			output: output.lesson.output,
+			review: {
+				draftSteps: output.lesson.steps.filter((step) => step.status === "draft").length,
+				emptyInstructions: output.lesson.steps.filter((step) => !step.instructions.trim()).length,
+			},
 			stepIds: output.lesson.steps.map((step) => step.id),
 			files: inventory,
 			complete: true,

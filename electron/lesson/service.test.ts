@@ -314,3 +314,50 @@ it.each([
 	).rejects.toThrow("project-changed");
 	expect(render).toHaveBeenCalledTimes(2);
 });
+it("persists output settings and writes a code/image-free derived package with truthful receipt", async () => {
+	const root = await directory(),
+		f = fixture(),
+		image = await imageFixture(),
+		step = {
+			...newStep("Output"),
+			imageId: image.id,
+			imageAlt: "PRIVATE_PROFILE_ALT",
+			code: { language: "plain", text: "PRIVATE_PROFILE_CODE" },
+		};
+	const source = {
+		...newLesson(),
+		steps: [step],
+		assets: [image],
+		output: {
+			version: 1 as const,
+			preset: "large-print" as const,
+			language: "ar",
+			direction: "rtl" as const,
+			includeImages: false,
+			includeCode: false,
+		},
+	};
+	const file = path.join(root, "original.lesson.json");
+	await f.service.saveEditable(source, async () => file);
+	const original = await f.service.openEditable(async () => file);
+	expect(original.status).toBe("opened");
+	if (original.status !== "opened") return;
+	expect(original.lesson.output).toEqual(source.output);
+	const exported = await f.service.exportGuide(original.lesson, [step.id], async () => root);
+	if (exported.status !== "exported") throw new Error("export");
+	expect(exported.images).toBe(0);
+	expect(await fs.readdir(exported.path)).not.toContain("assets");
+	const receipt = JSON.parse(
+		await fs.readFile(path.join(exported.path, "export-report.json"), "utf8"),
+	);
+	expect(receipt.output).toEqual(source.output);
+	expect(receipt.review.draftSteps).toBe(1);
+	for (const item of receipt.files) {
+		const content = await fs.readFile(path.join(exported.path, item.path), "utf8");
+		expect(content).not.toContain("PRIVATE_PROFILE_CODE");
+		expect(content).not.toContain("PRIVATE_PROFILE_ALT");
+		expect(content).not.toContain(image.base64);
+	}
+	expect((await f.service.openEditable(async () => file)).status).toBe("opened");
+	expect(await fs.readFile(file, "utf8")).toContain("PRIVATE_PROFILE_CODE");
+});

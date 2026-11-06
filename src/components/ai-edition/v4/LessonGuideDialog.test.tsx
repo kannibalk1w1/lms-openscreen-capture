@@ -101,3 +101,53 @@ it("permits clear/retype and commits a valid title on blur", () => {
 	fireEvent.blur(input);
 	expect((input as HTMLInputElement).value).toBe("Retyped");
 });
+it("persists reading settings and filters source steps without exporting hidden selections", async () => {
+	const lessonSave = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async () => ({
+		success: true,
+		result: { status: "saved", path: "/new/profile.json" },
+	}));
+	const lessonExport = vi.fn<NonNullable<LessonApi["lessonExport"]>>(async () => ({
+		success: true,
+		result: { status: "exported", path: "/new/guide", steps: 1, images: 0 },
+	}));
+	vi.stubGlobal("electronAPI", { lessonSave, lessonExport });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	let title = screen.getByLabelText("Step title");
+	fireEvent.change(title, { target: { value: "Alpha" } });
+	fireEvent.blur(title);
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	title = screen.getAllByLabelText("Step title")[1];
+	fireEvent.change(title, { target: { value: "Beta" } });
+	fireEvent.blur(title);
+	fireEvent.change(screen.getByLabelText("Reading preset"), { target: { value: "large-print" } });
+	fireEvent.change(screen.getByLabelText("Content language (does not translate text)"), {
+		target: { value: "ar" },
+	});
+	fireEvent.change(screen.getByLabelText("Reading direction"), { target: { value: "rtl" } });
+	fireEvent.click(screen.getByLabelText("Include optional code"));
+	fireEvent.change(screen.getByLabelText("Find by step title"), { target: { value: "Alpha" } });
+	expect(screen.getAllByLabelText("Step title")).toHaveLength(1);
+	expect(
+		(screen.getByRole("button", { name: "Export selected offline guide" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "Select matching steps" }));
+	expect(
+		(screen.getByRole("button", { name: "Export selected offline guide" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(false);
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() => expect(lessonSave).toHaveBeenCalledTimes(1));
+	expect(lessonSave.mock.calls[0][0].steps).toHaveLength(2);
+	expect(lessonSave.mock.calls[0][0].output).toMatchObject({
+		preset: "large-print",
+		language: "ar",
+		direction: "rtl",
+		includeCode: false,
+	});
+	await screen.findByText("Editable copy saved: /new/profile.json");
+	fireEvent.click(screen.getByRole("button", { name: "Export selected offline guide" }));
+	await waitFor(() => expect(lessonExport).toHaveBeenCalledTimes(1));
+	expect(lessonExport.mock.calls[0][1]).toEqual([lessonExport.mock.calls[0][0].steps[0].id]);
+});

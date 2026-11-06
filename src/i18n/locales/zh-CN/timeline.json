@@ -323,6 +323,50 @@
 			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
 			"render-busy": "A lesson still is already rendering. Wait for it to finish, then retry.",
 			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced."
+		},
+		"output": {
+			"title": "Guide output settings",
+			"preset": "Reading preset",
+			"standard": "Standard",
+			"large-print": "Large print",
+			"high-contrast": "High contrast",
+			"language": "Content language (does not translate text)",
+			"direction": "Reading direction",
+			"auto": "Automatic direction",
+			"ltr": "Left to right",
+			"rtl": "Right to left",
+			"images": "Include illustrations and their descriptions",
+			"code": "Include optional code",
+			"scope": "Presets change presentation only. Inclusion switches remove excluded material from the guide and its editable export; your saved source lesson keeps all content. These settings never enable an integration or collect data.",
+			"preview": "Reading preview",
+			"sample": "An example teaching step"
+		},
+		"query": {
+			"title": "Find and review steps",
+			"summary": "{{matches}} matches of {{total}} steps; {{reviewed}} source steps marked reviewed; {{checks}} checks need attention.",
+			"search": "Find by step title",
+			"status": "Source review label",
+			"source": "Source label kind",
+			"all": "All",
+			"draft": "Draft",
+			"reviewed": "Reviewed",
+			"authored": "Authored",
+			"recording-flag": "Recording flag",
+			"typing-section": "Typing section",
+			"problems": "Only steps with checks to review",
+			"select": "Select matching steps",
+			"clearSelection": "Clear export selection",
+			"reset": "Clear filters",
+			"hidden": "{{count}} selected steps are hidden by these filters. Select matches or clear filters before exporting.",
+			"scope": "Checks describe this source lesson; they are not tutor approval, privacy clearance or proof of achievement. Filtering does not change source steps or original evidence.",
+			"checks": "Source step checks",
+			"reorder": "Clear filters to reorder all source steps."
+		},
+		"findings": {
+			"draft": "Source step is marked draft.",
+			"empty-instructions": "Instructions are empty; review whether the title alone is sufficient.",
+			"missing-alt": "Illustration needs an alternative description if included.",
+			"empty-title": "The visible title is empty."
 		}
 	}
 }

@@ -87,7 +87,7 @@ sees them. SVG/arbitrary data URLs, traversal-shaped IDs, duplicate IDs, missing
 image refs and unsupported versions fail validation. Open reads only a regular,
 non-symlink selected file with an actual byte bound. Unknown JSON is never executable.
 The first UI strings use English fallback across locale files; translated wording
-and output language/profile selection remain open.
+remain open; content-language/direction and three reading presets are added in slice16 below.
 
 ## Exact validation and artifacts
 
@@ -126,14 +126,15 @@ regression test failed, then passed after the raw ruler/clip-specific trim check
 **Skipped/open:** visible Electron/Godot/OS keyboard/focus/a11y, physical portal/input,
 real footage privacy review, physical/native encoder synchronization, Windows/macOS,
 sustained/large guide performance and remaining desktop checklist. The computer
-provider lacks screenshot/hotkey/focus control. PDF, learner player/profiles,
+provider lacks screenshot/hotkey/focus control. PDF, standalone learner player,
 portable video/project dependencies, automatic semantic step recognition, source
-relink/re-extraction, recovery/autosave, lesson undo, CLI/MCP endpoints and review
+relink/re-extraction, recovery/autosave, lesson undo, CLI/MCP endpoints, custom profiles and tutor review
 approval workflow remain separate work. Original reports/evidence remain intact.
 Exact-SHA Claude review is pending until an actual report is delivered.
 
-Next: resolve actual review findings, then a bounded accessible output/profile and
-review/query workflow over this same contract; do not build additional app adapters.
+Historical next item at slice13 was profiles/review/query. Slice16 below delivers
+a bounded subset; safe editable-draft retention and shared agent access follow.
+Do not build additional app adapters.
 
 ## Review10 corrections (slice14)
 
@@ -216,3 +217,72 @@ Native Rust/helpers/compositor binaries unchanged. Exact-SHA rereview is
 pending. The original time cutoffs were revoked by the user; work continues under
 the [updated authorization](lesson-capture/OVERNIGHT_PLAN.md) and
 [current handoff](lesson-capture/CURRENT_IMPLEMENTATION_HANDOFF.md).
+
+## Reading profiles, language and source review (slice16)
+
+A bounded optional `output` block (version1) now travels with an editable lesson.
+Older lessons without it retain Standard/en/automatic direction and include their
+images/code by default. This build preserves the block on save/reopen; older strict
+readers may reject newly added fields rather than silently losing preferences.
+
+Three appearance presets are available: Standard18px/1.6 line height, Large
+print24px/1.8, High contrast20px/1.7 with black text/white background. They change
+only output presentation, never application integration or capture permission.
+Content language uses Intl's canonical language-tag validation; it does not
+translate text or guarantee a matching voice/font is installed. Direction can be
+automatic, LTR or RTL. English-generated source-review labels explicitly retain
+`lang=en`/LTR; user-authored content uses the selected language/direction. Code stays
+LTR. Source image pixels are unchanged, with meaningful alternative text still
+required when included. Visible captions are aria-hidden to avoid repeating the
+image alternative in the accessibility tree.
+
+Separate inclusion switches remove optional code and/or illustrations **from all
+derived output dependencies**, not merely CSS visibility. Excluded image refs,
+alternative descriptions, image bytes/source metadata and assets are absent;
+excluded optional code is absent from HTML, Markdown and the derived manifest.
+The original editable lesson keeps its complete content, and Save editable copy
+still saves every source step/asset. These switches do not redact the same words
+from instructions or other fields. Review included pixels/text before sharing.
+Exports and editable copies retain disclosed evidence/parent correlation metadata.
+The export receipt records actual output settings and selected source draft/empty
+instruction counts, alongside checksummed file inventory and lineage.
+
+The dialog can query source titles (bounded case-insensitive Unicode-normalized
+matching), source review label, source evidence kind, or steps with advisory checks.
+Checks report draft status, visibly empty title/instructions and missing image
+alternatives; they are not tutor approval, achievement or privacy certification.
+Step IDs/order/source evidence remain unchanged by filtering. Select matching steps
+explicitly replaces export selection. Hidden selected steps block export until the
+selection matches visible rows or filters are cleared; filtering cannot quietly
+export hidden selections. Clear filters to reorder the full source lesson.
+
+Markdown now distinguishes derived/source revisions (explicit N12-1 assertion).
+Leading instruction indentation is emitted as character references, preventing it
+from turning into an indented code block. No CommonMark reader is installed:
+generated syntax is tested, rendered Markdown-reader acceptance remains open.
+
+Actual file workflow: an existing native-pattern lesson is opened without project
+reads or native rendering, output settings are saved/reopened, then four derived
+variants are exported and independently reopened. The image/code-excluded variant
+has zero images/assets directory and no code/alt/pixel canary in any derived file;
+the full source copy retains all content. Artifacts are outsidecheckout in
+`lesson-output-profiles-fixture/`, with original/settings copy, four guide folders,
+verified receipts, probe summary and browser evidence.
+
+Actual Chromium `file://`, offline=true: **four variants × two widths (1100/360px)**,
+zero external requests/scripts/horizontal overflow, correct language/direction and
+18/24/20px computed font. Each retained illustration has exactly **one accessible
+alternative name** in the CDP accessibility tree; its visible caption is excluded
+there. Large-print mobile and Arabic RTL/high-contrast screenshots were inspected.
+This is browser semantic/layout proof, not a screen-reader, visible Electron,
+physical-input or cross-platform accessibility certification. Synthetic Arabic
+fixture text exercises direction/glyph rendering, not translation quality.
+
+Full milestone: **5,537 tests / 417 files**,135.91s; focused63/5 overlap. BothTS,
+Vite renderer/main/preload,Biome35existing warnings,i18n1220,docs/diff pass.
+No Rust/native/helper rebuild
+or new physical-capture evidence is claimed; native sources/binaries are unchanged.
+Full UI translations, custom course/profile library, PDF, standalone interactive
+player, lesson autosave/recovery/undo, CLI/MCP parity and tutor review workflow
+remain open. Next: actual review findings, then safe editable-draft retention and
+shared review/query/export access as a bounded next slice.

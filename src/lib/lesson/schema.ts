@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lessonOutputSchema } from "./output";
 
 export const MAX_LESSON_BYTES = 16 * 1024 * 1024;
 const id = z.string().uuid();
@@ -70,6 +71,7 @@ export const lessonManifestSchema = z
 			.strict()
 			.optional(),
 		title,
+		output: lessonOutputSchema.optional(),
 		steps: z.array(lessonStepSchema).max(200),
 		assets: z.array(lessonImageSchema).max(40),
 		extensions: z.record(z.string().regex(/^[a-z][a-z0-9.-]{0,79}$/), z.json()).optional(),
