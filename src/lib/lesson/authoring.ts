@@ -1,5 +1,11 @@
 import type { AxcutDocument } from "../ai-edition/schema";
-import { type LessonManifest, type LessonStep, lessonManifestSchema } from "./schema";
+import {
+	type LessonImage,
+	type LessonManifest,
+	type LessonStep,
+	lessonManifestSchema,
+	MAX_LESSON_BYTES,
+} from "./schema";
 export function newLesson(title = "Untitled lesson"): LessonManifest {
 	return {
 		format: "openscreen-lesson",
@@ -75,4 +81,41 @@ export function draftLessonSteps(document: AxcutDocument): LessonStep[] {
 		}
 	}
 	return steps;
+}
+
+export interface IllustrationRequest {
+	lessonId: string;
+	stepId: string;
+	revision: number;
+	imageId?: string;
+}
+/** Apply a validated response to the current lesson, preserving edits made during rendering. */
+export function attachLessonIllustration(
+	current: LessonManifest,
+	request: IllustrationRequest,
+	image: LessonImage,
+): LessonManifest {
+	const step = current.steps.find((step) => step.id === request.stepId);
+	if (
+		current.id !== request.lessonId ||
+		current.revision < request.revision ||
+		!step ||
+		step.imageId !== request.imageId
+	)
+		return current;
+	if (current.assets.some((asset) => asset.id === image.id))
+		throw new Error("Illustration identity already exists");
+	const steps = current.steps.map((step) =>
+		step.id === request.stepId ? { ...step, imageId: image.id, status: "draft" as const } : step,
+	);
+	const assets = [
+		...current.assets.filter(
+			(asset) => asset.id !== request.imageId || steps.some((step) => step.imageId === asset.id),
+		),
+		image,
+	];
+	const next = reviseLesson(current, { steps, assets });
+	if (new TextEncoder().encode(JSON.stringify(next)).byteLength > MAX_LESSON_BYTES)
+		throw new Error("Lesson exceeds limit");
+	return next;
 }

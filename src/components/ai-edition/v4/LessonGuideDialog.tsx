@@ -10,6 +10,7 @@ import { useScopedT } from "@/contexts/I18nContext";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import { type LessonErrorCode, LessonOperationError } from "@/lib/lesson/api";
 import {
+	attachLessonIllustration,
 	draftLessonSteps,
 	moveStep,
 	newLesson,
@@ -19,7 +20,12 @@ import {
 import { lessonRenderFingerprint } from "@/lib/lesson/frameSource";
 import { lessonOutput } from "@/lib/lesson/output";
 import { emptyLessonQuery, queryLesson, stepFindings } from "@/lib/lesson/review";
-import { type LessonManifest, type LessonStep, validateLesson } from "@/lib/lesson/schema";
+import {
+	type LessonManifest,
+	type LessonStep,
+	validateLesson,
+	validateLessonImage,
+} from "@/lib/lesson/schema";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
 import { LessonReviewControls } from "./LessonReviewControls";
@@ -43,6 +49,13 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		[error, setError] = useState<LessonErrorCode | null>(null),
 		[notice, setNotice] = useState("");
 	const epoch = useRef({ projectId });
+	const generation = useRef(0);
+	const replaceLesson = (value: LessonManifest) => {
+		generation.current++;
+		setLesson(value);
+		setSelected(value.steps.map((step) => step.id));
+		setQuery(emptyLessonQuery());
+	};
 	const busyRef = useRef(false);
 	useEffect(() => {
 		epoch.current = { projectId };
@@ -76,21 +89,23 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 				setEditNotice(t(next === "draft" ? "lesson.query.demoted" : "lesson.query.promoted"));
 		}
 	};
-	const run = async (action: (current: object) => Promise<void>) => {
+	const run = async (action: (current: () => boolean) => Promise<void>) => {
 		if (busyRef.current) return;
 		busyRef.current = true;
-		const current = epoch.current;
+		const projectEpoch = epoch.current,
+			lessonGeneration = generation.current;
+		const current = () => epoch.current === projectEpoch && generation.current === lessonGeneration;
 		setBusy(true);
 		setError(null);
 		setNotice("");
 		try {
 			await action(current);
 		} catch (error) {
-			if (epoch.current === current)
+			if (current())
 				setError(error instanceof LessonOperationError ? error.code : "lesson-operation-failed");
 		} finally {
 			busyRef.current = false;
-			if (epoch.current === current) setBusy(false);
+			if (epoch.current === projectEpoch) setBusy(false);
 		}
 	};
 	const active = selected.filter((id) => lesson.steps.some((step) => step.id === id));
@@ -158,14 +173,12 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							onClick={() =>
 								void run(async (current) => {
 									const result = await window.electronAPI.lessonOpen!();
-									if (epoch.current !== current) return;
+									if (!current()) return;
 									if (!result.success) throw new LessonOperationError(result.code);
 									if (result.result.status === "opened") {
 										const valid = await validateLesson(result.result.lesson);
-										if (epoch.current !== current) return;
-										setLesson(valid);
-										setSelected(valid.steps.map((step) => step.id));
-										setQuery(emptyLessonQuery());
+										if (!current()) return;
+										replaceLesson(valid);
 										setNotice(t("lesson.opened"));
 									}
 								})
@@ -179,7 +192,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							onClick={() =>
 								void run(async (current) => {
 									const result = await window.electronAPI.lessonSave!(lesson);
-									if (epoch.current !== current) return;
+									if (!current()) return;
 									if (!result.success) throw new LessonOperationError(result.code);
 									if (result.result.status === "saved")
 										setNotice(t("lesson.saved", { path: result.result.path }));
@@ -193,9 +206,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						key={lesson.id}
 						lesson={lesson}
 						onRestore={(valid) => {
-							setLesson(valid);
-							setSelected(valid.steps.map((step) => step.id));
-							setQuery(emptyLessonQuery());
+							replaceLesson(valid);
 							setNotice(t("lesson.drafts.restored"));
 						}}
 					/>
@@ -246,9 +257,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						}
 						onClick={() =>
 							void run(async (current) => {
-								if (epoch.current !== current) return;
+								if (!current()) return;
 								const result = await window.electronAPI.lessonExport!(lesson, active);
-								if (epoch.current !== current) return;
+								if (!current()) return;
 								if (!result.success) throw new LessonOperationError(result.code);
 								if (result.result.status === "exported")
 									setNotice(t("lesson.exported", { path: result.result.path }));
@@ -392,33 +403,38 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 												if (!snapshot || !store.projectId || store.dirty)
 													throw new LessonOperationError("project-changed");
 												const documentSha256 = await lessonRenderFingerprint(snapshot);
-												if (epoch.current !== current) return;
+												if (!current()) return;
 												const result = await window.electronAPI.lessonFrame!({
 													projectId: store.projectId,
 													rulerSec: store.currentTimeSec,
 													documentSha256,
 												});
-												if (epoch.current !== current) return;
+												if (!current()) return;
 												if (!result.success) throw new LessonOperationError(result.code);
 												if (useProjectStore.getState().document !== snapshot)
 													throw new LessonOperationError("project-changed");
-												const steps = lesson.steps.map((value) =>
-													value.id === step.id
-														? { ...value, imageId: result.result.id, status: "draft" as const }
-														: value,
-												);
-												const next = await validateLesson(
-													reviseLesson(lesson, {
-														steps,
-														assets: [
-															...lesson.assets.filter((asset) =>
-																steps.some((value) => value.imageId === asset.id),
-															),
-															result.result,
-														],
-													}),
-												);
-												if (epoch.current === current) setLesson(next);
+
+												const image = await validateLessonImage(result.result);
+												if (!current()) return;
+												if (useProjectStore.getState().document !== snapshot)
+													throw new LessonOperationError("project-changed");
+												const request = {
+													lessonId: lesson.id,
+													stepId: step.id,
+													revision: lesson.revision,
+													imageId: step.imageId,
+												};
+												setLesson((latest) => {
+													if (!current()) return latest;
+													try {
+														return attachLessonIllustration(latest, request, image);
+													} catch {
+														queueMicrotask(() => {
+															if (current()) setError("lesson-operation-failed");
+														});
+														return latest;
+													}
+												});
 											})
 										}
 									>

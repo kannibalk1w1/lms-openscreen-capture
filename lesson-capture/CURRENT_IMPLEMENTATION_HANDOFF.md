@@ -33,8 +33,9 @@ crossing cuts/clips. Actual review12 CLOSED MediumM14-1 at553bd9ca with no new H
 profiles/language/direction and bounded source review/title queries, with exact
 coverage in the guide doc. Actual review13 found no High/Medium atbef8b6e9. Slice17 fixes filtered edit focus
 and adds explicit manual recovery copies (not autosave), with fixed app-data
-location/quota, preview-confirmed restore and confirmed delete. Its exact SHA
-comes from git/next review request. Next: actual review, then shared CLI/MCP
+location/quota, preview-confirmed restore and confirmed delete. Its SHA is13f7d723. Actual review14 found no High/Medium; slice18 fixes its
+Low illustration/restore race and baseline late-text overwrite, with focused
+state regression coverage. Next: actual review15, then shared CLI/MCP
 query/export access; standalone learner/player and autosave remain later. No extra application adapters are authorized.
 
 Native helper/Rust source unchanged since slice11:134Rust pass/1existing ignored,

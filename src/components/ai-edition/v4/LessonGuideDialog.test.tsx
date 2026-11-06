@@ -7,6 +7,7 @@ import { createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import type { LessonApi } from "@/lib/lesson/api";
 import { newLesson, newStep } from "@/lib/lesson/authoring";
+import { imageFixture } from "@/lib/lesson/fixtures.test-support";
 import { LessonGuideDialog } from "./LessonGuideDialog";
 
 beforeEach(() => {
@@ -183,4 +184,119 @@ it("keeps a newly reviewed draft row visible until filters change", () => {
 	expect(
 		screen.getByText("The source step is marked reviewed and stays visible until filters change."),
 	).toBeTruthy();
+});
+
+it.each([
+	false,
+	true,
+])("ignores a pending illustration after restoring a lesson (same identity: %s)", async (sameIdentity) => {
+	const image = await imageFixture();
+	let finish: () => void = () => undefined;
+	const restored = {
+		...newLesson("Restored"),
+		steps: [newStep("Restored one"), newStep("Restored two")],
+	};
+	const frame = vi.fn<NonNullable<LessonApi["lessonFrame"]>>(
+		() =>
+			new Promise((resolve) => {
+				finish = () => resolve({ success: true, result: image });
+			}),
+	);
+	const save = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async (lesson) => {
+		if (sameIdentity) {
+			restored.id = lesson.id;
+			restored.steps[0].id = lesson.steps[0].id;
+			restored.revision = lesson.revision + 10;
+		}
+		return { success: true, result: { status: "cancelled" } };
+	});
+	vi.stubGlobal("electronAPI", {
+		lessonFrame: frame,
+		lessonSave: save,
+		lessonDraftList: async () => ({
+			success: true,
+			result: [
+				{
+					id: crypto.randomUUID(),
+					title: "Restored",
+					revision: 0,
+					bytes: 100,
+					savedAt: "2026-11-06T08:00:00Z",
+					readable: true,
+				},
+			],
+		}),
+		lessonDraftRead: async () => ({ success: true, result: restored }),
+	});
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() =>
+		expect(
+			(screen.getByRole("button", { name: "Save new editable copy" }) as HTMLButtonElement)
+				.disabled,
+		).toBe(false),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
+	// Deliberately inject the independent restore callback while rendering is pending.
+	fireEvent.click(screen.getByRole("button", { name: "Show local recovery copies" }));
+	await screen.findByRole("button", { name: "Preview restore" });
+	fireEvent.click(screen.getByRole("button", { name: "Preview restore" }));
+	await screen.findByRole("button", { name: "Restore this copy" });
+	fireEvent.click(screen.getByRole("button", { name: "Restore this copy" }));
+	await waitFor(() => expect(screen.getAllByLabelText("Step title")).toHaveLength(2));
+	await act(async () => finish());
+	expect(
+		screen.getAllByLabelText("Step title").map((input) => (input as HTMLInputElement).value),
+	).toEqual(["Restored one", "Restored two"]);
+	expect(document.querySelector("img")).toBeNull();
+});
+it("preserves text edits delivered while an illustration is pending", async () => {
+	const image = await imageFixture();
+	let finish: () => void = () => undefined;
+	const frame = vi.fn<NonNullable<LessonApi["lessonFrame"]>>(
+		() =>
+			new Promise((resolve) => {
+				finish = () => resolve({ success: true, result: image });
+			}),
+	);
+	vi.stubGlobal("electronAPI", { lessonFrame: frame });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
+	fireEvent.change(screen.getByLabelText("Instructions"), {
+		target: { value: "Later authored text" },
+	});
+	await act(async () => finish());
+	await waitFor(() => expect(document.querySelector("img")).toBeTruthy());
+	expect((screen.getByLabelText("Instructions") as HTMLTextAreaElement).value).toBe(
+		"Later authored text",
+	);
+});
+it("refuses a pending illustration after the source document changes", async () => {
+	const image = await imageFixture();
+	let finish: () => void = () => undefined;
+	const frame = vi.fn<NonNullable<LessonApi["lessonFrame"]>>(
+		() =>
+			new Promise((resolve) => {
+				finish = () => resolve({ success: true, result: image });
+			}),
+	);
+	vi.stubGlobal("electronAPI", { lessonFrame: frame });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
+	await act(async () => {
+		useProjectStore.setState({
+			document: createEmptyDocument({ projectId: "p", title: "Changed" }),
+		});
+		finish();
+	});
+	await screen.findByText(
+		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+	);
+	expect(document.querySelector("img")).toBeNull();
 });

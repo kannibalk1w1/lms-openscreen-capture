@@ -371,3 +371,24 @@ autosave/crash recovery of unsaved edits, lesson undo, full UI translations, rea
 screen readers, physical/visible desktop, Windows/macOS and sustained acceptance
 remain open. Next: actual review findings, then bounded shared query/export access
 using these same validators/services without new application collection.
+
+Slice18 addresses actual review14 LowL17-1 and baselineB17-1. A pending illustration
+cannot replace a restored lesson, including restoration with the same UUID.
+Replacement invalidates the generation of pending UI operations; valid frames
+attach to the latest authored step without replacing later text/title edits.
+Project/document/source guards still apply. Tests deliberately inject callbacks
+while rendering is pending; they establish state handling, not physical input.
+Actual review14 found no High/Medium at13f7d723 and ran80focused/8 independently,
+root/node TypeScript, touched Biome/i18n and two snapshot probes. It did not run
+a new full suite, test TypeScript, Vite/native or desktop acceptance. Review15 is
+required for this follow-up. Recovery store discovery remains outside CLI/MCP.
+
+Slice18 final validation:85 tests/8files pass,0skipped (62/5 narrower overlap);
+both root/test TypeScript, final Vite renderer/main/preload, lint35 existing
+warnings, i18n1243 and docs/diff pass. Full5,553/419 is the previous13f7d723
+milestone, not proof of this follow-up; the narrow renderer/schema fix uses the
+focused suite. No Rust/native source or staged binary changed and no native,
+visible desktop, OS input, accessibility or platform acceptance was rerun.
+Evidence is `slice-18-*` under the preserved overnight evaluation directory.
+Next concrete item: explicit-source-file lesson query and selected guide export
+through shared CLI/MCP validators/services, without recovery store access.

@@ -1,7 +1,14 @@
 import { expect, it } from "vitest";
 import { createEmptyDocument } from "../ai-edition/schema";
 import { TypingCapture } from "../typing/capture";
-import { draftLessonSteps, moveStep, newLesson, newStep, reviseLesson } from "./authoring";
+import {
+	attachLessonIllustration,
+	draftLessonSteps,
+	moveStep,
+	newLesson,
+	newStep,
+	reviseLesson,
+} from "./authoring";
 import { renderLessonGuide } from "./export";
 import { imageFixture } from "./fixtures.test-support";
 import { parseLesson, validateLesson } from "./schema";
@@ -143,4 +150,34 @@ it("drafts the maximum valid 220-character typing section identity without trunc
 	const [draft] = draftLessonSteps(doc);
 	expect(draft.evidence[0].eventId).toBe(take.sections[0].id);
 	expect(() => reviseLesson(newLesson(), { steps: [draft] })).not.toThrow();
+});
+
+it("attaches a delayed illustration without replacing later authored text or unrelated assets", async () => {
+	const previous = await imageFixture(),
+		unused = await imageFixture(),
+		image = await imageFixture();
+	const step = { ...newStep(), imageId: previous.id };
+	const lesson = { ...newLesson(), revision: 2, steps: [step], assets: [previous, unused] };
+	const request = { lessonId: lesson.id, stepId: step.id, revision: 2, imageId: previous.id };
+	const latest = reviseLesson(lesson, {
+		title: "Later title",
+		steps: [{ ...step, instructions: "Later text", status: "reviewed" }],
+	});
+	const result = attachLessonIllustration(latest, request, image);
+	expect(result.title).toBe("Later title");
+	expect(result.revision).toBe(4);
+	expect(result.steps[0]).toMatchObject({
+		instructions: "Later text",
+		status: "draft",
+		imageId: image.id,
+	});
+	expect(result.assets.map((asset) => asset.id)).toEqual([unused.id, image.id]);
+	expect(lesson.steps[0].imageId).toBe(previous.id);
+	for (const stale of [
+		{ ...latest, id: crypto.randomUUID() },
+		{ ...latest, revision: 1 },
+		{ ...latest, steps: [] },
+		{ ...latest, steps: [{ ...step, imageId: unused.id }] },
+	])
+		expect(attachLessonIllustration(stale, request, image)).toBe(stale);
 });

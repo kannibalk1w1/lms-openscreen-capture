@@ -127,22 +127,25 @@ export function decodeImage(image: LessonImage): Uint8Array {
 	const text = atob(image.base64);
 	return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
+export async function validateLessonImage(input: unknown): Promise<LessonImage> {
+	const image = lessonImageSchema.parse(input),
+		bytes = decodeImage(image),
+		size = jpegDimensions(bytes);
+	if (
+		bytes.length > 1024 * 1024 ||
+		size.width !== image.width ||
+		size.height !== image.height ||
+		(await sha256(bytes)) !== image.sha256
+	)
+		throw new Error("Lesson image integrity failure");
+	return image;
+}
 export async function validateLesson(input: unknown): Promise<LessonManifest> {
 	const text = JSON.stringify(input);
 	if (new TextEncoder().encode(text).byteLength > MAX_LESSON_BYTES)
 		throw new Error("Lesson exceeds 16 MiB");
 	const lesson = lessonManifestSchema.parse(input);
-	for (const image of lesson.assets) {
-		const bytes = decodeImage(image),
-			size = jpegDimensions(bytes);
-		if (
-			bytes.length > 1024 * 1024 ||
-			size.width !== image.width ||
-			size.height !== image.height ||
-			(await sha256(bytes)) !== image.sha256
-		)
-			throw new Error("Lesson image integrity failure");
-	}
+	for (const image of lesson.assets) await validateLessonImage(image);
 	return lesson;
 }
 export async function parseLesson(text: string): Promise<LessonManifest> {
