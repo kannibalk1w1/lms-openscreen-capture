@@ -4,8 +4,9 @@ The user explicitly resumed with â€œcontinue from where we left off pre-restartâ
 This slice fixes the Linux compositor's unknown final video sample duration,
 using the existing native encoder/muxer path. It adds no player, GUI/CLI/MCP
 materialization entry point, audio timing validator or capture functionality.
-Actual Claude review of the committed SHA is pending; no push is part of this
-worker's completion. Prior reviews and slice22 evidence remain unchanged.
+Actual [Claude review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md) accepts
+`2c29d268703374f332faa4ea58d2b08e709ef085` with no High/Medium findings for the
+bounded Linux software-encode scope. Prior reviews and slice22 evidence remain unchanged.
 
 ## Cause and narrow change
 
@@ -118,7 +119,13 @@ short-driver call omitted required `hasAudio` and failed before encoding; its
 script/log and the dependent validator failure remain beside the corrected run.
 The Electron app-path stub is confined to the external Node fixture, not the app.
 
-Next: coordinator commissions actual read-only Claude review of the exact local
-commit. B22-2 has bounded implementation/proof, not review approval. L23-1/T22-1,
-historical source-file identity, runtime encoded validation and the remaining
-product map stay open before broader user-facing integration or timed delivery.
+Review21 independently verified all four MP4s with ffprobe and a separate box
+parser, all45decoded frames and video/AAC packet payload identity,4focused Rust
+tests and6killed mutants. It confirmed addon/source identity and retained baseline
+doctest evidence; it did not rerun full suites/builds. B22-2 is closed for Linux
+software encoding. New LowL23-W1 tracks the same uncorrected duration pattern in
+Windows/macOS drains; neither platform nor VAAPI is accepted by these proofs.
+
+Next: runtime encoded-output validation and explicit source identity remain
+prerequisites for broader user-facing materialization or timed delivery. L23-1,
+T22-1, L23-W1 and the remaining product map stay open; timing flags remain false.

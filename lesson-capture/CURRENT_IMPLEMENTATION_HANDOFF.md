@@ -9,11 +9,17 @@ all prior evidence/reports remain; main stays unchanged.
 
 Current slice: [B22-2 native Linux video sample timing](../LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md).
 The narrow packet-duration fallback is implemented with actual encode/demux and
-rational time-base regressions. Final validation and exact-SHA Claude review are
-recorded in that document; the coordinator owns review dispatch and any push.
+rational time-base regressions. Actual [Claude review21](CLAUDE_POST_RESTART_REVIEW_21.md)
+accepts `2c29d268703374f332faa4ea58d2b08e709ef085` with no High/Medium findings,
+within Linux software-encode synthetic/offscreen scope. Independent packet/box,
+pixel/payload,4focused tests and6mutation checks support that verdict. New
+LowL23-W1 tracks the unchanged Windows/macOS duration pattern. Full worker
+validation and its baseline doctest failures are recorded in the timing document.
 The selected-media backend remains experimental with runtime timing flags false.
 No GUI/CLI/MCP integration, player, physical capture, Windows/macOS, VAAPI or audio
 alignment acceptance is added. L23-1/T22-1 and the broader product backlog remain.
+Next concrete work: runtime encoded-output validation and explicit source
+identity before user-facing materialization or timed delivery.
 
 Current disk inspection found `/tmp` largely empty (16GiB available) and about
 555GiB free on `/home`; the old tmp-full note is historical. Use pinned
