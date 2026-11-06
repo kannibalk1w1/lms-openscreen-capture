@@ -172,6 +172,9 @@ it.each([
 	}
 	expect(failed).toBeInstanceOf(RangeMediaError);
 	const error = failed as RangeMediaError;
+	expect(error.code).toBe(
+		kind === "source" || kind === "project" ? "range-media-changed" : "range-media-incomplete",
+	);
 	expect(error.artifactPath).toBeTruthy();
 	expect(error.message).not.toContain("PRIVATE");
 	expect(await fs.readdir(error.artifactPath!)).toEqual(["range.mp4"]);
@@ -196,3 +199,105 @@ it("normalizes missing-source filesystem errors without exposing private paths",
 	await expect(materializeLessonRange(f.options)).rejects.toThrow(/^range-media-unsupported$/);
 	expect(f.render).not.toHaveBeenCalled();
 });
+
+it("refuses a native-clamped clip shorter than the selected programme before destination selection", async () => {
+	const f = await fixture();
+	f.doc.assets[0].durationSec = 3;
+	f.doc.timeline.trimRanges = [];
+	f.doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 1,
+		endSec: 5,
+	});
+	expect(selection.programme).toMatchObject({ startSec: 1, endSec: 5 });
+	const pick = vi.fn(async () => root);
+	const render = vi.fn<RangeMediaRenderer>(async (_clips, file) => {
+		await fs.writeFile(file, "CLAMPED_MOCK_OUTPUT");
+		return { frames: 60, wallS: 1, fps: 60, videoDurationS: 2 };
+	});
+	await expect(
+		materializeLessonRange({ ...f.options, selection, render, pickDirectory: pick }),
+	).rejects.toThrow("range-media-unsupported");
+	expect(pick).not.toHaveBeenCalled();
+	expect(render).not.toHaveBeenCalled();
+	expect((await fs.readdir(root)).filter((name) => name.startsWith("lesson-range-"))).toEqual([]);
+});
+it.each([
+	NaN,
+	Infinity,
+	1.6,
+])("refuses native-reported duration %s without writing a completion receipt", async (duration) => {
+	const f = await fixture();
+	let failed: unknown;
+	try {
+		await materializeLessonRange({
+			...f.options,
+			render: async (...args) => ({ ...(await f.render(...args))!, videoDurationS: duration }),
+		});
+	} catch (error) {
+		failed = error;
+	}
+	expect(failed).toBeInstanceOf(RangeMediaError);
+	expect((failed as RangeMediaError).code).toBe("range-media-incomplete");
+	expect(await fs.readdir((failed as RangeMediaError).artifactPath!)).toEqual(["range.mp4"]);
+});
+it("revalidates render inputs before rendering and rejects a sidecar created during encoding", async () => {
+	const f = await fixture();
+	let reads = 0;
+	await expect(
+		materializeLessonRange({
+			...f.options,
+			readDocument: async () => {
+				reads++;
+				if (reads === 2) f.doc.timeline.clips[0].sourceStartSec = 0.25;
+				return f.doc;
+			},
+		}),
+	).rejects.toThrow("range-media-changed");
+	expect(f.render).not.toHaveBeenCalled();
+	// Restore only this disposable in-memory fixture, then re-plan its legitimate reference.
+	f.doc.timeline.clips[0].sourceStartSec = 0;
+	const selection = await planLessonRange(f.doc, {
+		projectId: "p",
+		documentSha256: await lessonRenderFingerprint(f.doc),
+		startSec: 0.5,
+		endSec: 4,
+	});
+	let failed: unknown;
+	try {
+		await materializeLessonRange({
+			...f.options,
+			selection,
+			render: async (...args) => {
+				const result = await f.render(...args);
+				await fs.writeFile(`${f.source}.cursor.json`, "PRIVATE_LATE_CURSOR");
+				return result;
+			},
+		});
+	} catch (error) {
+		failed = error;
+	}
+	expect((failed as RangeMediaError).code).toBe("range-media-incomplete");
+	expect(await fs.readdir((failed as RangeMediaError).artifactPath!)).toEqual(["range.mp4"]);
+});
+it.skipIf(process.platform === "win32")(
+	"keeps output directory, video and receipt private on POSIX",
+	async () => {
+		const f = await fixture(),
+			result = await materializeLessonRange(f.options);
+		if (result.status !== "materialized") throw new Error("Expected output");
+		expect((await fs.stat(result.path)).mode & 0o777).toBe(0o700);
+		for (const name of ["range.mp4", "range-export.json"])
+			expect((await fs.stat(path.join(result.path, name))).mode & 0o777).toBe(0o600);
+		const receipt = JSON.parse(
+			await fs.readFile(path.join(result.path, "range-export.json"), "utf8"),
+		);
+		expect(receipt.audio).toEqual({
+			policy: "native-source-or-synthesized-silence",
+			streamMetadataVerified: false,
+			timingVerified: false,
+		});
+	},
+);

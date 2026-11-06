@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (through accepted slice21; slice22 backend under review). **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (through accepted slice21; slice22 bounded review19 fix awaiting review20). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -49,7 +49,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | Idle-cut suggestions | Planned | Existing trims/speed edits and transcript/cursor signals | M, phase 4 |
 | Portable course visual presets | Partial | Existing style-preset service and arrow styles | M, phase 1 |
 | Recording preflight | Partial | Platform/helper checks and live journal health | M, phase 0 |
-| Export manifest integrity | Partial | Validated lesson assets, selected projection and verified output receipts; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
+| Export manifest integrity | Partial | Validated static lesson assets/projection and hash receipts; range backend uses native-stat/hash receipts, not encoded timing proof; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
 | Rolling buffer/save recent | Planned | Full recording, clips and source ranges | L/XL, preserved phase 0 reliability work |
 | Retakes/checkpoints/handoff | Partial | Existing editor checkpoints/CLI/MCP; no complete lesson retake workflow | L, phases 1–2/acceptance |
 

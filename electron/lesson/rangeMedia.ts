@@ -106,6 +106,16 @@ export async function prepareLessonRangeMedia(document: AxcutDocument, input: un
 		bitrate: 4_000_000,
 	};
 	const expectedFrames = outputFrameCount(clips, scene.speedRegions, params.fps);
+	// The clip reader can clamp to probed asset duration. That must never shorten
+	// the authored programme interval while certifying the clamped frame count.
+	// Apply the shared frame-grid rule to programme duration independently of
+	// native source clips, so their duration clamp cannot certify a shorter range.
+	const programmeFrames = outputFrameCount(
+		[{ sourceStartSec: 0, sourceEndSec: duration }],
+		undefined,
+		params.fps,
+	);
+	if (expectedFrames !== programmeFrames) throw new RangeMediaError("range-media-unsupported");
 	if (!Number.isInteger(expectedFrames) || expectedFrames < 1 || expectedFrames > 3600)
 		throw new RangeMediaError("range-media-unsupported");
 	return { selection, derived, clips, scene, params, expectedFrames };
@@ -229,6 +239,11 @@ export async function materializeLessonRange(options: {
 				validation: "native-reported-stats-and-file-hashes",
 				mediaDecodedByValidator: false,
 				encodedTimingVerified: false,
+				audio: {
+					policy: "native-source-or-synthesized-silence",
+					streamMetadataVerified: false,
+					timingVerified: false,
+				},
 			};
 			await fs.writeFile(
 				path.join(directory, "range-export.json"),

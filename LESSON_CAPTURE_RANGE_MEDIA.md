@@ -22,11 +22,14 @@ never renders a full-project temporary video for later cutting.
 
 The first supported subset is deliberately narrow:1/30–120 programme seconds,
 at most32 selected fragments and8 selected screen files, at most8GiB combined
-source bytes. Output is H.264 at30fps, source/project aspect scaled down to at
-most1280px on the long side, rounded to even dimensions. Webcam tracks, imported
+source bytes. Video output is H.264 at30fps, source/project aspect scaled down to at
+most1280px on the long side, rounded to even dimensions. Visible webcam tracks, imported
 audio, click sounds, external background/annotation images and webcam effects are
 refused rather than silently omitted. Embedded screen-file audio uses the existing
-native path but has no new audio-timing acceptance. Native zoom/cursor focus can
+native path but has no new audio-timing acceptance. Native output may include
+an AAC track, synthesized as silence when the source has no decodable audio.
+The receipt labels the audio policy and explicitly leaves stream metadata and
+audio timing unverified; an AAC track is not proof of recorded source audio. Native zoom/cursor focus can
 read `.cursor.json` even when hidden, so any adjacent cursor sidecar is refused
 before rendering and checked again afterwards; no cursor payload is collected.
 
@@ -42,7 +45,10 @@ Selected regular media files are read with leaf no-follow/nonblocking guards and
 hashed in bounded chunks. The project is revalidated before and after native
 encoding; source hashes and cursor-sidecar absence must remain the same. Native
 frame count and native-reported duration must match the shared expected frame
-count. The written MP4 is hashed, then `range-export.json` is written last with
+count. An independent programme-duration frame-grid count must also agree with
+the clip-list count, so a clip clamped to a shorter known asset duration cannot
+certify only part of the selected programme. Refusal happens before destination
+selection or rendering. The written MP4 is hashed, then `range-export.json` is written last with
 source/output hashes, path-free source ordinals and labelled provenance. It never
 copies original media or capture sidecars into the output directory.
 
@@ -59,7 +65,7 @@ remote method is inferred from this backend helper.
 The final retained driver uses a fresh, actually probed five-second H.264 source:
 640x360,30fps,150 decoded frames. Real DocumentService saves/reopens an unchanged
 baseline with sourceStart0, cut1–2 and2x speed2–4. Requested ruler0.5–4 yields
-kept0.5–1 and2–4. The unchanged staged addon renders those selected windows only,
+kept0.5–1 and2–4, corresponding to original programme0.5–2 (1.5seconds). The unchanged staged addon renders those selected windows only,
 using Vulkan on the RTX4070 and software libopenh264 after VAAPI is unavailable.
 It produces45 H.264 frames at nominal30fps. Source/project/original evidence bytes
 are unchanged; the selected output's hash matches its receipt.
@@ -70,9 +76,18 @@ errors approximately1.97,1.96,2.03 (threshold8). Three representative image chec
 are not universal frame-accuracy proof. No physical capture or audio alignment
 is tested.
 
-**Timing discrepancy remains open:** native stats report1.5seconds and the MP4
-format duration is1.5, but the video stream reports1.466667seconds, with average
-rate675/22 despite nominal30/1. The backend does not decode output at runtime;
+**Baseline native timing defect remains open:** native stats report1.5seconds,
+but the video stream reports1.466667seconds, with average675/22 despite nominal
+30/1. Review19 pinned the stored MP4 timing:44samples have duration512ticks at
+timescale15360, and the last sample has duration0. The edit list covers1467ms.
+Earlier native exports also show the same N−1-frame duration pattern, so this is
+not introduced by the backend.
+
+The retained output also contains an AAC LC48kHz track,72 audio frames/1.5seconds,
+at approximately−91dB (silence), while its source has video only. That audio track
+sets the MP4 format duration1.5seconds; it is not independent corroboration of
+video duration. Native clip inputs optimistically declare audio, so this is the
+existing synthesized-silence path. Review19 confirmed both streams read-only. The backend does not decode output at runtime;
 the return duration is explicitly `nativeReportedDurationSec`; the receipt also
 says `mediaDecodedByValidator:false` and `encodedTimingVerified:false`. A completion
 receipt proves this limited native-stat/hash contract, not timed-playback readiness.
@@ -105,7 +120,7 @@ Stale-project guidance is neutral for both stills and range references. These
 strengthen existing correct guards; review18 found no High/Medium defect.
 
 Unit tests cover ephemeral projection, source preservation, source/output hashes,
-forged/stale plans, unsupported dependencies, cursor sidecars, source links,
+forged/stale plans, background-image refusal, cursor sidecars, source links,
 cancellation, native/stat/source/project failures, incomplete receipts and fixed
 errors. Tests with mock bytes do not establish real codec validity; the separate
 native/decoder fixture above supplies bounded actual encoded proof.
@@ -115,7 +130,7 @@ skip in424files,114focused/8 and102broader/10 in different overlapping sets,
 root/test TS, Biome35warnings and i18n1253. Its report did not identify the exact
 individual skipped test name; do not label both candidate integration suites
 skipped or extend that count to this slice. Worker slice21 was5592/424,0skip.
-Actual review19 must inspect the new exact SHA. No new native/Rust source or binary,
+Actual review19 examined f7b8ed4c; the bounded fix requires actual review20. No new native/Rust source or binary,
 physical OS/portal/keyboard/camera, Windows/macOS, actual Electron/stdio process,
 screen-reader, full course package or timed-player acceptance is claimed.
 
@@ -131,6 +146,33 @@ prove equality at the checks surrounding this materialization, not that a source
 has remained unchanged since the reference was authored. Before any later user-
 facing materialization workflow, source identity/availability and encoded timing
 need explicit treatment; do not describe this as a complete source attestation.
-The current phase's bounded backend/native proof is pending actual review19.
+Actual review19 requires the bounded M22-1 fix; actual review20 must assess it.
 After its material findings are addressed, write the exact restart checkpoint and
 pause as requested. No further roadmap phase starts before user resumption.
+
+
+Actual review19 found MediumM22-1: native clip readers can clamp a clip to known
+asset duration before expected-frame counting. The new independent programme-grid
+comparison refuses that shorter window before folder choice/rendering. Its new
+regression passes the fix and fails f7b8ed4c in an outside-checkout snapshot.
+C22-1 AAC attribution/receipt policy is corrected above; baselineB22-2 last-video-
+sample duration0 is pinned and intentionally deferred until after restart.
+Timing flags remain false. Review19 considers that baseline timing limit
+nonblocking for this bounded experimental backend, but blocking for timed players,
+exact encoded duration and concatenation claims. No such next phase starts now.
+
+LowT22-1 coverage is strengthened for native NaN/infinite/wrong duration, pre-render
+project change, post-render cursor appearance, error-code mapping and POSIX modes.
+Per-dependency and all byte/source/fragment limit-edge mutation coverage is still
+incomplete; do not claim all17 guard mutations are now pinned. Code-reading and
+reviewer probes remain distinct from regression tests. Actual focused review20
+must assess the fix before the final restart checkpoint.
+
+
+Bounded review19-fix validation:56focused tests/4files pass, with16/1 narrower
+overlap. The selected clamp regression passes fixed and fails f7b8ed4c; its other
+15 cases are intentionally deselected in that mutation/baseline run. Root/test TS,
+renderer/main/preload Vite build, whole lint35 existing warnings and docs/diff
+pass. The full5609/425 zero-skip milestone belongs to f7b8ed4c before M22-1 was
+fixed; it was not repeated for this narrow guard/receipt change. Native encoding,
+Rust/binaries, physical input, UI/stdio and platform acceptance were not rerun.

@@ -36,7 +36,7 @@ were defence in depth because real disabled fieldsets already block input.
 Review11 MediumM14-1 was closed at553bd9ca by actual review12. Original reports
 and all follow-ups remain preserved; old pending labels are historical.
 
-## Current phase — slice22, review19 pending
+## Current phase — slice22, bounded review19 fix awaiting review20
 
 [Range media backend](../LESSON_CAPTURE_RANGE_MEDIA.md) materializes a limited
 selected interval through injected native export, with ephemeral cuts, source/
@@ -46,10 +46,17 @@ Review18 boundary-test gaps are strengthened; stale-project guidance is neutral.
 [Consolidated current matrix/backlog](PRODUCT_MAP.md) now distinguishes delivered
 manual/reference features from automatic generation and full future requirements.
 
+Actual review19 found MediumM22-1 (known asset duration can clamp native clips
+before frame-count checking). An independent selected-programme frame-grid check
+and regression address it; focused review20 is required. Review19 original report
+is preserved. Native/AAC timing honesty is corrected; no native code is changed.
+
 Actual staged-addon proof produces45 H.264 frames,640x360, nominal30fps. Three
 encoded samples match original-project native references at RGB MAE about2.
 Source/project/original evidence remain unchanged. **Open timing discrepancy:**
-native and format duration1.5s, video-stream duration1.466667s/avg675/22. Receipts
+native duration1.5s, video-stream duration1.466667s/avg675/22 from a zero-duration
+last sample. The synthesized silent AAC track sets format duration1.5s, which is
+not evidence of the video duration. Earlier native exports show the same defect. Receipts
 say nativeReportedDurationSec and encodedTimingVerified:false. Do not claim timed-
 playback readiness; resolving/validating this remains before later integration.
 The initial three-second-file/five-second-metadata encode failed and has no receipt.
