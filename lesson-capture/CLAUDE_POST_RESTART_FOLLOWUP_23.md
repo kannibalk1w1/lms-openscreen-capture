@@ -1,5 +1,13 @@
 # Review23 settlement and provenance follow-up — slice25
 
+Coordinator disposition: actual [review24](CLAUDE_POST_RESTART_REVIEW_24.md)
+acceptsfd749b82 with no High/Medium/material completion blocker and closes
+L25-1/T25-1. Its independent132focused/4,8real probes and13of14assertion mutation
+kills support the scoped verdict. New nitN26-1 remains an unpinned fast-failure
+case, still fail-closed. The worker account below is preserved as implementation
+evidence. After checkpoint/push, pause until user resumption; source identity is
+still plan-only and no new roadmap task begins.
+
 Actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md) accepts361fde51 with no
 High/Medium and closes review22 findings within the bounded Linux scope. Its
 original report is unchanged. The historical control tally is50assertion kills,

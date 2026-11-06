@@ -1,4 +1,29 @@
-# Slice25 task boundary — review/checkpoint then requested pause
+# PAUSED after accepted slice25 — 6 November 2026
+
+The user requested a pause after the current task. Actual
+[review24](CLAUDE_POST_RESTART_REVIEW_24.md) accepts exact
+`fd749b82dba3b72662ec64c1ab4235e02e6e5820` with no High/Medium or material
+completion blocker; L25-1 and T25-1 are CLOSED. Coordinator saves this report
+and pushes the feature checkpoint, then stops. Do not start implementation,
+review workers or another roadmap item until the user explicitly resumes.
+
+Independent review:132focused tests/4files pass,0skip;8real-process probes;
+14own mutants yield13assertion kills and1survivor, with no timeout/transform
+kills. Worker evidence remains159focused/6 and5731full/428,0skip, both TS,
+lint35existing warnings and docs/i18n/links;12final mutation controls are
+assertion kills. All111prior evidence files and original reports are unchanged.
+Worker/reviewer report no remaining owned fixture roots/processes; no user app
+was killed. Same-user wrapper descendants are not sandboxed by production code.
+
+On resumption: implement [authored source identity](AUTHORED_SOURCE_IDENTITY_PLAN.md)
+and its real source edit/revert proof before user-facing materialization/timed
+delivery. That work is PLAN ONLY, not delivered. New nitN26-1 is an unpinned
+stderr-at-successful-exit fast-failure case; it remains fail-closed at deadline.
+N24-2, L23-1/L23-W1, audio/physical/platform/hardware/player acceptance remain open.
+Existing feature-only authority persists; main staysfd2775e2. The old schedule
+remains revoked; this new user-requested pause takes precedence.
+
+## Historical slice25 task boundary
 
 User steering via coordinator msg_8ef0dda7d830 requests a pause after this current
 coherent task. Finish only the settlement/provenance slice, validation and local

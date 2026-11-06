@@ -9,7 +9,10 @@ Actual [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts
 guards and decoder provenance. Actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
 accepts361fde51 with no High/Medium and closes the review22 findings within scope.
 [Slice25 settlement/provenance fixes](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_23.md)
-address review23 Lows L25-1/T25-1 and await their own exact-SHA review.
+address review23 Lows L25-1/T25-1. Actual
+[review24](lesson-capture/CLAUDE_POST_RESTART_REVIEW_24.md) acceptsfd749b82 with
+no High/Medium/material blocker and closes both findings. The user-requested
+pause follows the coordinator checkpoint; authored source identity remains plan-only.
 Existing source and destination authority, explicit folder cancellation, native-stat checks and
 incomplete-artifact retention remain. No player or GUI/CLI/MCP entry point exists.
 

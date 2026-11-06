@@ -1,4 +1,14 @@
-# Post-restart resumption — 6 November 2026
+# Current user-requested pause — 6 November 2026
+
+The user requested: “after this next task we will need to pause for a while again”.
+The bounded settlement/provenance task is complete atfd749b82, accepted by actual
+Claude review24 with no High/Medium/material blocker. Save/push its reviewed
+checkpoint, then PAUSE. No further roadmap implementation or review dispatch
+until explicit user resumption. See CURRENT_IMPLEMENTATION_HANDOFF.md for exact
+coverage, remaining work and source-identity plan. Earlier resumption/authorization
+and original revoked time cutoffs below are history subject to this pause.
+
+# Historical post-restart resumption — 6 November 2026
 
 The user explicitly said “continue from where we left off pre-restart”. This
 resumes the restart pause. The original time cutoffs remain revoked. The current
