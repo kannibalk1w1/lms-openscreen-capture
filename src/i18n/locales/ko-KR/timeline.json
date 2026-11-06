@@ -300,7 +300,7 @@
 		"opened": "Editable lesson opened.",
 		"saved": "Editable copy saved: {{path}}",
 		"inventory": "Export selection: {{steps}} of {{total}} steps, {{images}} illustrations.",
-		"privacy": "Review selected instructions, code and image pixels before sharing, and describe every illustration before export. Export includes only selected steps and referenced images; no automatic redaction. Saving an editable copy retains every step and image.",
+		"privacy": "Review selected instructions, code and image pixels before sharing, and describe every illustration before export. Export includes only selected steps and referenced images; no automatic redaction. Saving an editable copy retains every step and image. Editable output also retains selected evidence IDs, source project/render fingerprints and parent lesson lineage for traceability.",
 		"export": "Export selected offline guide",
 		"exported": "Guide folder verified: {{path}}",
 		"include": "Include step {{number}}",
@@ -316,6 +316,13 @@
 		"frameSource": "Composed frame at {{time}}s on the original editor ruler; source revision recorded.",
 		"busy": "Working…",
 		"error": "The lesson operation could not finish. Save the video project before capturing a still, choose a visible frame and a new destination, then retry. Existing files are preserved.",
-		"code": "Optional code (plain text, included in selected exports)"
+		"code": "Optional code (plain text, included in selected exports)",
+		"errors": {
+			"lesson-operation-failed": "The lesson operation could not finish. Check the selected lesson or destination and retry. Existing files are preserved.",
+			"project-changed": "Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
+			"render-busy": "A lesson still is already rendering. Wait for it to finish, then retry.",
+			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced."
+		}
 	}
 }

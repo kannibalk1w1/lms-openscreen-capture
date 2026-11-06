@@ -1,7 +1,18 @@
 import type { LessonImage, LessonManifest } from "./schema";
+export type LessonErrorCode =
+	| "lesson-operation-failed"
+	| "project-changed"
+	| "frame-unavailable"
+	| "render-busy"
+	| "destination-exists";
+export class LessonOperationError extends Error {
+	constructor(readonly code: LessonErrorCode) {
+		super(code);
+	}
+}
 export type LessonResult<T> =
 	| { success: true; result: T }
-	| { success: false; code: "lesson-operation-failed" };
+	| { success: false; code: LessonErrorCode };
 export interface LessonApi {
 	lessonFrame?: (input: {
 		projectId: string;

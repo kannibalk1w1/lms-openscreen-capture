@@ -1,12 +1,19 @@
 import path from "node:path";
 import { app, dialog, ipcMain } from "electron";
+import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
 import { LessonService } from "../lesson/service";
 export function registerLessonHandlers(service: LessonService) {
 	const bounded = async <T>(run: () => Promise<T>) => {
 		try {
 			return { success: true as const, result: await run() };
-		} catch {
-			return { success: false as const, code: "lesson-operation-failed" as const };
+		} catch (error) {
+			const code: LessonErrorCode =
+				error instanceof LessonOperationError
+					? error.code
+					: error instanceof Error && "code" in error && error.code === "EEXIST"
+						? "destination-exists"
+						: "lesson-operation-failed";
+			return { success: false as const, code };
 		}
 	};
 	ipcMain.handle("lesson:frame", (_event, input: unknown) =>

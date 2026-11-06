@@ -2,10 +2,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
+import { createEmptyDocument, documentSchema } from "../../src/lib/ai-edition/schema";
+import { disabledCapturePrivacyPolicy } from "../../src/lib/capturePrivacy";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { imageFixture, jpegBase64 } from "../../src/lib/lesson/fixtures.test-support";
+import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
 import { sha256 } from "../../src/lib/lesson/schema";
+import { DocumentService } from "../ai-edition/document-service";
+import {
+	bindCapturePolicyToMedia,
+	writeCapturePolicyReceipt,
+} from "../recording/capturePolicyReceipt";
 import { LessonService } from "./service";
 
 const roots: string[] = [];
@@ -48,7 +55,7 @@ function fixture() {
 		doc,
 		render,
 		service: new LessonService(async () => doc, render),
-		digest: () => sha256(new TextEncoder().encode(JSON.stringify(doc))),
+		digest: () => lessonRenderFingerprint(doc),
 	};
 }
 it("captures via shared native scene/clip and ruler-to-programme projection, preserving frame provenance", async () => {
@@ -69,11 +76,11 @@ it("refuses stale documents and missing/trimmed source instead of making an inve
 	const f = fixture();
 	await expect(
 		f.service.captureFrame({ projectId: "p", rulerSec: 1, documentSha256: "0".repeat(64) }),
-	).rejects.toThrow("changed");
+	).rejects.toThrow("project-changed");
 	expect(f.render).not.toHaveBeenCalled();
 	await expect(
 		f.service.captureFrame({ projectId: "p", rulerSec: 11, documentSha256: await f.digest() }),
-	).rejects.toThrow("visible");
+	).rejects.toThrow("frame-unavailable");
 });
 it("saves/reopens a separate editable manifest without overwriting evidence or loading an adapter", async () => {
 	const root = await directory(),
@@ -147,7 +154,7 @@ it("rejects trimmed positions and maps later ruler times through the same export
 	];
 	await expect(
 		f.service.captureFrame({ projectId: "p", rulerSec: 2, documentSha256: await f.digest() }),
-	).rejects.toThrow("visible");
+	).rejects.toThrow("frame-unavailable");
 	await f.service.captureFrame({ projectId: "p", rulerSec: 4, documentSha256: await f.digest() });
 	expect(f.render.mock.calls[0][3]).toEqual([120]);
 });
@@ -159,4 +166,82 @@ it("rejects traversal-shaped image identities and unsupported image payloads bef
 		f.service.saveEditable({ ...newLesson(), assets: [{ ...image, id: "../../outside" }] }, picker),
 	).rejects.toThrow();
 	expect(picker).not.toHaveBeenCalled();
+});
+it.each([
+	"recovered",
+	"receipt-change",
+])("captures saved %s projects through real DocumentService and store schema roundtrips", async (kind) => {
+	const root = await directory(),
+		media = path.join(root, "take.mp4");
+	await fs.writeFile(media, "fixed source bytes");
+	const documents = new DocumentService(path.join(root, "projects"), root);
+	const created = await documents.createProject("Real source");
+	if (kind === "receipt-change") {
+		const captureId = crypto.randomUUID();
+		writeCapturePolicyReceipt(media, {
+			version: 2,
+			captureId,
+			policy: disabledCapturePrivacyPolicy(),
+			applicationIdentity: "unavailable",
+			collectionAllowedAtStart: false,
+			suppressedAtStart: false,
+		});
+		await bindCapturePolicyToMedia(media, captureId);
+	}
+	const added = await documents.addAsset(created.project.id, { path: media });
+	added.timeline.clips = [
+		{
+			id: "source-clip",
+			assetId: added.assets[0].id,
+			sourceStartSec: 0,
+			sourceEndSec: 5,
+			timelineStartSec: 0,
+			timelineEndSec: 5,
+			origin: "user",
+			reason: "fixture",
+			wordRefs: [],
+		},
+	];
+	if (kind === "recovered")
+		added.assets[0].capturePrivacy = {
+			status: "interrupted",
+			journalPresent: false,
+			recoveredFrom: "interrupted",
+		};
+	const store = documentSchema.parse(await documents.saveProject(documentSchema.parse(added)));
+	const before = await lessonRenderFingerprint(store);
+	if (kind === "receipt-change")
+		await fs.writeFile(`${media}.capture-policy.json`, "PRIVATE_INVALID_RECEIPT_CANARY");
+	const read = await new DocumentService(path.join(root, "projects"), root).getProject(
+		created.project.id,
+	);
+	expect(JSON.stringify(read)).not.toEqual(JSON.stringify(store));
+	expect(await lessonRenderFingerprint(read)).toBe(before);
+	const render = vi.fn(async (_clips: unknown, _scene: string, _fps: number, frames: number[]) => [
+		{ index: frames[0], width: 2, height: 2, jpeg: Buffer.from(jpegBase64, "base64") },
+	]);
+	const service = new LessonService((id) => documents.getProject(id), render);
+	const image = await service.captureFrame({
+		projectId: created.project.id,
+		rulerSec: 1,
+		documentSha256: before,
+	});
+	expect(image.source.fingerprintKind).toBe("render-inputs-v1");
+	expect(render).toHaveBeenCalledTimes(1);
+	const changed = documentSchema.parse(await documents.getProject(created.project.id));
+	changed.timeline.clips[0].sourceStartSec = 0.5;
+	await documents.saveProject(changed);
+	await expect(
+		service.captureFrame({ projectId: created.project.id, rulerSec: 1, documentSha256: before }),
+	).rejects.toThrow("project-changed");
+	expect(render).toHaveBeenCalledTimes(1);
+	expect(await fs.readFile(media, "utf8")).toBe("fixed source bytes");
+});
+it("rejects raw clip geometry overhang beyond the source extent", async () => {
+	const f = fixture();
+	f.doc.timeline.clips[0].sourceEndSec = 2;
+	await expect(
+		f.service.captureFrame({ projectId: "p", rulerSec: 3, documentSha256: await f.digest() }),
+	).rejects.toThrow("frame-unavailable");
+	expect(f.render).not.toHaveBeenCalled();
 });

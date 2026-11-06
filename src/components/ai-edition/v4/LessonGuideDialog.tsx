@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { useScopedT } from "@/contexts/I18nContext";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { type LessonErrorCode, LessonOperationError } from "@/lib/lesson/api";
 import {
 	draftLessonSteps,
 	moveStep,
@@ -15,9 +16,10 @@ import {
 	newStep,
 	reviseLesson,
 } from "@/lib/lesson/authoring";
-import { projectLesson } from "@/lib/lesson/export";
-import { type LessonManifest, type LessonStep, sha256, validateLesson } from "@/lib/lesson/schema";
+import { lessonRenderFingerprint } from "@/lib/lesson/frameSource";
+import { type LessonManifest, type LessonStep, validateLesson } from "@/lib/lesson/schema";
 import styles from "./LessonGuideDialog.module.css";
+import { LessonTitleInput } from "./LessonTitleInput";
 export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const t = useScopedT("timeline");
 	const document = useProjectStore((s) => s.document),
@@ -25,7 +27,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
 	const [selected, setSelected] = useState<string[]>([]),
 		[busy, setBusy] = useState(false),
-		[error, setError] = useState(false),
+		[error, setError] = useState<LessonErrorCode | null>(null),
 		[notice, setNotice] = useState("");
 	const epoch = useRef({ projectId });
 	const busyRef = useRef(false);
@@ -35,10 +37,18 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 			epoch.current = { projectId };
 		};
 	}, [projectId]);
+	const author = (operation: () => LessonManifest) => {
+		try {
+			setLesson(operation());
+			setError(null);
+		} catch {
+			setError("lesson-operation-failed");
+		}
+	};
 	const update = (id: string, change: Partial<LessonStep>) =>
-		setLesson((value) =>
-			reviseLesson(value, {
-				steps: value.steps.map((step) =>
+		author(() =>
+			reviseLesson(lesson, {
+				steps: lesson.steps.map((step) =>
 					step.id === id ? { ...step, ...change, status: change.status ?? "draft" } : step,
 				),
 			}),
@@ -48,12 +58,13 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		busyRef.current = true;
 		const current = epoch.current;
 		setBusy(true);
-		setError(false);
+		setError(null);
 		setNotice("");
 		try {
 			await action(current);
-		} catch {
-			if (epoch.current === current) setError(true);
+		} catch (error) {
+			if (epoch.current === current)
+				setError(error instanceof LessonOperationError ? error.code : "lesson-operation-failed");
 		} finally {
 			busyRef.current = false;
 			if (epoch.current === current) setBusy(false);
@@ -80,13 +91,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 				>
 					<label>
 						{t("lesson.lessonTitle")}
-						<input
-							maxLength={300}
+						<LessonTitleInput
 							value={lesson.title}
-							onChange={(event) => {
-								if (event.target.value)
-									setLesson(reviseLesson(lesson, { title: event.target.value }));
-							}}
+							onCommit={(title) => author(() => reviseLesson(lesson, { title }))}
 						/>
 					</label>
 					<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -95,7 +102,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							disabled={lesson.steps.length >= 200}
 							onClick={() => {
 								const step = newStep(t("lesson.newStep"));
-								setLesson(reviseLesson(lesson, { steps: [...lesson.steps, step] }));
+								author(() => reviseLesson(lesson, { steps: [...lesson.steps, step] }));
 								setSelected([...active, step.id]);
 							}}
 						>
@@ -107,7 +114,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							onClick={() => {
 								if (!document) return;
 								const steps = draftLessonSteps(document).slice(0, 200 - lesson.steps.length);
-								setLesson(reviseLesson(lesson, { steps: [...lesson.steps, ...steps] }));
+								author(() => reviseLesson(lesson, { steps: [...lesson.steps, ...steps] }));
 								setSelected([...active, ...steps.map((step) => step.id)]);
 							}}
 						>
@@ -120,7 +127,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								void run(async (current) => {
 									const result = await window.electronAPI.lessonOpen!();
 									if (epoch.current !== current) return;
-									if (!result.success) throw new Error("open");
+									if (!result.success) throw new LessonOperationError(result.code);
 									if (result.result.status === "opened") {
 										const valid = await validateLesson(result.result.lesson);
 										if (epoch.current !== current) return;
@@ -140,7 +147,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								void run(async (current) => {
 									const result = await window.electronAPI.lessonSave!(lesson);
 									if (epoch.current !== current) return;
-									if (!result.success) throw new Error("save");
+									if (!result.success) throw new LessonOperationError(result.code);
 									if (result.result.status === "saved")
 										setNotice(t("lesson.saved", { path: result.result.path }));
 								})
@@ -170,11 +177,10 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						}
 						onClick={() =>
 							void run(async (current) => {
-								const projection = await projectLesson(lesson, active);
 								if (epoch.current !== current) return;
-								const result = await window.electronAPI.lessonExport!(projection, active);
+								const result = await window.electronAPI.lessonExport!(lesson, active);
 								if (epoch.current !== current) return;
-								if (!result.success) throw new Error("export");
+								if (!result.success) throw new LessonOperationError(result.code);
 								if (result.result.status === "exported")
 									setNotice(t("lesson.exported", { path: result.result.path }));
 							})
@@ -211,12 +217,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								</label>
 								<label>
 									{t("lesson.stepTitle")}
-									<input
-										maxLength={300}
+									<LessonTitleInput
 										value={step.title}
-										onChange={(event) => {
-											if (event.target.value) update(step.id, { title: event.target.value });
-										}}
+										onCommit={(title) => update(step.id, { title })}
 									/>
 								</label>
 								<label>
@@ -264,14 +267,14 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									<button
 										type="button"
 										disabled={index === 0}
-										onClick={() => setLesson(moveStep(lesson, step.id, -1))}
+										onClick={() => author(() => moveStep(lesson, step.id, -1))}
 									>
 										{t("lesson.up")}
 									</button>
 									<button
 										type="button"
 										disabled={index === lesson.steps.length - 1}
-										onClick={() => setLesson(moveStep(lesson, step.id, 1))}
+										onClick={() => author(() => moveStep(lesson, step.id, 1))}
 									>
 										{t("lesson.down")}
 									</button>
@@ -279,7 +282,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										type="button"
 										onClick={() => {
 											const steps = lesson.steps.filter((value) => value.id !== step.id);
-											setLesson(
+											author(() =>
 												reviseLesson(lesson, {
 													steps,
 													assets: lesson.assets.filter((asset) =>
@@ -305,10 +308,8 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 												const store = useProjectStore.getState();
 												const snapshot = store.document;
 												if (!snapshot || !store.projectId || store.dirty)
-													throw new Error("Save project first");
-												const documentSha256 = await sha256(
-													new TextEncoder().encode(JSON.stringify(snapshot)),
-												);
+													throw new LessonOperationError("project-changed");
+												const documentSha256 = await lessonRenderFingerprint(snapshot);
 												if (epoch.current !== current) return;
 												const result = await window.electronAPI.lessonFrame!({
 													projectId: store.projectId,
@@ -316,9 +317,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 													documentSha256,
 												});
 												if (epoch.current !== current) return;
-												if (!result.success) throw new Error("frame");
+												if (!result.success) throw new LessonOperationError(result.code);
 												if (useProjectStore.getState().document !== snapshot)
-													throw new Error("Project changed");
+													throw new LessonOperationError("project-changed");
 												const steps = lesson.steps.map((value) =>
 													value.id === step.id
 														? { ...value, imageId: result.result.id, status: "draft" as const }
@@ -369,7 +370,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					})}
 				</fieldset>
 				{busy && <p role="status">{t("lesson.busy")}</p>}
-				{error && <p role="alert">{t("lesson.error")}</p>}
+				{error && <p role="alert">{t(`lesson.errors.${error}`)}</p>}
 				{notice && (
 					<p role="status" style={{ overflowWrap: "anywhere" }}>
 						{notice}

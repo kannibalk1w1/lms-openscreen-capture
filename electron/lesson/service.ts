@@ -8,8 +8,10 @@ import {
 	readSpeedRegions,
 } from "../../src/lib/ai-edition/document/timeline";
 import type { AxcutDocument } from "../../src/lib/ai-edition/schema";
-import { trimAppliesToClip } from "../../src/lib/ai-edition/timeline/trim-mapping";
+import { keptRawSpans } from "../../src/lib/ai-edition/timeline/programme-time";
+import { LessonOperationError } from "../../src/lib/lesson/api";
 import { renderLessonGuide } from "../../src/lib/lesson/export";
+import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
 import {
 	decodeImage,
 	jpegDimensions,
@@ -41,24 +43,18 @@ export class LessonService {
 		private readonly renderFrames: LessonRenderFrames,
 	) {}
 	async captureFrame(input: unknown): Promise<LessonImage> {
-		if (this.rendering) throw new Error("Lesson frame rendering is busy");
+		if (this.rendering) throw new LessonOperationError("render-busy");
 		const request = frameRequest.parse(input);
 		this.rendering = true;
 		try {
 			const doc = await this.readDocument(request.projectId);
-			const digest = await sha256(new TextEncoder().encode(JSON.stringify(doc)));
+			const digest = await lessonRenderFingerprint(doc);
 			if (doc.project.id !== request.projectId || digest !== request.documentSha256)
-				throw new Error("Project changed; save and retry");
-			const visible = doc.timeline.clips.some((clip) => {
-				if (request.rulerSec < clip.timelineStartSec || request.rulerSec >= clip.timelineEndSec)
-					return false;
-				const sourceSec = clip.sourceStartSec + request.rulerSec - clip.timelineStartSec;
-				return !doc.timeline.trimRanges.some(
-					(trim) =>
-						trimAppliesToClip(trim, clip) && sourceSec >= trim.startSec && sourceSec < trim.endSec,
-				);
-			});
-			if (!visible) throw new Error("No visible source at this ruler position");
+				throw new LessonOperationError("project-changed");
+			const visible = keptRawSpans(doc.timeline.clips, doc.timeline.trimRanges).some(
+				(span) => request.rulerSec >= span.startSec && request.rulerSec < span.endSec,
+			);
+			if (!visible) throw new LessonOperationError("frame-unavailable");
 			const paths = new Map(doc.assets.map((asset) => [asset.id, asset.originalPath]));
 			if (doc.timeline.clips.some((clip) => !paths.get(clip.assetId)))
 				throw new Error("Project source is missing");
@@ -95,7 +91,12 @@ export class LessonService {
 				sha256: await sha256(frame.jpeg),
 				width: frame.width,
 				height: frame.height,
-				source: { ...request, basis: "editor-ruler-seconds", precision: "60fps-floor" },
+				source: {
+					...request,
+					fingerprintKind: "render-inputs-v1",
+					basis: "editor-ruler-seconds",
+					precision: "60fps-floor",
+				},
 			};
 		} finally {
 			this.rendering = false;
@@ -113,9 +114,14 @@ export class LessonService {
 		const target = await pickPath();
 		if (!target) return { status: "cancelled" as const };
 		if (!(await fs.lstat(target)).isFile()) throw new Error("Choose a regular lesson file");
-		const file = await fs.open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+		const file = await fs.open(
+			target,
+			constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+		);
 		try {
-			if ((await file.stat()).size > 16 * 1024 * 1024) throw new Error("Lesson file exceeds limit");
+			const stat = await file.stat();
+			if (!stat.isFile()) throw new Error("Choose a regular lesson file");
+			if (stat.size > 16 * 1024 * 1024) throw new Error("Lesson file exceeds limit");
 			const buffer = Buffer.alloc(16 * 1024 * 1024 + 1);
 			let count = 0;
 			while (count < buffer.length) {
@@ -165,6 +171,7 @@ export class LessonService {
 			version: 1,
 			lessonId: output.lesson.id,
 			revision: output.lesson.revision,
+			derivedFrom: output.lesson.derivedFrom,
 			stepIds: output.lesson.steps.map((step) => step.id),
 			files: inventory,
 			complete: true,

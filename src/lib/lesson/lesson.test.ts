@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { createEmptyDocument } from "../ai-edition/schema";
+import { TypingCapture } from "../typing/capture";
 import { draftLessonSteps, moveStep, newLesson, newStep, reviseLesson } from "./authoring";
 import { renderLessonGuide } from "./export";
 import { imageFixture } from "./fixtures.test-support";
@@ -109,4 +110,37 @@ it("keeps undescribed illustrations editable but requires alternative text befor
 	const lesson = { ...newLesson(), steps: [step], assets: [image] };
 	expect((await validateLesson(lesson)).steps).toHaveLength(1);
 	await expect(renderLessonGuide(lesson, [step.id])).rejects.toThrow("Describe");
+});
+it("gives exported subsets a fresh identity with explicit parent/selection lineage", async () => {
+	const a = newStep("A"),
+		b = newStep("B"),
+		original = { ...newLesson(), revision: 7, steps: [a, b] };
+	const output = await renderLessonGuide(original, [b.id]);
+	expect(output.lesson.id).not.toBe(original.id);
+	expect(output.lesson.revision).toBe(0);
+	expect(output.lesson.derivedFrom).toEqual({ id: original.id, revision: 7, stepIds: [b.id] });
+	const reopened = await parseLesson(JSON.stringify(output.lesson));
+	const edited = reviseLesson(reopened, { title: "Derived edit" });
+	const next = await renderLessonGuide(edited, [b.id]);
+	expect(next.lesson.derivedFrom).toEqual({ id: edited.id, revision: 1, stepIds: [b.id] });
+	expect(original.revision).toBe(7);
+});
+it("preserves apostrophes, literal setext lines and instruction hard breaks in Markdown", async () => {
+	const step = { ...newStep("Don't <panic>"), instructions: "It's literal\n===\n---\nFinal line" };
+	const output = await renderLessonGuide({ ...newLesson(), steps: [step] }, [step.id]);
+	expect(output.markdown).toContain("Don't &lt;panic&gt;");
+	expect(output.markdown).not.toContain("&#39;");
+	expect(output.markdown).toContain("It's literal  \n\\=\\=\\=  \n\\-\\-\\-  \nFinal line");
+});
+
+it("drafts the maximum valid 220-character typing section identity without truncation", () => {
+	const doc = createEmptyDocument({ projectId: "p", title: "Long section identity" }),
+		capture = new TypingCapture("x", () => 0, "t");
+	capture.observe("xy", [], "insertText");
+	const take = capture.finish();
+	take.sections[0].id = "s".repeat(220);
+	doc.typingTakes = [take];
+	const [draft] = draftLessonSteps(doc);
+	expect(draft.evidence[0].eventId).toBe(take.sections[0].id);
+	expect(() => reviseLesson(newLesson(), { steps: [draft] })).not.toThrow();
 });

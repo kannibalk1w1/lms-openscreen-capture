@@ -31,8 +31,10 @@ it("authors and renumbers stable steps with every integration/API absent", () =>
 	show();
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
 	fireEvent.change(screen.getByLabelText("Step title"), { target: { value: "First" } });
+	fireEvent.blur(screen.getByLabelText("Step title"));
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
 	fireEvent.change(screen.getAllByLabelText("Step title")[1], { target: { value: "Second" } });
+	fireEvent.blur(screen.getAllByLabelText("Step title")[1]);
 	fireEvent.click(screen.getAllByRole("button", { name: "Move up" })[1]);
 	expect(
 		screen.getAllByLabelText("Step title").map((input) => (input as HTMLInputElement).value),
@@ -58,7 +60,7 @@ it("exports only included steps and keeps editable save separate", async () => {
 	fireEvent.click(screen.getByLabelText("Include step 2"));
 	fireEvent.click(screen.getByRole("button", { name: "Export selected offline guide" }));
 	await waitFor(() => expect(lessonExport).toHaveBeenCalledTimes(1));
-	expect(lessonExport.mock.calls[0][0].steps).toHaveLength(1);
+	expect(lessonExport.mock.calls[0][0].steps).toHaveLength(2);
 	expect(lessonExport.mock.calls[0][1]).toHaveLength(1);
 	expect(lessonSave).not.toHaveBeenCalled();
 	await screen.findByText("Guide folder verified: /new/guide");
@@ -87,4 +89,15 @@ it("ignores an opened lesson that returns after the active project changes", asy
 	);
 	await act(async () => finish());
 	expect(screen.queryByDisplayValue("OLD_PROJECT_CANARY")).toBeNull();
+});
+
+it("permits clear/retype and commits a valid title on blur", () => {
+	vi.stubGlobal("electronAPI", undefined);
+	show();
+	const input = screen.getByLabelText("Lesson title");
+	fireEvent.change(input, { target: { value: "" } });
+	expect((input as HTMLInputElement).value).toBe("");
+	fireEvent.change(input, { target: { value: "Retyped" } });
+	fireEvent.blur(input);
+	expect((input as HTMLInputElement).value).toBe("Retyped");
 });

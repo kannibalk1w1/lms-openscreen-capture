@@ -8,7 +8,7 @@ export const lessonEvidenceSchema = z
 		kind: z.enum(["recording-flag", "typing-section", "authored"]),
 		assetId: z.string().max(200).optional(),
 		takeId: z.string().max(200).optional(),
-		eventId: z.string().max(200).optional(),
+		eventId: z.string().max(220).optional(),
 		sessionId: z.string().max(200).optional(),
 		clock: z.enum(["recording-control-active-ms", "typing-session-elapsed-ms", "unmapped"]),
 		atMs: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
@@ -21,6 +21,7 @@ export const lessonSourceSchema = z
 		rulerSec: z.number().finite().nonnegative().max(86400),
 		basis: z.literal("editor-ruler-seconds"),
 		precision: z.literal("60fps-floor"),
+		fingerprintKind: z.literal("render-inputs-v1").optional(),
 		documentSha256: z.string().regex(/^[a-f0-9]{64}$/),
 	})
 	.strict();
@@ -60,6 +61,14 @@ export const lessonManifestSchema = z
 		version: z.literal(1),
 		id,
 		revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+		derivedFrom: z
+			.object({
+				id,
+				revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+				stepIds: z.array(id).min(1).max(200),
+			})
+			.strict()
+			.optional(),
 		title,
 		steps: z.array(lessonStepSchema).max(200),
 		assets: z.array(lessonImageSchema).max(40),

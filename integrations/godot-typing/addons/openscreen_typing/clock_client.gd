@@ -230,6 +230,8 @@ func start_journal(file_path: String) -> bool:
 	return _journal != null
 
 func stop_journal(reason := "user-stop") -> void:
+	if _journal == null and _journal_state != "recording":
+		return
 	if _journal != null:
 		_write({"event": "clock-stop", "atMs": maxi(0, Time.get_ticks_msec() - _started_ms), "reason": reason})
 	_journal = null

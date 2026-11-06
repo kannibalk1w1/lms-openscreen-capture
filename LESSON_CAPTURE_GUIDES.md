@@ -19,7 +19,7 @@ the native media or Godot clock. Drafting does not copy raw keys, text history,
 unsaved buffers, original media paths or application-specific runtime objects.
 
 The lesson contains editable text/code and embedded bounded JPEG illustrations,
-with their dimensions, SHA256 and explicit source project/ruler/document fingerprint.
+with their dimensions, SHA256 and explicit source project/ruler/render-input fingerprint.
 The original video project retains editable overlays and source media. A captured
 illustration is a flattened composed sample; it is not a replacement for that
 project or an editable copy of its annotations. The lesson does not duplicate the
@@ -48,8 +48,9 @@ Capture uses the existing compositor `renderFrames`, shared native clip/scene
 builders and the exporter's ruler→programme trim/speed projection. It renders one
 frame on the 60fps compositor grid (floor), at most 1280px wide; actual source frame
 sampling follows the decoder and is not claimed as physical/frame timing proof.
-The selected original ruler time, projection precision and full saved-document
-fingerprint are retained. Source coordinates are not inferred from UTC or flags.
+The selected original ruler time, projection precision and versioned render-input
+fingerprint are retained. New captures identify `fingerprintKind: render-inputs-v1`;
+earlier stills without that field retain their historical full-document JSON hash. Source coordinates are not inferred from UTC or flags.
 
 Dirty/stale projects, changed project identity, missing source, raw ruler gaps and
 trimmed positions fail explicitly. A trimmed ruler position cannot silently become
@@ -70,7 +71,7 @@ An explicit parent-folder picker creates a fresh `lesson-<UUID>` directory:
   independently reopenable even without the original video or any adapter.
 - `assets/`: only referenced JPEG bytes; source IDs cannot create arbitrary paths.
 - `export-report.json`: completion receipt written **last**, listing input lesson
-  revision, included step IDs and verified byte sizes/SHA256 of the written files.
+  revision and explicit parent lesson/revision/selection lineage, included step IDs and verified byte sizes/SHA256 of the written files.
 
 Every written payload is read back and checked before the receipt is written.
 No receipt means an incomplete export. A failed folder is preserved for inspection;
@@ -133,3 +134,52 @@ Exact-SHA Claude review is pending until an actual report is delivered.
 
 Next: resolve actual review findings, then a bounded accessible output/profile and
 review/query workflow over this same contract; do not build additional app adapters.
+
+## Review10 corrections (slice14)
+
+Actual [review10](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_10.md) accepted slice12
+and found one Medium in slice13: hashing full document JSON failed for saved
+recovered projects because main-process privacy inspection reconstructs fields
+and can change after load. Slice14 uses the shared canonical **render-inputs-v1**
+fingerprint: actual native scene/clips, project identity, raw clip geometry, trims
+and speed projection. It deliberately excludes derived privacy inspection and save
+timestamps; it is not an attestation/hash of source media bytes or the whole project.
+The renderer still rejects dirty/changed project state; actual render/source edits
+still reject old fingerprints. Existing stills retain their original hash meaning.
+
+Two real DocumentService → renderer schema parse/save → reinspection regressions
+cover recovery metadata key order and changed receipt inspection. A source-range
+edit is rejected in both. A real saved recovered project then reached the actual
+Vulkan compositor and produced a **1280×733** still, with editable/derived save and
+reopen. The probe aliases only unrelated Electron app-path lookup in disposable
+Node tooling; the project service, disk inspection and compositor are real. No
+visible Electron capture action or physical recording was exercised.
+
+Markdown now preserves apostrophes, escapes literal setext markers and emits hard
+line breaks matching HTML. No CommonMark renderer is installed, so this is tested
+as exact generated syntax; reader-specific rendering remains open. Subset exports
+receive fresh lesson UUID/revision0 plus immediate parent id/revision/selected-step
+lineage. Reopen/edit/re-export keeps distinct identities and original step IDs.
+The receipt records the child and parent lineage. Correlation metadata (selected
+evidence IDs, project/render fingerprints, parent lesson IDs) is retained for
+traceability and explicitly disclosed in the UI inventory.
+
+Raw visibility now reuses `keptRawSpans`, matching source extent and export
+projection even when clip geometry overhangs. Optional evidence IDs admit the
+producer's full220-character section limit. Title inputs allow clear/retype and
+commit on blur; invalid authoring mutations show a bounded error. IPC distinguishes
+stale/unsaved project, no kept frame, busy render and existing destination without
+exposing exceptions. Open adds O_NONBLOCK and checks the opened file is regular
+after O_NOFOLLOW, guarding replacement with a FIFO.
+
+The clock client's limit footer **and final journal state/signal** remain `limit`
+after disconnect (real Godot4.7.1 assertion). Original review reports are preserved.
+Validation: **118 focused tests / seven files**, bothTS,Vite,Biome35,i18n/docs/diff.
+Full5495 remains the prior milestone; no new full-suite claim for this fix. Native
+Rust/helper/compositor sources and binaries are unchanged. Recovered guide opens
+under Chromium `file://` offline: one image/step, zero external requests/scripts.
+Artifacts: `slice-14-*`, `lesson-guide-recovered-fixture/` (real projects, native
+still, original lesson, derived guide, receipt/browser summary/screenshot).
+All prior physical/visible-UI/platform/performance skips and unsaved-draft/undo/
+recovery debt remain open. Fixes await actual exact-SHA rereview. Next: accessible
+profiles and focused lesson review/query controls after that review.
