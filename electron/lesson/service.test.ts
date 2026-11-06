@@ -361,3 +361,115 @@ it("persists output settings and writes a code/image-free derived package with t
 	expect((await f.service.openEditable(async () => file)).status).toBe("opened");
 	expect(await fs.readFile(file, "utf8")).toContain("PRIVATE_PROFILE_CODE");
 });
+it("plans an explicit half-open ruler range through cuts and speed without rendering or altering source", async () => {
+	const f = fixture();
+	f.doc.timeline.trimRanges = [
+		{
+			id: "cut",
+			assetId: "a",
+			clipId: "c",
+			startSec: 3,
+			endSec: 5,
+			reason: "removed",
+			origin: "user",
+		},
+	];
+	f.doc.legacyEditor = { speedRegions: [{ id: "speed", startMs: 5000, endMs: 10000, speed: 2 }] };
+	const before = JSON.stringify(f.doc);
+	const range = await f.service.planRange({
+		projectId: "p",
+		documentSha256: await f.digest(),
+		startSec: 2,
+		endSec: 8,
+	});
+	expect(range).toMatchObject({
+		version: 1,
+		provenance: "authored-selection",
+		basis: "editor-ruler-seconds",
+		startSec: 2,
+		endSec: 8,
+		keptSpans: [
+			{ startSec: 2, endSec: 3 },
+			{ startSec: 5, endSec: 8 },
+		],
+		programme: { basis: "editor-programme-seconds", startSec: 2, endSec: 4.5 },
+	});
+	expect(f.render).not.toHaveBeenCalled();
+	expect(JSON.stringify(f.doc)).toBe(before);
+	expect(JSON.stringify(range)).not.toContain("/original-source.mp4");
+	const step = { ...newStep(), mediaSelection: range },
+		lesson = { ...newLesson(), steps: [step] };
+	const reopened = await f.service.openEditable(async () => {
+		const target = path.join(await directory(), "range.json");
+		await fs.writeFile(target, JSON.stringify(lesson));
+		return target;
+	});
+	if (reopened.status !== "opened") throw new Error("Expected open");
+	expect(reopened.lesson.steps[0].mediaSelection).toEqual(range);
+});
+it("refuses stale range sources, removed/outside boundaries, unprobed and overlapping timeline data", async () => {
+	const f = fixture();
+	f.doc.timeline.trimRanges = [
+		{
+			id: "cut",
+			assetId: "a",
+			clipId: "c",
+			startSec: 3,
+			endSec: 5,
+			reason: "removed",
+			origin: "user",
+		},
+	];
+	const request = { projectId: "p", documentSha256: await f.digest(), startSec: 1, endSec: 8 };
+	await expect(f.service.planRange({ ...request, documentSha256: "0".repeat(64) })).rejects.toThrow(
+		"project-changed",
+	);
+	for (const [startSec, endSec] of [
+		[1, 4],
+		[4, 8],
+		[1, 11],
+		[8, 8],
+		[8, 1],
+		[-1, 2],
+		[0, Infinity],
+	])
+		await expect(f.service.planRange({ ...request, startSec, endSec })).rejects.toThrow();
+	f.doc.timeline.clips.push({
+		...f.doc.timeline.clips[0],
+		id: "overlap",
+		timelineStartSec: 2,
+		timelineEndSec: 12,
+	});
+	await expect(
+		f.service.planRange({ ...request, documentSha256: await f.digest() }),
+	).rejects.toThrow("range-unavailable");
+	f.doc.timeline.clips.pop();
+	f.doc.timeline.clips[0].sourceEndSec = undefined;
+	await expect(
+		f.service.planRange({ ...request, documentSha256: await f.digest() }),
+	).rejects.toThrow("range-unavailable");
+	expect(f.render).not.toHaveBeenCalled();
+});
+it("bounds range-plan fragmentation before retaining more than 128 spans", async () => {
+	const f = fixture();
+	f.doc.timeline.clips[0].sourceEndSec = 300;
+	f.doc.timeline.clips[0].timelineEndSec = 300;
+	f.doc.timeline.trimRanges = Array.from({ length: 129 }, (_, index) => ({
+		id: `cut-${index}`,
+		assetId: "a",
+		clipId: "c",
+		startSec: index * 2 + 1,
+		endSec: index * 2 + 2,
+		reason: "cut",
+		origin: "user" as const,
+	}));
+	await expect(
+		f.service.planRange({
+			projectId: "p",
+			documentSha256: await f.digest(),
+			startSec: 0,
+			endSec: 260,
+		}),
+	).rejects.toThrow("range-unavailable");
+	expect(f.render).not.toHaveBeenCalled();
+});

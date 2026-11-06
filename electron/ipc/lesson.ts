@@ -26,6 +26,9 @@ export function registerLessonHandlers(service: LessonService) {
 	ipcMain.handle("lesson:draft-read", (_event, id: unknown) => bounded(() => drafts.read(id)));
 	ipcMain.handle("lesson:draft-remove", (_event, id: unknown) => bounded(() => drafts.remove(id)));
 
+	ipcMain.handle("lesson:plan-range", (_event, input: unknown) =>
+		bounded(() => service.planRange(input)),
+	);
 	ipcMain.handle("lesson:frame", (_event, input: unknown) =>
 		bounded(() => service.captureFrame(input)),
 	);

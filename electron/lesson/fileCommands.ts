@@ -24,6 +24,7 @@ export async function queryLessonFile(input: unknown) {
 			sources: [
 				...new Set(step.evidence.length ? step.evidence.map((value) => value.kind) : ["authored"]),
 			],
+			hasMediaSelection: !!step.mediaSelection,
 			hasImage: !!step.imageId,
 			hasCode: !!step.code,
 			findings: stepFindings(step),

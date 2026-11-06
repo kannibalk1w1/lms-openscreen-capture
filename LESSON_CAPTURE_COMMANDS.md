@@ -35,7 +35,7 @@ Argument errors use the existing CLI error/help path and exit2. Without `--json`
 success is readable JSON and file failure is the same fixed error string. This
 command has no JSON-output-file option. Successful query output contains lesson
 UUID/revision/title, total/matching counts and matched step IDs, source-order
-numbers, titles, draft/reviewed status, source kinds, image/code presence and
+numbers, titles, draft/reviewed status, source kinds, image/code presence (and slice21 `hasMediaSelection`) and
 review findings. It omits instructions, code, image bytes/alt, evidence identifiers,
 source paths, provenance hashes and extensions. Authored titles are still content:
 select only a lesson whose titles may be shared with the client.
@@ -160,3 +160,9 @@ both root/test TS, final Vite renderer/main/preload, lint35 existing warnings,
 i18n1244, docs/diff pass. HTTP gate mutation confirms that returning consent after
 an early read still fails the zero-read regression. Query annotations remain
 read-only because queries do not write; authorization is independently enforced.
+
+
+Slice21 full sources may contain an authored saved-project `mediaSelection` plan.
+Queries expose only `hasMediaSelection`, never its project/fingerprint/timing plan.
+Static guides strip unresolved references, since no video is packaged. Existing
+HTTP permission and explicit-file boundaries stay intact. [Range scope](LESSON_CAPTURE_RANGES.md).

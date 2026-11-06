@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lessonMediaSelectionSchema } from "./mediaSelection";
 import { lessonOutputSchema } from "./output";
 
 export const MAX_LESSON_BYTES = 16 * 1024 * 1024;
@@ -48,6 +49,7 @@ export const lessonStepSchema = z
 		instructions: z.string().max(12000),
 		status: z.enum(["draft", "reviewed"]),
 		evidence: z.array(lessonEvidenceSchema).max(32),
+		mediaSelection: lessonMediaSelectionSchema.optional(),
 		imageId: id.optional(),
 		imageAlt: z.string().max(1000).default(""),
 		code: z

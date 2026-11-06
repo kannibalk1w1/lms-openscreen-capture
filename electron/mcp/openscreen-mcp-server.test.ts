@@ -1,3 +1,4 @@
+import * as lessonTools from "./lesson-tools";
 // End-to-end over real HTTP: the SDK's own client against the server on an
 // ephemeral port, with an in-memory stand-in for the editor window and a real
 // DocumentService on a temp directory for the projects that are not open.
@@ -30,6 +31,7 @@ import { TOOL_DESCRIPTIONS } from "../ai-edition/deep-agent/service";
 import { DocumentService } from "../ai-edition/document-service";
 import { createMediaTools } from "./media-tools";
 import {
+	createOpenScreenMcpServer,
 	LIST_PROJECTS_TOOL,
 	MCP_ENDPOINT_PATH,
 	type McpApplyResult,
@@ -1164,4 +1166,21 @@ it("writes a selected guide through authenticated HTTP only when MCP edits are e
 		"OMIT_THIS",
 	);
 	expect(await fsPromises.readFile(source, "utf8")).toBe(bytes);
+});
+
+it.each([
+	"http",
+	"stdio",
+] as const)("passes the actual %s transport into lesson tool registration", async (transport) => {
+	const registration = vi.spyOn(lessonTools, "registerLessonTools");
+	const server = createOpenScreenMcpServer(
+		{ transport, host: new FakeEditor(), projects, editsAllowed: () => true, version: "0" },
+		async () => ({ content: [] }),
+	);
+	try {
+		expect(registration).toHaveBeenCalledWith(server, expect.objectContaining({ transport }));
+	} finally {
+		registration.mockRestore();
+		await server.close();
+	}
 });

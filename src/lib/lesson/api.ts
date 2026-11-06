@@ -1,8 +1,10 @@
+import type { LessonMediaSelection, LessonRangeRequest } from "./mediaSelection";
 import type { LessonImage, LessonManifest } from "./schema";
 export type LessonErrorCode =
 	| "lesson-operation-failed"
 	| "project-changed"
 	| "frame-unavailable"
+	| "range-unavailable"
 	| "render-busy"
 	| "destination-exists"
 	| "local-draft-limit"
@@ -16,6 +18,7 @@ export type LessonResult<T> =
 	| { success: true; result: T }
 	| { success: false; code: LessonErrorCode };
 export interface LessonApi {
+	lessonPlanRange?: (input: LessonRangeRequest) => Promise<LessonResult<LessonMediaSelection>>;
 	lessonFrame?: (input: {
 		projectId: string;
 		rulerSec: number;

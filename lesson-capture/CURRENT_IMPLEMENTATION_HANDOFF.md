@@ -42,8 +42,13 @@ coverage is in ../LESSON_CAPTURE_COMMANDS.md. Actual review16 accepts74d58a5a wi
 HTTP authority wording/boundary by gating arbitrary-path lesson queries before
 file access; explicit CLI/stdio/app-channel authority stays. It adds static
 offline guide navigation, heading focus and print flow, with bounded browser/PDF
-proof (not a timed media player). Next: actual review17, then remaining learner
-media/package work or independent roadmap items; standalone learner/player and autosave remain later. No extra application adapters are authorized.
+proof (not a timed media player). Actual review17 accepts d0949f9f with no High/Medium and closes the HTTP gate
+finding. Slice21 addresses transport-propagation/empty-heading nits and adds
+explicit saved-project range references with cut/speed planning, full-source
+roundtrip and static-guide exclusion. No video is copied/decoded/encoded.
+See ../LESSON_CAPTURE_RANGES.md for exact limits/evidence. Next: actual review18,
+then selected media materialization/revalidation prerequisites or independent
+roadmap items; standalone learner/player and autosave remain later. No extra application adapters are authorized.
 
 Native helper/Rust source unchanged since slice11:134Rust pass/1existing ignored,
 helper SHA f7c5055fb322ebc201a01ef0122d0222b56d354dfee5ce2b9b2bbfe1a37b4d3c.

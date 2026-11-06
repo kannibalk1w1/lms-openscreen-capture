@@ -345,3 +345,101 @@ it("rejects source changes while illustration integrity validation is still pend
 	);
 	expect(document.querySelector("img")).toBeNull();
 });
+it("attaches an explicit saved-project range, saves it only in the lesson and permits removal", async () => {
+	const plan = vi.fn<NonNullable<LessonApi["lessonPlanRange"]>>(async (input) => ({
+		success: true,
+		result: {
+			...input,
+			version: 1,
+			provenance: "authored-selection",
+			basis: "editor-ruler-seconds",
+			fingerprintKind: "render-inputs-v1",
+			keptSpans: [{ startSec: input.startSec, endSec: input.endSec }],
+			programme: {
+				basis: "editor-programme-seconds",
+				startSec: input.startSec,
+				endSec: input.endSec,
+			},
+		},
+	}));
+	const save = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async () => ({
+		success: true,
+		result: { status: "cancelled" },
+	}));
+	vi.stubGlobal("electronAPI", { lessonPlanRange: plan, lessonSave: save });
+	const source = useProjectStore.getState().document;
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	const attach = screen.getByRole("button", {
+		name: "Attach range from saved project",
+	}) as HTMLButtonElement;
+	expect(attach.disabled).toBe(true);
+	fireEvent.change(screen.getByLabelText("Ruler start (seconds)"), { target: { value: "2" } });
+	fireEvent.change(screen.getByLabelText("Ruler end (seconds)"), { target: { value: "4" } });
+	fireEvent.click(screen.getByLabelText("I have reviewed this step"));
+	fireEvent.click(attach);
+	await screen.findByText(
+		"Stored reference: 2–4 ruler seconds, 1 kept spans. Source media availability and frame accuracy are unverified.",
+	);
+	expect(plan.mock.calls[0][0]).toMatchObject({ projectId: "p", startSec: 2, endSec: 4 });
+	expect((screen.getByLabelText("I have reviewed this step") as HTMLInputElement).checked).toBe(
+		false,
+	);
+	expect(useProjectStore.getState().document).toBe(source);
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+	expect(save.mock.calls[0][0].steps[0].mediaSelection).toMatchObject({
+		startSec: 2,
+		endSec: 4,
+		provenance: "authored-selection",
+	});
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Remove video range reference" }));
+	expect(screen.queryByText(/Stored reference:/)).toBeNull();
+});
+it("ignores a pending range plan when the source document changes", async () => {
+	let finish: () => void = () => undefined;
+	const plan = vi.fn<NonNullable<LessonApi["lessonPlanRange"]>>(
+		(input) =>
+			new Promise((resolve) => {
+				finish = () =>
+					resolve({
+						success: true,
+						result: {
+							...input,
+							version: 1,
+							provenance: "authored-selection",
+							basis: "editor-ruler-seconds",
+							fingerprintKind: "render-inputs-v1",
+							keptSpans: [{ startSec: input.startSec, endSec: input.endSec }],
+							programme: {
+								basis: "editor-programme-seconds",
+								startSec: input.startSec,
+								endSec: input.endSec,
+							},
+						},
+					});
+			}),
+	);
+	vi.stubGlobal("electronAPI", { lessonPlanRange: plan });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getByLabelText("Ruler end (seconds)"), { target: { value: "4" } });
+	fireEvent.click(screen.getByRole("button", { name: "Attach range from saved project" }));
+	await waitFor(() => expect(plan).toHaveBeenCalledTimes(1));
+	await act(async () => {
+		useProjectStore.setState({
+			document: createEmptyDocument({ projectId: "p", title: "Changed" }),
+		});
+		finish();
+	});
+	await waitFor(() =>
+		expect((document.querySelector("fieldset") as HTMLFieldSetElement).disabled).toBe(false),
+	);
+	expect(screen.queryByText(/Stored reference:/)).toBeNull();
+	await screen.findByText(
+		"Save and reload the current video project, then capture the still again. Its render inputs changed or edits are unsaved.",
+	);
+});

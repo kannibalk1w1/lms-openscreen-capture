@@ -119,3 +119,34 @@ export function attachLessonIllustration(
 		throw new Error("Lesson exceeds limit");
 	return next;
 }
+
+/** Attach to current authored state; a replaced/removed/changed target refuses the stale plan. */
+export function attachLessonMediaSelection(
+	current: LessonManifest,
+	request: {
+		lessonId: string;
+		stepId: string;
+		revision: number;
+		previous?: import("./mediaSelection").LessonMediaSelection;
+	},
+	selection: import("./mediaSelection").LessonMediaSelection,
+): LessonManifest {
+	const step = current.steps.find((value) => value.id === request.stepId);
+	if (
+		current.id !== request.lessonId ||
+		current.revision < request.revision ||
+		!step ||
+		JSON.stringify(step.mediaSelection) !== JSON.stringify(request.previous)
+	)
+		return current;
+	const next = reviseLesson(current, {
+		steps: current.steps.map((value) =>
+			value.id === step.id
+				? { ...value, mediaSelection: selection, status: "draft" as const }
+				: value,
+		),
+	});
+	if (new TextEncoder().encode(JSON.stringify(next)).byteLength > MAX_LESSON_BYTES)
+		throw new Error("Lesson exceeds limit");
+	return next;
+}

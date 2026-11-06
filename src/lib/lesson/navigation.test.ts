@@ -92,5 +92,7 @@ it("gives an empty authored title a nonempty navigation label without rewriting 
 	const doc = documentOf((await renderLessonGuide(lesson, [step.id])).html);
 	expect(doc.querySelector(".contents a")?.textContent).toBe("Step 1");
 	expect(doc.querySelector(".contents a span")?.getAttribute("lang")).toBe("en");
+	expect(doc.querySelector("main h2")?.textContent).toBe("Step 1");
+	expect(doc.querySelector("main h2 span")?.getAttribute("lang")).toBe("en");
 	expect(step.title).toBe("   ");
 });

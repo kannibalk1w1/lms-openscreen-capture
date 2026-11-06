@@ -11,6 +11,7 @@ import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import { type LessonErrorCode, LessonOperationError } from "@/lib/lesson/api";
 import {
 	attachLessonIllustration,
+	attachLessonMediaSelection,
 	draftLessonSteps,
 	moveStep,
 	newLesson,
@@ -18,6 +19,7 @@ import {
 	reviseLesson,
 } from "@/lib/lesson/authoring";
 import { lessonRenderFingerprint } from "@/lib/lesson/frameSource";
+import { lessonMediaSelectionSchema } from "@/lib/lesson/mediaSelection";
 import { lessonOutput } from "@/lib/lesson/output";
 import { emptyLessonQuery, queryLesson, stepFindings } from "@/lib/lesson/review";
 import {
@@ -28,6 +30,7 @@ import {
 } from "@/lib/lesson/schema";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
+import { LessonRangeControls } from "./LessonRangeControls";
 import { LessonReviewControls } from "./LessonReviewControls";
 import { LessonTitleInput } from "./LessonTitleInput";
 import { LocalLessonDraftControls } from "./LocalLessonDraftControls";
@@ -337,6 +340,59 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										}
 									/>
 								</label>
+
+								<LessonRangeControls
+									key={`${lesson.id}-${step.id}-${generation.current}`}
+									selection={step.mediaSelection}
+									available={!!document && !!projectId && !!window.electronAPI?.lessonPlanRange}
+									onRemove={() => update(step.id, { mediaSelection: undefined })}
+									onAttach={(startSec, endSec) =>
+										void run(async (current) => {
+											const store = useProjectStore.getState(),
+												snapshot = store.document;
+											if (!snapshot || !store.projectId || store.dirty)
+												throw new LessonOperationError("project-changed");
+											const documentSha256 = await lessonRenderFingerprint(snapshot);
+											if (!current()) return;
+											const result = await window.electronAPI.lessonPlanRange!({
+												projectId: store.projectId,
+												documentSha256,
+												startSec,
+												endSec,
+											});
+											if (!current()) return;
+											if (!result.success) throw new LessonOperationError(result.code);
+											if (useProjectStore.getState().document !== snapshot)
+												throw new LessonOperationError("project-changed");
+											const selection = lessonMediaSelectionSchema.parse(result.result);
+											if (
+												selection.projectId !== store.projectId ||
+												selection.documentSha256 !== documentSha256 ||
+												selection.startSec !== startSec ||
+												selection.endSec !== endSec
+											)
+												throw new LessonOperationError("project-changed");
+											const request = {
+												lessonId: lesson.id,
+												stepId: step.id,
+												revision: lesson.revision,
+												previous: step.mediaSelection,
+											};
+											setLesson((latest) => {
+												if (!current()) return latest;
+												try {
+													return attachLessonMediaSelection(latest, request, selection);
+												} catch {
+													queueMicrotask(() => {
+														if (current()) setError("lesson-operation-failed");
+													});
+													return latest;
+												}
+											});
+										})
+									}
+								/>
+
 								{stepFindings(step).length > 0 && (
 									<ul aria-label={t("lesson.query.checks")}>
 										{stepFindings(step).map((kind) => (

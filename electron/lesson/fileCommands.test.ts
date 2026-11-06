@@ -188,3 +188,23 @@ it.skipIf(process.platform === "win32")(
 		expect((await fs.readdir(root)).sort()).toEqual(["link.json", "selected.json"]);
 	},
 );
+it("reports only the presence of an authored media selection without leaking its project or timing plan", async () => {
+	const source = await fixture();
+	source.lesson.steps[0].mediaSelection = {
+		version: 1,
+		provenance: "authored-selection",
+		basis: "editor-ruler-seconds",
+		projectId: "PRIVATE_RANGE_PROJECT",
+		documentSha256: "b".repeat(64),
+		fingerprintKind: "render-inputs-v1",
+		startSec: 2,
+		endSec: 4,
+		keptSpans: [{ startSec: 2, endSec: 4 }],
+		programme: { basis: "editor-programme-seconds", startSec: 2, endSec: 4 },
+	};
+	await fs.writeFile(source.manifestPath, JSON.stringify(source.lesson));
+	const result = await queryLessonFile({ manifestPath: source.manifestPath });
+	expect(result.steps[0].hasMediaSelection).toBe(true);
+	expect(JSON.stringify(result)).not.toContain("PRIVATE_RANGE_PROJECT");
+	expect(JSON.stringify(result)).not.toContain("keptSpans");
+});

@@ -123,8 +123,11 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    parity without recovery-store discovery. Actual review15 accepts414823d6
    with no High/Medium; actual review16 accepts74d58a5a with no High/Medium. Slice20 tightens HTTP lesson
    query permission before file access and adds script-free offline guide
-   navigation/print flow; it still needs its own review.
-   Next: remaining learner media/package dependencies over this portable contract,
+   navigation/print flow; actual review17 accepts d0949f9f with no High/Medium.
+   [Slice21](LESSON_CAPTURE_RANGES.md) adds explicit authored range references
+   bound to saved render inputs and existing trim/speed mapping, with no media
+   copying/playback. It needs its own review.
+   Next: selected media materialization/revalidation prerequisites over this portable contract,
    with physical/native/platform acceptance still open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.

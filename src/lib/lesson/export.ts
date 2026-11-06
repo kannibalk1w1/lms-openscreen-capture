@@ -42,6 +42,8 @@ export async function projectLesson(
 		.filter((step) => selected.has(step.id))
 		.map((step) => ({
 			...step,
+			// Static guides carry no video: do not export unresolved media references.
+			mediaSelection: undefined,
 			...(!output.includeImages ? { imageId: undefined, imageAlt: "" } : {}),
 			...(!output.includeCode ? { code: undefined } : {}),
 		}));
@@ -75,7 +77,7 @@ export async function renderLessonGuide(lesson: LessonManifest, ids: string[]) {
 				index + 1 < selected.steps.length
 					? `<a href="#${anchor(index + 1)}">Next step (${index + 2})</a>`
 					: "";
-			return `<section aria-labelledby="${anchor(index)}"><h2 id="${anchor(index)}" tabindex="-1">${index + 1}. ${html(step.title)}</h2><p class="status" lang="en" dir="ltr">${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}</p><p>${html(step.instructions.replace(/\r\n?/g, "\n")).replace(/\n/g, "<br>")}</p>${image ? `<figure><img src="data:image/jpeg;base64,${image.base64}" alt="${html(step.imageAlt)}" width="${image.width}" height="${image.height}"><figcaption aria-hidden="true">${html(step.imageAlt)}</figcaption></figure>` : ""}${step.code ? `<pre dir="ltr"><code>${html(step.code.text)}</code></pre>` : ""}<nav class="step-navigation" aria-label="Step ${index + 1} navigation" lang="en" dir="ltr"><a href="#lesson-steps">Back to steps</a>${previous}${next}</nav></section>`;
+			return `<section aria-labelledby="${anchor(index)}"><h2 id="${anchor(index)}" tabindex="-1">${step.title.trim() ? `${index + 1}. ${html(step.title)}` : `<span lang="en" dir="ltr">Step ${index + 1}</span>`}</h2><p class="status" lang="en" dir="ltr">${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}</p><p>${html(step.instructions.replace(/\r\n?/g, "\n")).replace(/\n/g, "<br>")}</p>${image ? `<figure><img src="data:image/jpeg;base64,${image.base64}" alt="${html(step.imageAlt)}" width="${image.width}" height="${image.height}"><figcaption aria-hidden="true">${html(step.imageAlt)}</figcaption></figure>` : ""}${step.code ? `<pre dir="ltr"><code>${html(step.code.text)}</code></pre>` : ""}<nav class="step-navigation" aria-label="Step ${index + 1} navigation" lang="en" dir="ltr"><a href="#lesson-steps">Back to steps</a>${previous}${next}</nav></section>`;
 		})
 		.join("\n");
 	const outputHtml = `<!doctype html><html lang="${html(output.language)}" dir="${output.direction}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>${html(selected.title)}</title><style>

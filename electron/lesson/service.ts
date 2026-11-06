@@ -14,6 +14,7 @@ import {
 	buildLessonSceneDescription,
 	lessonRenderFingerprint,
 } from "../../src/lib/lesson/frameSource";
+import { lessonRangeRequestSchema } from "../../src/lib/lesson/mediaSelection";
 import {
 	decodeImage,
 	jpegDimensions,
@@ -23,6 +24,7 @@ import {
 } from "../../src/lib/lesson/schema";
 import type { CompositorClipInput } from "../../src/native/contracts";
 import { buildNativeClipList } from "../../src/native/sceneDescription";
+import { planLessonRange } from "./rangePlan";
 import { readLessonFile } from "./readLessonFile";
 export type LessonRenderFrames = (
 	clips: CompositorClipInput[],
@@ -44,6 +46,10 @@ export class LessonService {
 		private readonly readDocument: (id: string) => Promise<AxcutDocument>,
 		private readonly renderFrames: LessonRenderFrames,
 	) {}
+	async planRange(input: unknown) {
+		const request = lessonRangeRequestSchema.parse(input);
+		return planLessonRange(await this.readDocument(request.projectId), request);
+	}
 	async captureFrame(input: unknown): Promise<LessonImage> {
 		if (this.rendering) throw new LessonOperationError("render-busy");
 		const request = frameRequest.parse(input);

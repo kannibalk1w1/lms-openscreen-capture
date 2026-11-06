@@ -468,3 +468,13 @@ No Rust/native source/binary changed or native/physical acceptance was rerun.
 Actual review17 must assess the committed SHA. Next: remaining explicit step/media
 package prerequisites; timed player, captions/progress, autosave and physical/
 platform acceptance remain open.
+
+
+[Slice21 range references](LESSON_CAPTURE_RANGES.md) retain explicit author-selected
+saved-project intervals in the full lesson only. Static guides strip unresolved
+range metadata because they contain no video. Existing image/code inclusion and
+selected-step/lineage behavior remain. Empty source titles now get the same neutral
+English StepN label in heading and contents, without changing source or Markdown.
+Actual review17 accepted d0949f9f with no High/Medium and closed the HTTP authority
+finding; its separate propagation/fallback nits are addressed in slice21. Its
+approval does not cover the new range slice.

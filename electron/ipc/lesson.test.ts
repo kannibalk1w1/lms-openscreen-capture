@@ -68,3 +68,19 @@ it("routes explicit local recovery operations through the real bounded store wit
 		electron.getPath.mockReturnValue("/disposable");
 	}
 });
+it("range planning IPC validates the request before project reads and hides raw errors", async () => {
+	const read = vi.fn(async () => {
+		throw new Error("PRIVATE_RANGE_PROJECT_ERROR");
+	});
+	electron.handle.mockClear();
+	registerLessonHandlers(new LessonService(read, async () => null));
+	const plan = electron.handle.mock.calls.find(([name]) => name === "lesson:plan-range")![1];
+	expect(
+		await plan(null, { projectId: "p", documentSha256: "a".repeat(64), startSec: 2, endSec: 1 }),
+	).toEqual({ success: false, code: "lesson-operation-failed" });
+	expect(read).not.toHaveBeenCalled();
+	expect(
+		await plan(null, { projectId: "p", documentSha256: "a".repeat(64), startSec: 1, endSec: 2 }),
+	).toEqual({ success: false, code: "lesson-operation-failed" });
+	expect(read).toHaveBeenCalledTimes(1);
+});
