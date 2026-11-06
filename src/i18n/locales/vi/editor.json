@@ -465,6 +465,7 @@
 		"scope_global": "Global pointer buttons",
 		"scope_applications": "Application allowlist",
 		"limit": "A matching receipt verifies association, not physical completeness or redaction. Video, audio, typing and earlier evidence still need privacy review.",
-		"interrupted": "Previous capture owners are no longer running. Media can be recovered without unverified evidence."
+		"interrupted": "Previous capture owners are no longer running. Media can be recovered without unverified evidence.",
+		"recovered": "Recovery history remains unverified:"
 	}
 }

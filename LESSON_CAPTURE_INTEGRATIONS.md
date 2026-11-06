@@ -1,5 +1,9 @@
 # Optional application boundary — overnight slice 9
 
+Historical slice-9 validation. [Review-8 follow-up](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_8.md)
+adds bounded disabled-import feedback, visible unverified provenance and explicit
+provider-status reset; it also preserves recovery exclusions across every inspection path.
+
 This is the first working subset of the [integration design](lesson-capture/APPLICATION_INTEGRATIONS.md).
 It adapts the existing Godot typing **file importer**, with an optional internal
 capability/session boundary and real persistent controls. It does not connect to

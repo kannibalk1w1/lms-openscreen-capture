@@ -78,7 +78,7 @@ interface Window {
 		) => Promise<import("./integrations/applicationIntegrationService").IntegrationSettingsResult>;
 		importTypingSource?: (
 			source: string,
-		) => Promise<import("../src/lib/typing/portable").ImportedTypingFile[]>;
+		) => Promise<import("../src/lib/applicationIntegrations/schema").TypingImportResult>;
 		onApplicationIntegrationsChanged?: (
 			callback: (
 				snapshot: import("./integrations/applicationIntegrationService").IntegrationSnapshot,

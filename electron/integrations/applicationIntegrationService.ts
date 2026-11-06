@@ -14,6 +14,12 @@ import type { ImportedTypingFile } from "../../src/lib/typing/portable";
 import { MAX_TYPING_BYTES, typingTakeSchema } from "../../src/lib/typing/schema";
 import type { AppSettingsStore } from "../app-settings";
 
+export class TypingIntegrationDisabledError extends Error {
+	constructor() {
+		super("Enable Godot journal import before reading this raw journal");
+	}
+}
+
 /** The only current integration is an explicitly selected-file decoder, never a live watcher. */
 export class ApplicationIntegrationService {
 	private readonly sources = new Map<string, string>();
@@ -92,7 +98,7 @@ export class ApplicationIntegrationService {
 				(status) => status.descriptor.id === "godot-codeedit" && status.enabled,
 			)
 		)
-			throw new Error("Enable Godot journal import before reading this raw journal");
+			throw new TypingIntegrationDisabledError();
 		const instanceId = randomUUID(),
 			sessionId = randomUUID(),
 			artifactId = randomUUID();

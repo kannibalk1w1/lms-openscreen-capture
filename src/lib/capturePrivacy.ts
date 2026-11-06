@@ -106,6 +106,15 @@ export const capturePrivacyBindingSchema = z
 	})
 	.strict();
 export type CapturePrivacyBinding = z.infer<typeof capturePrivacyBindingSchema>;
+export const captureRecoveryReasonSchema = z.enum([
+	"invalid",
+	"pending",
+	"interrupted",
+	"mismatch",
+	"conflict",
+	"unavailable",
+]);
+export type CaptureRecoveryReason = z.infer<typeof captureRecoveryReasonSchema>;
 export const capturePrivacyInspectionSchema = z
 	.object({
 		status: z.enum([
@@ -120,9 +129,7 @@ export const capturePrivacyInspectionSchema = z
 			"conflict",
 		]),
 		journalPresent: z.boolean(),
-		recoveredFrom: z
-			.enum(["invalid", "pending", "interrupted", "mismatch", "conflict", "unavailable"])
-			.optional(),
+		recoveredFrom: captureRecoveryReasonSchema.optional(),
 		receipt: capturePrivacyReceiptSchema.optional(),
 		binding: capturePrivacyBindingSchema.optional(),
 	})
@@ -164,4 +171,26 @@ export function minimizeCapturePrivacyReceipt(
 		collectionAllowedAtStart: receipt.collectionAllowedAtStart,
 		suppressedAtStart: receipt.suppressedAtStart,
 	};
+}
+
+/** Recovery exclusions survive fresh neighboring artifacts until a separate review decision. */
+export function captureEvidencePackagingDecision(
+	inspection: CapturePrivacyInspection,
+): { allowed: true } | { allowed: false; recoveredFrom: CaptureRecoveryReason } {
+	if (inspection.recoveredFrom) return { allowed: false, recoveredFrom: inspection.recoveredFrom };
+	switch (inspection.status) {
+		case "bound":
+		case "legacy":
+		case "missing":
+			return { allowed: true };
+		case "invalid":
+		case "pending":
+		case "interrupted":
+		case "mismatch":
+		case "conflict":
+		case "unavailable":
+			return { allowed: false, recoveredFrom: inspection.status };
+		default:
+			return { allowed: false, recoveredFrom: "invalid" };
+	}
 }

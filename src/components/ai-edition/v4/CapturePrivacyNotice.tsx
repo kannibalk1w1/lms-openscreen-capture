@@ -18,6 +18,11 @@ export function CapturePrivacyNotice({ asset }: { asset: AxcutAsset }) {
 		>
 			<strong>{t("capturePrivacy.title")}</strong>
 			<p>{t(`capturePrivacy.${inspection?.status ?? "missing"}`)}</p>
+			{inspection?.recoveredFrom && (
+				<p>
+					{t("capturePrivacy.recovered")} {t(`capturePrivacy.${inspection.recoveredFrom}`)}
+				</p>
+			)}
 			{inspection?.receipt && (
 				<p>
 					{t("capturePrivacy.policyAtStart")}{" "}

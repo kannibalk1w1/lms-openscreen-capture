@@ -215,7 +215,9 @@
 			"capability": "Capability: Godot typing journal schema 1, tested with Godot 4.7.1. Reads the file you choose; plugin installation, monitoring and live capture require separate setup and permission.",
 			"failed": "The optional import failed. Choose a supported complete journal, or disable the integration.",
 			"unsupportedEvidence": "The stored integration provenance is unsupported. Validated typing content remains available; adapter-specific scope and clock claims are unverified.",
-			"incompatible": "The optional provider contract is incompatible. Ordinary capture and saved evidence remain available."
+			"incompatible": "The optional provider contract is incompatible. Ordinary capture and saved evidence remain available.",
+			"enableHint": "Enable Godot typing journal import in Application integrations, then try this file again.",
+			"unverifiedProvenance": "Integration provenance is a source claim. It does not verify an application, collection scope or clock synchronization."
 		}
 	},
 	"code": {

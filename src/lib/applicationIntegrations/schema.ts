@@ -87,3 +87,7 @@ export const GODOT_JOURNAL_DESCRIPTOR: IntegrationDescriptor = {
 	supportedApplicationVersions: ["4.7.1"],
 	mode: "selected-file",
 };
+
+export type TypingImportResult =
+	| { success: true; files: import("../typing/portable").ImportedTypingFile[] }
+	| { success: false; code: "integration-disabled" | "invalid-typing-source" };

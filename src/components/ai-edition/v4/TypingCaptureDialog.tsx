@@ -188,9 +188,22 @@ export function TypingCaptureDialog({
 			if (useProjectStore.getState().projectId !== projectId || currentWriteEpoch() !== epoch)
 				return;
 			let files: ImportedTypingFile[];
-			if (window.electronAPI?.importTypingSource)
-				files = await window.electronAPI.importTypingSource(source);
-			else {
+			if (window.electronAPI?.importTypingSource) {
+				const result = await window.electronAPI.importTypingSource(source);
+				if (useProjectStore.getState().projectId !== projectId || currentWriteEpoch() !== epoch)
+					return;
+				if (!result.success) {
+					setError(
+						t(
+							result.code === "integration-disabled"
+								? "typing.integrations.enableHint"
+								: "typing.importError",
+						),
+					);
+					return;
+				}
+				files = result.files;
+			} else {
 				JSON.parse(source);
 				files = importTypingFiles(source);
 			} // Core portable data also works in a browser; raw adapters require the main boundary.
@@ -228,6 +241,7 @@ export function TypingCaptureDialog({
 				</DialogHeader>
 				<div className={styles.body}>
 					<ApplicationIntegrationSettings />
+					{take?.integration && <p>{t("typing.integrations.unverifiedProvenance")}</p>}
 					{take?.integration && "status" in take.integration && (
 						<p role="alert">{t("typing.integrations.unsupportedEvidence")}</p>
 					)}

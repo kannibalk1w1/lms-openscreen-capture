@@ -38,9 +38,14 @@ it("actual IPC callbacks persist configuration and broadcast failures without st
 			statuses: [expect.objectContaining({ state: "available-offline" })],
 		}),
 	);
-	await expect(load(null, "PRIVATE_INVALID_CANARY\ninvalid")).rejects.toThrow("could not start");
+	await expect(load(null, "PRIVATE_INVALID_CANARY\ninvalid")).resolves.toEqual({
+		success: false,
+		code: "invalid-typing-source",
+	});
 	expect(JSON.stringify(send.mock.calls)).not.toContain("PRIVATE_INVALID_CANARY");
 	expect(get().statuses[0].state).toBe("error");
+	expect(set(null, { version: 1, enabledAdapterIds: ["godot-codeedit"] }).success).toBe(true);
+	expect(get().statuses[0].state).toBe("available-offline");
 	expect(set(null, { version: 1, enabledAdapterIds: [] }).success).toBe(true);
 	expect(get().statuses[0].state).toBe("disabled");
 });

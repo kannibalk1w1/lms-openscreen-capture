@@ -226,7 +226,7 @@ async function present(target: string) {
 }
 
 /** Production import/reopen/pack inspection. Binding proves source association, not consent authenticity. */
-export async function inspectCapturePrivacy(
+async function inspectCapturePrivacyState(
 	video: string,
 	embedded?: CapturePrivacyInspection,
 ): Promise<CapturePrivacyInspection> {
@@ -287,4 +287,18 @@ export async function inspectCapturePrivacy(
 			...(embedded?.binding ? { binding: embedded.binding } : {}),
 		};
 	}
+}
+
+/** Never let a transient inspection path erase a persisted recovery exclusion. */
+export async function inspectCapturePrivacy(
+	video: string,
+	embedded?: CapturePrivacyInspection,
+): Promise<CapturePrivacyInspection> {
+	const parsed = capturePrivacyInspectionSchema.safeParse(embedded);
+	const previous = parsed.success ? parsed.data : undefined;
+	const inspected = await inspectCapturePrivacyState(video, previous);
+	return {
+		...inspected,
+		...(previous?.recoveredFrom ? { recoveredFrom: previous.recoveredFrom } : {}),
+	};
 }

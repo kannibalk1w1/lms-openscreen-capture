@@ -475,12 +475,70 @@ it("discards an optional importer response after the project changes", async () 
 		const other = createEmptyDocument({ title: "B", projectId: "ipc-b" });
 		useProjectStore.setState({ projectId: "ipc-b", document: other });
 		await act(async () => {
-			finish([{ take, mode: "captured-edits" }]);
+			finish({ success: true, files: [{ take, mode: "captured-edits" }] });
 		});
 		expect(useProjectStore.getState().document?.typingTakes).toBeUndefined();
 		expect(
 			(screen.getByRole("textbox", { name: "Capture pad" }) as HTMLTextAreaElement).value,
 		).not.toContain("PRIVATE_OTHER_PROJECT_CANARY");
+	} finally {
+		window.electronAPI = before;
+	}
+});
+it("explains how to enable a disabled raw Godot decoder without calling a valid file malformed", async () => {
+	const before = window.electronAPI;
+	try {
+		useProjectStore.setState({
+			projectId: "disabled-import",
+			document: createEmptyDocument({ title: "Disabled", projectId: "disabled-import" }),
+		});
+		const source = [
+			{
+				schemaVersion: 1,
+				event: "typing-start",
+				producer: "godot-codeedit",
+				sessionId: "valid",
+				sequence: 0,
+				atMs: 0,
+				initialText: "",
+				documentName: "example.gd",
+				startedAt: "2026-11-06T00:00:00Z",
+				offsetEncoding: "unicode-code-points",
+			},
+			{
+				schemaVersion: 1,
+				event: "typing-stop",
+				sessionId: "valid",
+				sequence: 1,
+				atMs: 1,
+				coverage: "complete",
+			},
+		]
+			.map((row) => JSON.stringify(row))
+			.join("\n");
+		Object.assign(window, {
+			electronAPI: {
+				importTypingSource: vi
+					.fn()
+					.mockResolvedValue({ success: false, code: "integration-disabled" }),
+			},
+		});
+		render(
+			<I18nProvider>
+				<TypingCaptureDialog open onClose={vi.fn()} />
+			</I18nProvider>,
+		);
+		const file = new File([], "take.jsonl");
+		Object.defineProperty(file, "text", { value: async () => source });
+		fireEvent.change(screen.getByLabelText("Import typing journal"), { target: { files: [file] } });
+		await waitFor(() =>
+			expect(
+				screen.getByText(
+					"Enable Godot typing journal import in Application integrations, then try this file again.",
+				),
+			).toBeTruthy(),
+		);
+		expect(useProjectStore.getState().document?.typingTakes).toBeUndefined();
 	} finally {
 		window.electronAPI = before;
 	}

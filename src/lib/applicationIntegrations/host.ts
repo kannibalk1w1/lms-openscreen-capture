@@ -62,7 +62,11 @@ export class ApplicationIntegrationHost {
 	}
 	setEnabled(ids: readonly string[]) {
 		for (const id of [...this.enabled]) if (!ids.includes(id)) this.disable(id);
-		for (const id of ids) if (this.descriptors.has(id)) this.enabled.add(id);
+		for (const id of ids)
+			if (this.descriptors.has(id)) {
+				this.enabled.add(id);
+				if (this.providers.has(id)) this.errors.delete(id);
+			}
 	}
 	disable(id: string) {
 		this.enabled.delete(id);

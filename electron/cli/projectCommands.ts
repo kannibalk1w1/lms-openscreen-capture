@@ -1,3 +1,4 @@
+import { captureEvidencePackagingDecision } from "../../src/lib/capturePrivacy";
 import {
 	inspectCapturePrivacy,
 	writeCapturePolicyReceipt,
@@ -88,11 +89,12 @@ export async function runPackCommand(
 
 	const screenSource = await resolveSource(screenVideoPath);
 	const capturePrivacy = await inspectCapturePrivacy(screenSource, data.capturePrivacy);
-	const evidenceAllowed = ["bound", "legacy", "missing"].includes(capturePrivacy.status);
+	const packaging = captureEvidencePackagingDecision(capturePrivacy);
+	const evidenceAllowed = packaging.allowed;
 	const warnings: string[] = [];
 	if (!evidenceAllowed)
 		warnings.push(
-			`Capture privacy is ${capturePrivacy.status}; packaged media only, excluding input/cursor/flag evidence and policy sidecars.`,
+			`Capture evidence remains excluded (${packaging.allowed ? capturePrivacy.status : packaging.recoveredFrom}); packaged media only, excluding input/cursor/flag evidence and policy sidecars.`,
 		);
 	else if (capturePrivacy.status !== "bound" && capturePrivacy.journalPresent)
 		warnings.push(
@@ -127,18 +129,12 @@ export async function runPackCommand(
 	if (evidenceAllowed && (await isFile(flagsSidecar))) await copyIn(flagsSidecar);
 	const packedProject: PackedProjectData = {
 		...data,
-		capturePrivacy: evidenceAllowed
+		capturePrivacy: packaging.allowed
 			? capturePrivacy
 			: {
 					status: capturePrivacy.status,
 					journalPresent: false,
-					recoveredFrom: capturePrivacy.status as
-						| "invalid"
-						| "pending"
-						| "interrupted"
-						| "mismatch"
-						| "conflict"
-						| "unavailable",
+					recoveredFrom: packaging.recoveredFrom,
 				},
 		media: {
 			...media,

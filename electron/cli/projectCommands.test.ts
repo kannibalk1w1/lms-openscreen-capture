@@ -353,3 +353,90 @@ it("preserves recovery provenance through real pack, migration and document disk
 	expect(reopened.assets[0].capturePrivacy?.receipt).toBeUndefined();
 	expect(await fs.readFile(`${screen}.capture-policy.lock`, "utf8")).toBe("unknown prior owner");
 });
+
+it.each([
+	"lock",
+	"invalid-sidecar",
+])("keeps recovered exclusions after a transient %s, save/reopen and neighboring journal", async (kind) => {
+	const screen = await make("rec/clip.mp4", "recovered video");
+	const documents = new DocumentService(path.join(root, "projects"), path.join(root, "links"));
+	const initial = await documents.createProject("Recovered");
+	const added = await documents.addAsset(initial.project.id, { path: screen });
+	await documents.saveProject({
+		...added,
+		assets: added.assets.map((asset) => ({
+			...asset,
+			capturePrivacy: {
+				status: "interrupted",
+				recoveredFrom: "interrupted",
+				journalPresent: false,
+			},
+		})),
+	});
+	const temporary = `${screen}.${kind === "lock" ? "capture-policy.lock" : "capture-policy.json"}`;
+	await fs.writeFile(
+		temporary,
+		kind === "lock" ? "unknown owner" : "PRIVATE_INVALID_RECEIPT_CANARY",
+	);
+	const transient = await documents.getProject(initial.project.id);
+	expect(transient.assets[0].capturePrivacy?.recoveredFrom).toBe("interrupted");
+	await documents.saveProject(transient);
+	await fs.unlink(temporary);
+	const reopened = await documents.getProject(initial.project.id);
+	expect(reopened.assets[0].capturePrivacy?.recoveredFrom).toBe("interrupted");
+	await fs.writeFile(`${screen}.events.ndjson`, "PRIVATE_ADJACENT_JOURNAL_CANARY");
+	const project = await writeProject("recovered.openscreen", {
+		version: 1,
+		media: { screenVideoPath: screen },
+		capturePrivacy: reopened.assets[0].capturePrivacy,
+	});
+	const output = path.join(root, "recovered-output");
+	await runPackCommand(project, output, true, recorder().write);
+	expect((await fs.readdir(output)).sort()).toEqual(["clip.mp4", "recovered.openscreen"]);
+	expect(await fs.readFile(`${screen}.events.ndjson`, "utf8")).toBe(
+		"PRIVATE_ADJACENT_JOURNAL_CANARY",
+	);
+});
+it.runIf(process.platform !== "win32" && process.getuid?.() !== 0)(
+	"retains a recovery exclusion through a real transient permission failure",
+	async () => {
+		const screen = await make("rec/clip.mp4", "recovered video");
+		const directory = path.dirname(screen);
+		const documents = new DocumentService(path.join(root, "projects"), path.join(root, "links"));
+		const initial = await documents.createProject("Recovered permissions");
+		const added = await documents.addAsset(initial.project.id, { path: screen });
+		await documents.saveProject({
+			...added,
+			assets: added.assets.map((asset) => ({
+				...asset,
+				capturePrivacy: {
+					status: "interrupted",
+					recoveredFrom: "interrupted",
+					journalPresent: false,
+				},
+			})),
+		});
+		try {
+			await fs.chmod(directory, 0);
+			const inaccessible = await documents.getProject(initial.project.id);
+			expect(inaccessible.assets[0].capturePrivacy).toMatchObject({
+				status: "unavailable",
+				recoveredFrom: "interrupted",
+			});
+			await documents.saveProject(inaccessible);
+		} finally {
+			await fs.chmod(directory, 0o700);
+		}
+		const reopened = await documents.getProject(initial.project.id);
+		expect(reopened.assets[0].capturePrivacy?.recoveredFrom).toBe("interrupted");
+		await fs.writeFile(`${screen}.events.ndjson`, "PRIVATE_RESTORED_JOURNAL_CANARY");
+		const project = await writeProject("permissions.openscreen", {
+			version: 1,
+			media: { screenVideoPath: screen },
+			capturePrivacy: reopened.assets[0].capturePrivacy,
+		});
+		const output = path.join(root, "permissions-output");
+		await runPackCommand(project, output, true, recorder().write);
+		expect((await fs.readdir(output)).sort()).toEqual(["clip.mp4", "permissions.openscreen"]);
+	},
+);
