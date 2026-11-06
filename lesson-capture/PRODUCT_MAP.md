@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (through accepted slice21; slice22 bounded review19 fix awaiting review20). **Record once. Produce multiple editable teaching resources.**
+Updated 6 November 2026 (through accepted slice21; bounded backend accepted at125ec5de by review20; paused for restart). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -62,8 +62,8 @@ Actual reviews through18 accept their exact SHAs; original reports retain limits
 The expanded requirement descriptions below remain future acceptance targets, not
 claims that every listed operation exists.
 
-1. Complete/review the current selected-media materialization/revalidation backend
-   and actual encoded-output proof. Slice22 is a backend building block, not a GUI,
+1. Current selected-media materialization/revalidation backend and encoded proof
+   are accepted within their bounds at125ec5de by actual review20 (M22-1 closed). Slice22 is a backend building block, not a GUI,
    CLI or player release. Its first native MP4 proof found a video-stream duration
    discrepancy; do not claim timed-playback readiness from native stats alone.
 2. **Pause after this current phase**, as the user requested to restart the machine.

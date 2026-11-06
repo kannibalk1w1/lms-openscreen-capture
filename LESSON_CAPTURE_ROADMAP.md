@@ -90,7 +90,9 @@ constraints. [Current authorization and superseded schedule](lesson-capture/OVER
 and encoded proof, then pause for the user to restart. No further roadmap phase
 begins before resumption. Actual review19 examined f7b8ed4c and found MediumM22-1 in the backend
 asset-duration clamp. A bounded programme-grid guard/regression addresses it;
-actual focused review20 is required before the restart checkpoint. Historical High/Medium/pending notes below
+actual review20 CLOSED M22-1 and accepts125ec5de with no High/Medium/material
+blocker. The current bounded phase is complete; the user-requested restart
+checkpoint/pause is active. Historical High/Medium/pending notes below
 are snapshots of earlier stages, not a current unresolved-finding list.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
@@ -137,7 +139,7 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    copying/playback. Actual review18 accepts8e0316ab with no High/Medium; its
    boundary-test gaps are addressed in slice22.
    Current phase: backend selected-media materialization/revalidation and native
-   encoded-output proof, including the bounded review19 M22-1 fix awaiting20.
+   encoded-output proof, including the bounded review19 M22-1 fix CLOSED by actual review20 at125ec5de.
    Baseline zero-last-sample native timing and synthesized AAC attribution are
    explicit; no timed-playback acceptance is claimed.
    This is not GUI/API/player delivery. Pause after this phase for the requested

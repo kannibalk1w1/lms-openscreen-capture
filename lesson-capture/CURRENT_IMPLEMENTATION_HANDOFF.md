@@ -1,6 +1,6 @@
 # Current phase and requested restart checkpoint — 6 November 2026
 
-**Finish current materialization phase, review/fix it, checkpoint and pause.**
+**PAUSED after the current backend phase: user restart requested.**
 The user requested a pause to restart the computer after the selected-media
 materialization/revalidation and actual encoded-output proof already in progress.
 Do not start a timed player, API/UI integration or another roadmap phase before
@@ -36,7 +36,7 @@ were defence in depth because real disabled fieldsets already block input.
 Review11 MediumM14-1 was closed at553bd9ca by actual review12. Original reports
 and all follow-ups remain preserved; old pending labels are historical.
 
-## Current phase — slice22, bounded review19 fix awaiting review20
+## Current phase complete — reviewed125ec5de; restart pause
 
 [Range media backend](../LESSON_CAPTURE_RANGE_MEDIA.md) materializes a limited
 selected interval through injected native export, with ephemeral cuts, source/
@@ -48,7 +48,8 @@ manual/reference features from automatic generation and full future requirements
 
 Actual review19 found MediumM22-1 (known asset duration can clamp native clips
 before frame-count checking). An independent selected-programme frame-grid check
-and regression address it; focused review20 is required. Review19 original report
+and regression address it; actual review20 CLOSED M22-1 and C22-1 and accepts
+125ec5de with no High/Medium/material blocker. Review19 original report
 is preserved. Native/AAC timing honesty is corrected; no native code is changed.
 
 Actual staged-addon proof produces45 H.264 frames,640x360, nominal30fps. Three
@@ -85,12 +86,22 @@ libraries; do not set the unnamespaced FFmpeg LD_LIBRARY_PATH needed for Rust te
 
 Artifacts: `../openscreen-evaluation/overnight-2026-11-06/`, including
 `lesson-range-native-fixture-verified/`, failed/final earlier fixtures and
-`slice-22-*`. Preserve every source/report/probe/WIP file. After review/fixes,
-checkpoint exact code/review/test/remote SHAs and stop only this worker's temporary
-app/server/render processes. Root confirms all workers settled before saying the
+`slice-22-*`. Preserve every source/report/probe/WIP file. The final docs-only checkpoint contains original review20, its disposition and
+OVERNIGHT_REPORT_2026-11-06.md; no code changed after reviewed125ec5de. Exact final
+HEAD/remote/main/clean status is recorded in restart-git-verification.json outside
+checkout and the completion receipt. Final owned-process audit found no temporary
+app/server/render/verification process; no processes/caches were killed or purged. Root confirms all workers settled before saying the
 computer is safe to restart. No next phase starts automatically.
 
 Open acceptance/backlog: physical portal/OS input/timing/device-loss, actual
 Electron/stdio/screen-reader, Windows/macOS, sustained use, full privacy/redaction,
 rolling buffer, retakes/handoff, automatic semantic guides, full media/course
 packaging, timed controls/captions/progress, autosave and remaining product map.
+
+
+Deferred findings: L23-1 rare fail-closed float-boundary refusal, T22-1 remaining
+limit/dependency regression gaps, B22-2 native last-sample duration0. No native
+fix, API/UI integration, timed player or further phase before user resumption.
+Actual review20 independent59focused/5,0skip,root/test TS/Biome35 and probes/
+mutations accepted125ec5de. Worker56/4focused+Vite/TS/lint/docs validate the narrow
+fix; full5609/425 belongs to f7b8ed4c before the Medium fix. Preserve all evidence.
