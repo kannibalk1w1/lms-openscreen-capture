@@ -42,6 +42,17 @@ pub struct CursorAsset {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
+    ClockSnapshot {
+        request_id: String,
+        observed_monotonic_ms: u64,
+        state: &'static str,
+        media_time_ms: Option<u64>,
+        interval_id: Option<u64>,
+        interval_start_monotonic_ms: Option<u64>,
+        interval_end_monotonic_ms: Option<u64>,
+        interval_media_start_ms: Option<u64>,
+    },
+    #[serde(rename_all = "camelCase")]
     InputDiscontinuity {
         monotonic_ms: u64,
         device: String,
@@ -95,6 +106,7 @@ pub enum Event {
     Ready {
         timestamp_ms: u64,
         button_privacy_version: u8,
+        clock_snapshot_version: u8,
         /// Runtime libpipewire version, not the vendored header version.
         pipewire_version: Option<String>,
         /// Whether the portal advertises METADATA cursor mode at all.
@@ -269,9 +281,12 @@ impl<W: Write> Emitter<W> {
             // and "the stream ran fine and this is teardown". `or_insert` so the
             // events that carry a meaningful timestamp of their own (a sample's
             // capture time) keep it.
-            object
-                .entry("timestampMs".to_owned())
-                .or_insert_with(|| timestamp_ms().into());
+            // Cross-process clock queries deliberately carry no UTC relation.
+            if !matches!(event, Event::ClockSnapshot { .. }) {
+                object
+                    .entry("timestampMs".to_owned())
+                    .or_insert_with(|| timestamp_ms().into());
+            }
         }
 
         writeln!(self.out, "{value}")?;
@@ -314,6 +329,7 @@ mod tests {
             &Event::Ready {
                 timestamp_ms: 42,
                 button_privacy_version: 1,
+                clock_snapshot_version: 1,
                 pipewire_version: Some("1.0.5".to_owned()),
                 cursor_metadata_supported: true,
                 cursor_mode: "metadata",
@@ -362,6 +378,7 @@ mod tests {
         let value = parse_one(&Event::Ready {
             timestamp_ms: 7,
             button_privacy_version: 1,
+            clock_snapshot_version: 1,
             pipewire_version: None,
             cursor_metadata_supported: false,
             cursor_mode: "embedded",

@@ -71,8 +71,8 @@ it("isolates two same-type instances sharing local session IDs and sequences", a
 	]);
 	expect(f.emits.get("a")!(observation(a))).toBe(true);
 	expect(f.emits.get("b")!(observation(b))).toBe(true);
-	expect(f.host.take("a")[0].scope.artifactId).toBe("file-a");
-	expect(f.host.take("b")[0].scope.artifactId).toBe("file-b");
+	expect(f.host.take("a")[0].scope).toEqual({ kind: "selected-file", artifactId: "file-a" });
+	expect(f.host.take("b")[0].scope).toEqual({ kind: "selected-file", artifactId: "file-b" });
 	expect(f.emits.get("a")!(observation(b, 1))).toBe(false);
 	expect(f.host.statuses()[0].activeSessions).toBe(1);
 	expect(f.stops.get("a")).toHaveBeenCalledTimes(1);
@@ -252,4 +252,38 @@ it("routes different adapter IDs independently even when their local IDs collide
 	host.disable(a.adapterId);
 	expect(emits.get(b.adapterId)!(observation(b, 1))).toBe(true);
 	host.close("b");
+});
+it("a selected-file grant cannot authorize a paired-project clock capability", async () => {
+	const descriptor = {
+		...GODOT_JOURNAL_DESCRIPTOR,
+		id: "godot-recording-clock",
+		mode: "paired-project" as const,
+		capabilities: ["recording.clock"],
+	};
+	const start = vi.fn(() => () => undefined);
+	const host = new ApplicationIntegrationHost([descriptor], [{ descriptor, start }]);
+	host.enable(descriptor.id);
+	const session = {
+		version: 1,
+		adapterId: descriptor.id,
+		instanceId: "paired-instance",
+		sessionId: "paired-session",
+		capability: "recording.clock",
+		scope: {
+			kind: "paired-project",
+			applicationId: "godot",
+			projectId: "a".repeat(64),
+			grantId: "64c1e73a-04b8-40da-aa34-7a7ec0f1c711",
+		},
+	};
+	await expect(host.open(session, { selectedFileAuthorized: true })).rejects.toThrow(
+		"not authorized",
+	);
+	await expect(host.open(session, { pairedProjectGrantId: "other" })).rejects.toThrow(
+		"not authorized",
+	);
+	expect(start).not.toHaveBeenCalled();
+	await host.open(session, { pairedProjectGrantId: session.scope.grantId });
+	expect(start).toHaveBeenCalledTimes(1);
+	host.disable(descriptor.id);
 });

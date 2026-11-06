@@ -7,6 +7,12 @@ import {
 	normalizeCapturePrivacyPolicy,
 	summarizeCapturePrivacyPolicy,
 } from "../../../src/lib/capturePrivacy";
+import {
+	type NativeClockSnapshot,
+	NativeClockSourceEndedError,
+	nativeClockSnapshotEventSchema,
+	nativeClockSnapshotSchema,
+} from "../../../src/lib/clockBridge/schema";
 import type { InputCaptureHealth, InputCaptureStatus } from "../../../src/native/captureEvents";
 import type { CursorRecordingData } from "../../../src/native/contracts";
 import { CaptureEventJournal } from "../../recording/captureEventJournal";
@@ -82,6 +88,7 @@ const HELPER_EVENTS = new Set([
 	"input-capture-status",
 	"input-discontinuity",
 	"input-drain",
+	"clock-snapshot",
 ]);
 
 export interface LinuxCaptureConfig {
@@ -152,6 +159,16 @@ export class LinuxNativeCaptureSession {
 	private readyReject: ((error: Error) => void) | null = null;
 	private readyTimer: NodeJS.Timeout | null = null;
 
+	private clockSnapshotSupported = false;
+	private stopping = false;
+	private readonly clockQueries = new Map<
+		string,
+		{
+			resolve: (point: NativeClockSnapshot) => void;
+			reject: (error: Error) => void;
+			timer: ReturnType<typeof setTimeout>;
+		}
+	>();
 	private capturing = false;
 	private startedResolve: (() => void) | null = null;
 	private startedReject: ((error: Error) => void) | null = null;
@@ -243,6 +260,7 @@ export class LinuxNativeCaptureSession {
 			}
 		});
 		child.once("exit", (code, signal) => {
+			this.rejectClockQueries();
 			this.releaseDestination?.();
 			this.process = null;
 			if (this.capturing && !this.stopped) this.inputInterrupted = true;
@@ -508,6 +526,8 @@ export class LinuxNativeCaptureSession {
 	 * recording.
 	 */
 	async stop(): Promise<LinuxCaptureResult> {
+		this.stopping = true;
+		this.rejectClockQueries();
 		const child = this.process;
 		if (!child) {
 			if (this.stopped) {
@@ -561,6 +581,7 @@ export class LinuxNativeCaptureSession {
 	/** Kills the helper and discards whatever it wrote. */
 	discard() {
 		this.discarded = true;
+		this.rejectClockQueries();
 		this.kill();
 		if (!this.process) this.releaseDestination?.();
 	}
@@ -596,6 +617,35 @@ export class LinuxNativeCaptureSession {
 		});
 		this.discard();
 		await exited;
+	}
+
+	/** Read-only query of the encoder's own clock; never derives it from UTC or parent controls. */
+	get clockIdentity(): string {
+		return this.captureId;
+	}
+	sampleClock(): Promise<NativeClockSnapshot> {
+		if (!this.process || this.stopping || this.stopped || this.discarded)
+			return Promise.reject(new NativeClockSourceEndedError());
+		if (!this.clockSnapshotSupported)
+			return Promise.reject(new Error("Native recording clock snapshots are unavailable"));
+		if (this.clockQueries.size >= 4)
+			return Promise.reject(new Error("Native recording clock query capacity reached"));
+		const requestId = randomUUID();
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.clockQueries.delete(requestId);
+				reject(new Error("Native recording clock query timed out"));
+			}, 1000);
+			this.clockQueries.set(requestId, { resolve, reject, timer });
+			this.write(`clock ${requestId}`);
+		});
+	}
+	private rejectClockQueries() {
+		for (const pending of this.clockQueries.values()) {
+			clearTimeout(pending.timer);
+			pending.reject(new NativeClockSourceEndedError());
+		}
+		this.clockQueries.clear();
 	}
 
 	private write(command: string) {
@@ -654,6 +704,7 @@ export class LinuxNativeCaptureSession {
 					typeof payload.code === "string" &&
 					payload.code.startsWith("click-capture-"));
 			if (
+				payload.event !== "clock-snapshot" &&
 				payload.event !== "cursor-sample" &&
 				payload.event !== "pointer-button" &&
 				((this.buttonDecision.allowed && this.capturing && !this.stopped) || !privateInputLine)
@@ -666,6 +717,24 @@ export class LinuxNativeCaptureSession {
 
 	private handleEvent(payload: PipeWireHelperEvent) {
 		switch (payload.event) {
+			case "clock-snapshot": {
+				const parsed = nativeClockSnapshotEventSchema.safeParse(payload);
+				if (!parsed.success) return;
+				const pending = this.clockQueries.get(parsed.data.requestId);
+				if (!pending) return;
+				const { event: _event, schemaVersion: _schemaVersion, requestId, ...fields } = parsed.data;
+				const point = nativeClockSnapshotSchema.safeParse({
+					version: 1,
+					clockId: this.captureId,
+					...fields,
+				});
+				this.clockQueries.delete(requestId);
+				clearTimeout(pending.timer);
+				if (point.success) pending.resolve(point.data);
+				else pending.reject(new Error("Invalid native recording clock response"));
+				return;
+			}
+
 			case "input-capture-status":
 				if (this.inputSuppressed) return;
 				this.inputStatus = {
@@ -718,6 +787,7 @@ export class LinuxNativeCaptureSession {
 					this.journal?.append(payload);
 				return;
 			case "ready":
+				this.clockSnapshotSupported = payload.clockSnapshotVersion === 1;
 				if (payload.buttonPrivacyVersion !== 1) {
 					this.suppressButtonEvidence();
 					this.rejectReady(

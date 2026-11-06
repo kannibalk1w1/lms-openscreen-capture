@@ -70,6 +70,17 @@ interface Window {
 		onSelectedSourceChanged: (
 			callback: (source: ProcessedDesktopSource | null) => void,
 		) => () => void;
+		getRecordingClockBridge?: () => Promise<
+			import("../src/lib/clockBridge/schema").ClockBridgeStatus
+		>;
+		createRecordingClockPair?: () => Promise<{
+			success: boolean;
+			code?: string;
+			status: import("../src/lib/clockBridge/schema").ClockBridgeStatus;
+		}>;
+		stopRecordingClockBridge?: () => Promise<
+			import("../src/lib/clockBridge/schema").ClockBridgeStatus
+		>;
 		getApplicationIntegrations?: () => Promise<
 			import("./integrations/applicationIntegrationService").IntegrationSnapshot
 		>;

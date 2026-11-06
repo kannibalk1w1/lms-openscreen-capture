@@ -24,13 +24,21 @@ export const integrationDescriptorSchema = z
 		label: z.string().min(1).max(200),
 		capabilities: z.array(identity).min(1).max(32),
 		supportedApplicationVersions: z.array(identity).max(32),
-		mode: z.literal("selected-file"),
+		mode: z.enum(["selected-file", "paired-project"]),
 	})
 	.strict();
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
-export const integrationScopeSchema = z
-	.object({ kind: z.literal("selected-file"), artifactId: identity })
-	.strict();
+export const integrationScopeSchema = z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("selected-file"), artifactId: identity }).strict(),
+	z
+		.object({
+			kind: z.literal("paired-project"),
+			applicationId: z.literal("godot"),
+			projectId: z.string().regex(/^[a-f0-9]{64}$/),
+			grantId: z.string().uuid(),
+		})
+		.strict(),
+]);
 export const integrationSessionSchema = z
 	.object({
 		version: z.literal(1),
@@ -61,6 +69,7 @@ export type IntegrationObservation = z.infer<typeof integrationObservationSchema
 export type IntegrationState =
 	| "disabled"
 	| "available-offline"
+	| "available"
 	| "unavailable"
 	| "connecting"
 	| "incompatible"
@@ -91,3 +100,13 @@ export const GODOT_JOURNAL_DESCRIPTOR: IntegrationDescriptor = {
 export type TypingImportResult =
 	| { success: true; files: import("../typing/portable").ImportedTypingFile[] }
 	| { success: false; code: "integration-disabled" | "invalid-typing-source" };
+
+export const GODOT_CLOCK_DESCRIPTOR: IntegrationDescriptor = {
+	id: "godot-recording-clock",
+	version: "1",
+	contractVersion: 1,
+	label: "Godot recording clock",
+	capabilities: ["recording.clock"],
+	supportedApplicationVersions: ["4.7.1"],
+	mode: "paired-project",
+};

@@ -179,6 +179,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getSelectedSource: () => {
 		return ipcRenderer.invoke("get-selected-source");
 	},
+	getRecordingClockBridge: () => ipcRenderer.invoke("recording-clock:get"),
+	createRecordingClockPair: () => ipcRenderer.invoke("recording-clock:pair"),
+	stopRecordingClockBridge: () => ipcRenderer.invoke("recording-clock:stop"),
 	getApplicationIntegrations: () => ipcRenderer.invoke("application-integrations:get"),
 	setApplicationIntegrations: (
 		settings: import("../src/lib/applicationIntegrations/schema").IntegrationSettings,

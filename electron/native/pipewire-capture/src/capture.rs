@@ -738,6 +738,10 @@ impl Capture {
         }
     }
 
+    pub(crate) fn clock_snapshot(&self, at: Instant) -> crate::capture_clock::Snapshot {
+        self.clock.snapshot_at(at)
+    }
+
     /// Project a reader observation through the encoder's historical active intervals.
     pub(crate) fn input_projection(&self, at: Instant) -> Option<crate::capture_clock::Projection> {
         self.clock.project(at)

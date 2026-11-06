@@ -29,6 +29,7 @@ import {
 import type { TypingReviewTarget } from "@/lib/typing/review";
 import type { TypingSection, TypingTake } from "@/lib/typing/schema";
 import { ApplicationIntegrationSettings } from "./ApplicationIntegrationSettings";
+import { RecordingClockBridgeControls } from "./RecordingClockBridgeControls";
 import styles from "./TypingCaptureDialog.module.css";
 
 export function TypingCaptureDialog({
@@ -241,6 +242,7 @@ export function TypingCaptureDialog({
 				</DialogHeader>
 				<div className={styles.body}>
 					<ApplicationIntegrationSettings />
+					<RecordingClockBridgeControls projectId={projectId} />
 					{take?.integration && <p>{t("typing.integrations.unverifiedProvenance")}</p>}
 					{take?.integration && "status" in take.integration && (
 						<p role="alert">{t("typing.integrations.unsupportedEvidence")}</p>

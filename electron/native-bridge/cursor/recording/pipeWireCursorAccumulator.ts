@@ -35,6 +35,9 @@ export interface PipeWireCursorAssetPayload {
 }
 
 export type PipeWireHelperEvent =
+	| import("zod").z.infer<
+			typeof import("../../../../src/lib/clockBridge/schema").nativeClockSnapshotEventSchema
+	  >
 	| InputDiscontinuityEvidence
 	| InputDrainEvidence
 	| CaptureBoundaryEvidence
@@ -45,6 +48,7 @@ export type PipeWireHelperEvent =
 			timestampMs: number;
 			/** Native button collection opt-in and one-way suppression protocol. */
 			buttonPrivacyVersion?: number;
+			clockSnapshotVersion?: number;
 			pipewireVersion?: string | null;
 			/** The mode really negotiated; absent from helpers older than #1357. */
 			cursorMode?: "metadata" | "embedded" | "hidden";

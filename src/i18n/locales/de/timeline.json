@@ -218,6 +218,30 @@
 			"incompatible": "The optional provider contract is incompatible. Ordinary capture and saved evidence remain available.",
 			"enableHint": "Enable Godot typing journal import in Application integrations, then try this file again.",
 			"unverifiedProvenance": "Integration provenance is a source claim. It does not verify an application, collection scope or clock synchronization."
+		},
+		"clockBridge": {
+			"title": "Godot recording clock link",
+			"scope": "Separate permission for read-only clock metadata from one native Linux take. Choose a project and private link file, then connect that file in Godot. No text, keys or editor state is shared. The link expires after one hour or the paired take ends; pause status includes transport delay.",
+			"unavailable": "A native Linux clock source is unavailable. Ordinary capture remains available.",
+			"disabled": "Clock sharing is off.",
+			"paired": "Project paired; waiting for a clock client.",
+			"waiting": "Paired client is waiting for native recording clock samples.",
+			"recording": "Last native sample: recording.",
+			"paused": "Last native sample: paused.",
+			"stale": "Clock samples are stale. Current recording state is unverified.",
+			"expired": "Clock link expired. Create a new private link.",
+			"project": "Chosen project:",
+			"link": "Open this private link file in the Godot addon:",
+			"pair": "Create read-only clock link…",
+			"stop": "Stop sharing recording clock",
+			"error": "Could not create or change the clock link. Choose project.godot and a new private link filename.",
+			"inspect": "Inspect a saved clock sample journal",
+			"inspection": "{{samples}} samples, {{gaps}} gaps, {{paused}} paused samples; maximum round trip {{rtt}} ms. Sampled source claims are unverified, not frame-accurate synchronization.",
+			"closed": "The file was closed; continuous capture coverage is not certified.",
+			"unclosed": "The file has no closing record; its ending is unverified.",
+			"inspectError": "Could not validate this bounded clock sample journal.",
+			"helperError": "The installed native helper does not support recording clock snapshots. Update the helper or continue with ordinary capture.",
+			"ended": "The paired native take ended. Create a new private link for another recording."
 		}
 	},
 	"code": {

@@ -257,6 +257,7 @@ enum Message {
     },
     /// FIFO fence for a bounded drain of messages already queued at Stop.
     InputDrainComplete,
+    ClockQuery(String),
     SuppressInput,
     InputStatus {
         state: &'static str,
@@ -329,9 +330,11 @@ fn main() {
         fail(&mut emitter, error.code(), &error.message());
     }
 
+    let _ = events::monotonic_ms_at(Instant::now());
     let _ = emitter.emit(&Event::Ready {
         timestamp_ms: timestamp_ms(),
         button_privacy_version: 1,
+        clock_snapshot_version: 1,
         pipewire_version: shim::library_version(),
         cursor_metadata_supported,
         cursor_mode: cursor_mode.as_str(),
@@ -533,6 +536,39 @@ fn fail<W: Write>(emitter: &mut Emitter<W>, code: &str, message: &str) -> ! {
 /// `resume`, one per line on stdin (see the `proc.stdin.write("pause\n")` calls
 /// in electron/ipc/handlers.ts). Unknown lines are ignored rather than fatal —
 /// a newer parent talking to an older helper should degrade, not crash.
+fn parse_clock_request(line: &str) -> Option<String> {
+    let id = line.strip_prefix("clock ")?;
+    if id.is_empty()
+        || id.len() > 64
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return None;
+    }
+    Some(id.to_owned())
+}
+
+fn emit_clock_snapshot<W: Write>(
+    emitter: &mut Emitter<W>,
+    request_id: String,
+    snapshot: capture_clock::Snapshot,
+    at: Instant,
+) {
+    let _ = emitter.emit(&Event::ClockSnapshot {
+        request_id,
+        observed_monotonic_ms: events::monotonic_ms_at(at),
+        state: snapshot.state,
+        media_time_ms: snapshot.elapsed.map(|duration| duration.as_millis() as u64),
+        interval_id: snapshot.interval_id,
+        interval_start_monotonic_ms: snapshot.interval_start.map(events::monotonic_ms_at),
+        interval_end_monotonic_ms: snapshot.interval_end.map(events::monotonic_ms_at),
+        interval_media_start_ms: snapshot
+            .interval_media_start
+            .map(|duration| duration.as_millis() as u64),
+    });
+}
+
 fn spawn_stdin_reader(sender: Sender<Message>, gate: Arc<input::InputGate>) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
@@ -564,7 +600,14 @@ fn spawn_stdin_reader(sender: Sender<Message>, gate: Arc<input::InputGate>) {
                         return;
                     }
                 }
-                _ => continue,
+                _ => {
+                    if let Some(request_id) = parse_clock_request(line.trim()) {
+                        if sender.send(Message::ClockQuery(request_id)).is_err() {
+                            return;
+                        }
+                    }
+                    continue;
+                }
             }
         }
         let _ = sender.send(Message::Stop);
@@ -943,6 +986,14 @@ fn run<W: Write>(
                 );
             }
 
+            Ok(Message::ClockQuery(request_id)) => {
+                let at = Instant::now();
+                let snapshot = capture
+                    .as_ref()
+                    .map(|capture| capture.clock_snapshot(at))
+                    .unwrap_or_else(|| capture_clock::CaptureClock::default().snapshot_at(at));
+                emit_clock_snapshot(emitter, request_id, snapshot, at);
+            }
             Ok(Message::Pause) => {
                 if paused {
                     continue;
@@ -3078,5 +3129,50 @@ mod privacy_request_tests {
                 .capture_pointer_buttons
         );
         assert!(serde_json::from_str::<Request>(r#"{"capturePointerButtons":"yes"}"#).is_err());
+    }
+}
+
+#[cfg(test)]
+mod clock_query_tests {
+    use super::*;
+    #[test]
+    fn clock_request_is_bounded_and_cannot_inject_control_verbs() {
+        assert_eq!(
+            parse_clock_request("clock 1234-abcd"),
+            Some("1234-abcd".into())
+        );
+        for request in [
+            "clock ",
+            "clock pause\nstop",
+            "clock ../file",
+            "pause",
+            "clock a b",
+        ] {
+            assert_eq!(parse_clock_request(request), None);
+        }
+        assert_eq!(
+            parse_clock_request(&format!("clock {}", "x".repeat(65))),
+            None
+        );
+    }
+    #[test]
+    fn actual_query_emitter_reports_frozen_media_and_no_wall_clock_or_input() {
+        let base = Instant::now();
+        let mut clock = capture_clock::CaptureClock::default();
+        clock.start(base);
+        clock.pause(base + Duration::from_millis(50));
+        let at = base + Duration::from_millis(100);
+        let mut output = Vec::new();
+        let mut emitter = Emitter::new(&mut output, false);
+        emit_clock_snapshot(&mut emitter, "1234-abcd".into(), clock.snapshot_at(at), at);
+        let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(value["schemaVersion"], 1);
+        assert_eq!(value["event"], "clock-snapshot");
+        assert_eq!(value["state"], "paused");
+        assert_eq!(value["mediaTimeMs"], 50);
+        assert_eq!(value["intervalId"], 0);
+        assert!(value.get("timestampMs").is_none());
+        assert!(value.get("buttonsDown").is_none());
+        assert!(value.get("device").is_none());
     }
 }

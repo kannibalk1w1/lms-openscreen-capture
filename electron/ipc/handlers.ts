@@ -32,6 +32,7 @@ import {
 } from "../../src/lib/capturePrivacy";
 import type { CliSourcesResult } from "../../src/lib/cliContracts";
 import { pickRecordingSource } from "../../src/lib/cliSourcePick";
+import { NativeClockSourceEndedError } from "../../src/lib/clockBridge/schema";
 import {
 	collectMacCaptureExcludedWindowIds,
 	type NativeMacRecordingRequest,
@@ -99,6 +100,7 @@ import {
 import { findMediaLinksByFingerprint, registerMediaLinks } from "../media/mediaLinksRegistry";
 import { relinkProjectMedia } from "../media/projectMediaRelinker";
 import { showOpenDialogOver, showSaveDialogOver } from "../messageBox";
+import { requireClockSnapshotHelper } from "../native-bridge/capture/clockSnapshotProbe";
 import {
 	type LinuxCaptureSourceKind,
 	LinuxNativeCaptureSession,
@@ -1958,7 +1960,23 @@ export function registerIpcHandlers(
 		if (typeof paused === "boolean") recordingFlags.pause(paused);
 	});
 	const appSettings = new AppSettingsStore(app.getPath("userData"));
-	registerApplicationIntegrationHandlers();
+	registerApplicationIntegrationHandlers({
+		clockAvailable: () => process.platform === "linux" && Boolean(findPipeWireCursorHelperPath()),
+		verifyClockHelper: () => {
+			const helper = findPipeWireCursorHelperPath();
+			return helper
+				? requireClockSnapshotHelper(helper)
+				: Promise.reject(new Error("Native clock helper unavailable"));
+		},
+		queryClock: (expectedClockId?: string) => {
+			const session = linuxNativeCaptureSession;
+			if (expectedClockId && (!session || session.clockIdentity !== expectedClockId))
+				return Promise.reject(new NativeClockSourceEndedError());
+			return (
+				session?.sampleClock() ?? Promise.reject(new Error("Native recording clock unavailable"))
+			);
+		},
+	});
 	const linuxCaptureStartup = new LinuxCaptureStartup<LinuxNativeCaptureSession>({
 		handle: (channel, handler) => ipcMain.handle(channel, handler),
 		platform: () => process.platform,

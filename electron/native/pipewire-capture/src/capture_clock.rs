@@ -23,7 +23,38 @@ pub struct Projection {
     pub interval_id: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct Snapshot {
+    pub state: &'static str,
+    pub elapsed: Option<Duration>,
+    pub interval_id: Option<u64>,
+    pub interval_start: Option<Instant>,
+    pub interval_end: Option<Instant>,
+    pub interval_media_start: Option<Duration>,
+}
+
 impl CaptureClock {
+    /// Current clock state at a query observation, never a cross-process UTC mapping.
+    pub fn snapshot_at(&self, at: Instant) -> Snapshot {
+        let last = self.intervals.last();
+        Snapshot {
+            state: if self.stopped.is_some() {
+                "stopped"
+            } else if !self.started() {
+                "waiting"
+            } else if self.paused {
+                "paused"
+            } else {
+                "recording"
+            },
+            elapsed: self.elapsed_at(at),
+            interval_id: self.intervals.len().checked_sub(1).map(|id| id as u64),
+            interval_start: last.map(|interval| interval.start),
+            interval_end: last.and_then(|interval| interval.end),
+            interval_media_start: last.map(|interval| interval.media_start),
+        }
+    }
+
     pub fn started(&self) -> bool {
         !self.intervals.is_empty()
     }
@@ -118,6 +149,39 @@ mod tests {
     use super::*;
     fn ms(base: Instant, value: u64) -> Instant {
         base + Duration::from_millis(value)
+    }
+
+    #[test]
+    fn live_samples_share_encoder_pause_intervals_and_never_start_a_waiting_clock() {
+        let base = Instant::now();
+        let mut clock = CaptureClock::default();
+        assert_eq!(clock.snapshot_at(base).state, "waiting");
+        assert_eq!(clock.snapshot_at(base).elapsed, None);
+        clock.start(ms(base, 10));
+        let running = clock.snapshot_at(ms(base, 30));
+        assert_eq!(running.state, "recording");
+        assert_eq!(running.elapsed, Some(Duration::from_millis(20)));
+        assert_eq!(running.interval_id, Some(0));
+        assert_eq!(running.interval_start, Some(ms(base, 10)));
+        assert_eq!(running.interval_end, None);
+        clock.pause(ms(base, 50));
+        let paused = clock.snapshot_at(ms(base, 100));
+        assert_eq!(paused.state, "paused");
+        assert_eq!(paused.elapsed, Some(Duration::from_millis(40)));
+        assert_eq!(paused.interval_end, Some(ms(base, 50)));
+        clock.resume(ms(base, 200));
+        let resumed = clock.snapshot_at(ms(base, 220));
+        assert_eq!(resumed.interval_id, Some(1));
+        assert_eq!(
+            resumed.interval_media_start,
+            Some(Duration::from_millis(40))
+        );
+        assert_eq!(resumed.elapsed, Some(Duration::from_millis(60)));
+        clock.stop(ms(base, 250));
+        let stopped = clock.snapshot_at(ms(base, 1000));
+        assert_eq!(stopped.state, "stopped");
+        assert_eq!(stopped.elapsed, Some(Duration::from_millis(90)));
+        assert_eq!(stopped.interval_end, Some(ms(base, 250)));
     }
 
     #[test]

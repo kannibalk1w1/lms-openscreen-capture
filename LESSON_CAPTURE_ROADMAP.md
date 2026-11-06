@@ -41,7 +41,7 @@ packs. Outputs share stable steps and source references; source evidence stays i
 | --- | --- | --- |
 | 0 Capture correctness and privacy | Input clocks/gaps, native reliability, allowlists/suppression/retention/privacy review, preflight, rolling buffer | Partial; privacy is critical before broader input/semantic collection |
 | 1 Structured lesson generation | Versioned steps, screenshot/guide drafts, editable ordering/numbering, manifests, portable course presets | Planned integrated workflow; existing events/annotations/typing reused |
-| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing adapter and human onset calibration exist; semantics/live bridge remain open |
+| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; continuous edit mapping/semantics remain open |
 | 3 Learner-facing delivery | Standalone offline HTML player, differentiated accessible profiles, troubleshooting | Planned; caption/font/theme controls are reusable partial foundations |
 | 4 Authoring efficiency | Script/checklist companion, QC/idle suggestions, object-linked arrows, local asset library | Partial existing notes/flags/diagnostics/styles; integrated workflows planned |
 | 5 Review and evidence | Local comments/approval/revisions and optional tutor-curated evidence packs | Planned; never infer achievement from activity alone |
@@ -61,6 +61,7 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
   [stop/recovery](LESSON_CAPTURE_INPUT_STOP.md): Linux journal, interval identity,
   historical reader projection, bounded stop drain/audio admission and explicit
   device/kernel gaps. Global driver scope and physical/Windows acceptance remain open.
+- [Explicit clock link](LESSON_CAPTURE_CLOCK_BRIDGE.md): optional same-project Godot native-clock samples, pause state and portable bounded journal inspection. Read-only round-trip brackets; no automatic edit mapping, typing pause control or physical timing acceptance.
 - [Flags](LESSON_CAPTURE_FLAGS.md), [scoped typing](LESSON_CAPTURE_TYPING.md) and
   [Godot onset association](LESSON_CAPTURE_ASSOCIATION.md): human-calibrated source
   placement; no continuous Godot/encoder synchronization or arbitrary desktop text capture.
@@ -105,8 +106,8 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    Godot journal import with durable default-off controls, bounded instance/session/
    scope/capability routing and disabled/failure/isolation/offline-reopen tests.
    Live application/project attestation and integration CLI/MCP commands remain open.
-   Review slices 8/9 before deep Godot expansion.
-   Continue explicit Godot/video clock bridge under that policy, then shared
+   Actual review8 reports no High/Medium on slices8/9; bounded Low followups are in slice10.
+   [Slice11](LESSON_CAPTURE_CLOCK_BRIDGE.md) adds explicit read-only Godot/native clock samples and pause state under that policy, with continuous edit mapping still open. Proceed to shared
    versioned lesson-step/asset manifest and an offline illustrated-guide vertical
    slice, with export and reopening. Expanded semantic capture waits for privacy.
 4. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),

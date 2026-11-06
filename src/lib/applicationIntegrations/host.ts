@@ -60,6 +60,12 @@ export class ApplicationIntegrationHost {
 			this.providers.set(descriptor.id, provider);
 		}
 	}
+	enable(id: string) {
+		if (this.descriptors.has(id)) {
+			this.enabled.add(id);
+			if (this.providers.has(id)) this.errors.delete(id);
+		}
+	}
 	setEnabled(ids: readonly string[]) {
 		for (const id of [...this.enabled]) if (!ids.includes(id)) this.disable(id);
 		for (const id of ids)
@@ -89,19 +95,27 @@ export class ApplicationIntegrationHost {
 									(c) => c.context.adapterId === descriptor.id && c.active,
 								)
 							? "connecting"
-							: "available-offline",
+							: descriptor.mode === "selected-file"
+								? "available-offline"
+								: "available",
 			activeSessions: [...this.sessions.values()].filter(
 				(c) => c.context.adapterId === descriptor.id && c.active,
 			).length,
 			...(this.errors.get(descriptor.id) ? { error: this.errors.get(descriptor.id) } : {}),
 		}));
 	}
-	async open(value: unknown, permission: { selectedFileAuthorized: boolean }): Promise<string> {
+	async open(
+		value: unknown,
+		permission: { selectedFileAuthorized?: boolean; pairedProjectGrantId?: string },
+	): Promise<string> {
 		const context = integrationSessionSchema.parse(value);
 		const provider = this.providers.get(context.adapterId);
 		if (
 			!this.enabled.has(context.adapterId) ||
-			!permission.selectedFileAuthorized ||
+			!(context.scope.kind === "selected-file"
+				? permission.selectedFileAuthorized === true
+				: permission.pairedProjectGrantId === context.scope.grantId) ||
+			this.descriptors.get(context.adapterId)?.mode !== context.scope.kind ||
 			!provider ||
 			!this.descriptors.get(context.adapterId)?.capabilities.includes(context.capability)
 		)

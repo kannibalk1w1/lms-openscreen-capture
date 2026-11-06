@@ -5,6 +5,7 @@ import {
 	type IntegrationProvider,
 } from "../../src/lib/applicationIntegrations/host";
 import {
+	GODOT_CLOCK_DESCRIPTOR,
 	GODOT_JOURNAL_DESCRIPTOR,
 	type IntegrationSettings,
 	integrationSettingsSchema,
@@ -20,7 +21,7 @@ export class TypingIntegrationDisabledError extends Error {
 	}
 }
 
-/** The only current integration is an explicitly selected-file decoder, never a live watcher. */
+/** File decoding and read-only clock pairing have independent permissions; neither watches editor text. */
 export class ApplicationIntegrationService {
 	private readonly sources = new Map<string, string>();
 	readonly host: ApplicationIntegrationHost;
@@ -30,6 +31,7 @@ export class ApplicationIntegrationService {
 			AppSettingsStore,
 			"getIntegrationSettings" | "setIntegrationSettings"
 		>,
+		clockProvider?: IntegrationProvider,
 	) {
 		const provider: IntegrationProvider = {
 			descriptor: GODOT_JOURNAL_DESCRIPTOR,
@@ -52,13 +54,19 @@ export class ApplicationIntegrationService {
 				return () => undefined;
 			},
 		};
-		this.host = new ApplicationIntegrationHost([GODOT_JOURNAL_DESCRIPTOR], [provider]);
+		this.host = new ApplicationIntegrationHost(
+			[GODOT_JOURNAL_DESCRIPTOR, GODOT_CLOCK_DESCRIPTOR],
+			[provider, ...(clockProvider ? [clockProvider] : [])],
+		);
 		this.host.setEnabled(settings.getIntegrationSettings().enabledAdapterIds);
 	}
 	snapshot() {
 		const settings = this.settings.getIntegrationSettings();
 		for (const status of this.host.statuses())
-			if (!settings.enabledAdapterIds.some((id) => id === status.descriptor.id))
+			if (
+				status.descriptor.id === "godot-codeedit" &&
+				!settings.enabledAdapterIds.some((id) => id === status.descriptor.id)
+			)
 				this.host.disable(status.descriptor.id);
 		return { settings, statuses: this.host.statuses(), saveFailed: this.saveFailed };
 	}
@@ -66,11 +74,15 @@ export class ApplicationIntegrationService {
 		const next = integrationSettingsSchema.parse(value);
 		// Denial stops active optional sessions even when the subsequent durable save fails.
 		for (const status of this.host.statuses())
-			if (!next.enabledAdapterIds.some((id) => id === status.descriptor.id))
+			if (
+				status.descriptor.id === "godot-codeedit" &&
+				!next.enabledAdapterIds.some((id) => id === status.descriptor.id)
+			)
 				this.host.disable(status.descriptor.id);
 		try {
 			this.settings.setIntegrationSettings(next);
-			this.host.setEnabled(next.enabledAdapterIds);
+			if (next.enabledAdapterIds.includes("godot-codeedit")) this.host.enable("godot-codeedit");
+			else this.host.disable("godot-codeedit");
 			this.saveFailed = false;
 			return { success: true, ...this.snapshot() };
 		} catch {

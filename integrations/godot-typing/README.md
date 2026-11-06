@@ -70,3 +70,12 @@ The capture-pad event budget remains 10,000. Normalized takes can hold up to
 are preserved; limits still stop capture visibly rather than dropping edits.
 The review-driven compact-journal regression and its exact coverage are recorded
 in [association validation](../../LESSON_CAPTURE_ASSOCIATION.md).
+
+## Optional read-only recording clock
+
+The addon now includes a separate **Recording clock** dialog. Explicitly create a
+private project link in OpenScreen, open it in the same project and optionally
+save a new clock-only JSONL journal. Native pause state is sampled and delayed;
+this does not pause typing or map edits to video. Stop saving and disconnect are
+separate actions. Ordinary typing remains usable without any clock connection.
+See [scope, workflow and exact evidence](../../LESSON_CAPTURE_CLOCK_BRIDGE.md).

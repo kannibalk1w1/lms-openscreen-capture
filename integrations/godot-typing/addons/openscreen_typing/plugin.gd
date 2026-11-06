@@ -2,6 +2,17 @@
 extends EditorPlugin
 
 const Observer = preload("observer.gd")
+const ClockClient = preload("clock_client.gd")
+var _clock_client: ClockClient
+var _clock_button: Button
+var _clock_status: Label
+var _clock_picker: FileDialog
+var _clock_journal_picker: FileDialog
+var _clock_save: Button
+var _clock_journal_status := ""
+var _clock_dialog: AcceptDialog
+var _clock_entry: Button
+var _clock_controls: VBoxContainer
 const MAX_BYTES := 8 * 1024 * 1024
 var _observer: Observer
 var _file: FileAccess
@@ -27,6 +38,80 @@ func _enter_tree() -> void:
 	_status.text = "Typing capture off"
 	_bar.add_child(_status)
 	add_control_to_container(CONTAINER_TOOLBAR, _bar)
+	_clock_client = ClockClient.new()
+	add_child(_clock_client)
+	_clock_dialog = AcceptDialog.new()
+	_clock_dialog.title = "Read-only recording clock"
+	_clock_dialog.min_size = Vector2i(600, 300)
+	get_editor_interface().get_base_control().add_child(_clock_dialog)
+	_clock_controls = VBoxContainer.new()
+	_clock_dialog.add_child(_clock_controls)
+	_clock_controls.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_clock_controls.offset_left = 16
+	_clock_controls.offset_top = 16
+	_clock_controls.offset_right = -16
+	_clock_controls.offset_bottom = -56
+	var explanation := Label.new()
+	explanation.text = "Explicit project pairing shares clock metadata only. Pause status is delayed and does not pause typing capture. Disconnect or wait for expiry to stop the link."
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_clock_controls.add_child(explanation)
+	_clock_entry = Button.new()
+	_clock_entry.text = "Recording clock…"
+	_clock_entry.tooltip_text = "Read-only clock pairing, pause status and sample export"
+	_clock_entry.pressed.connect(func(): _clock_dialog.popup_centered(Vector2i(640, 320)))
+	_bar.add_child(_clock_entry)
+	_clock_button = Button.new()
+	_clock_button.text = "Connect recording clock"
+	_clock_button.tooltip_text = "Read-only clock and pause status for an explicitly paired project. Shares no text or editor state."
+	_clock_button.pressed.connect(_toggle_clock)
+	_clock_controls.add_child(_clock_button)
+	_clock_status = Label.new()
+	_clock_status.text = "Recording clock off"
+	_clock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_clock_controls.add_child(_clock_status)
+	_clock_save = Button.new()
+	_clock_save.text = "Save clock samples"
+	_clock_save.pressed.connect(func():
+		if _clock_client.is_journal_open():
+			_clock_client.stop_journal("user-stop")
+		elif _clock_client.active:
+			_clock_journal_picker.popup_centered_ratio(0.65)
+	)
+	_clock_controls.add_child(_clock_save)
+	_clock_client.status_changed.connect(func(state: String):
+		if not is_instance_valid(_clock_status) or not is_instance_valid(_clock_button):
+			return
+		_clock_status.text = "Recording clock: " + state + " · delayed status, not typing sync" + _clock_journal_status
+		_clock_button.text = "Disconnect recording clock" if _clock_client.active else "Connect recording clock"
+		if is_instance_valid(_clock_entry):
+			_clock_entry.text = "Clock: " + state
+	)
+	_clock_client.journal_changed.connect(func(state: String):
+		if not is_instance_valid(_clock_status) or not is_instance_valid(_clock_save):
+			return
+		_clock_journal_status = " · sample file: " + state
+		_clock_save.text = "Stop saving clock samples" if _clock_client.is_journal_open() else "Save clock samples"
+		if is_instance_valid(_clock_entry):
+			_clock_entry.text = "Clock: " + _clock_client.clock_state() + (" · saving" if _clock_client.is_journal_open() else "")
+		_clock_status.text = "Recording clock: " + _clock_client.clock_state() + " · delayed status, not typing sync" + _clock_journal_status
+	)
+	_clock_picker = FileDialog.new()
+	_clock_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_clock_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_clock_picker.add_filter("*.json", "Private OpenScreen clock link")
+	_clock_picker.title = "Connect read-only recording clock for this project"
+	_clock_picker.file_selected.connect(func(file_path: String): _clock_client.connect_file(file_path))
+	get_editor_interface().get_base_control().add_child(_clock_picker)
+	_clock_journal_picker = FileDialog.new()
+	_clock_journal_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_clock_journal_picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	_clock_journal_picker.add_filter("*.jsonl", "OpenScreen clock sample evidence")
+	_clock_journal_picker.title = "Save clock samples to a new file"
+	_clock_journal_picker.file_selected.connect(func(file_path: String):
+		if not _clock_client.start_journal(file_path):
+			_clock_status.text = "Choose a new clock journal path while connected"
+	)
+	get_editor_interface().get_base_control().add_child(_clock_journal_picker)
 	_picker = FileDialog.new()
 	_picker.access = FileDialog.ACCESS_FILESYSTEM
 	_picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
@@ -37,6 +122,15 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	_stop_capture()
+	if is_instance_valid(_clock_client):
+		_clock_client.disconnect_clock()
+		_clock_client.queue_free()
+	if is_instance_valid(_clock_dialog):
+		_clock_dialog.queue_free()
+	if is_instance_valid(_clock_picker):
+		_clock_picker.queue_free()
+	if is_instance_valid(_clock_journal_picker):
+		_clock_journal_picker.queue_free()
 	remove_control_from_container(CONTAINER_TOOLBAR, _bar)
 	_bar.queue_free()
 	_picker.queue_free()
@@ -122,3 +216,9 @@ func _stop_capture() -> void:
 		_status.text = ("Capture limit reached · " if _limited else "Saved · ") + _path.get_file()
 	if is_instance_valid(_button):
 		_button.text = "Capture typing"
+
+func _toggle_clock() -> void:
+	if _clock_client.active:
+		_clock_client.disconnect_clock()
+	else:
+		_clock_picker.popup_centered_ratio(0.65)

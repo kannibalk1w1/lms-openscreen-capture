@@ -1557,3 +1557,75 @@ it("keeps a spawned helper reservation after a signal error until proven exit", 
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+it("queries the helper clock independently of input consent and excludes clock responses from diagnostics", async () => {
+	const session = newSession();
+	const start = session.start();
+	await Promise.resolve();
+	helper.emitEvent({ event: "ready", clockSnapshotVersion: 1, timestampMs: 1000 });
+	await start;
+	const sampled = session.sampleClock();
+	const command = helper.stdinWrites.at(-1)!;
+	expect(command).toMatch(/^clock [0-9a-f-]{36}\n$/);
+	const requestId = command.trim().slice(6);
+	helper.emitEvent({
+		event: "clock-snapshot",
+		requestId,
+		privateDeviceInfo: "PRIVATE_CLOCK_CANARY",
+		observedMonotonicMs: 100,
+		state: "paused",
+		mediaTimeMs: 50,
+		intervalId: 0,
+		intervalStartMonotonicMs: 0,
+		intervalEndMonotonicMs: 50,
+		intervalMediaStartMs: 0,
+	});
+	expect(await sampled).toMatchObject({
+		version: 1,
+		clockId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+		state: "paused",
+		mediaTimeMs: 50,
+		intervalId: 0,
+	});
+	expect(session.helperOutput).not.toContain(requestId);
+	expect(JSON.stringify(await sampled)).not.toContain("PRIVATE_CLOCK_CANARY");
+	expect(session.inputCaptureHealth.privacy?.allowed).toBe(false);
+	session.discard();
+	helper.emit("exit", null, "SIGTERM");
+});
+it("does not query an older helper without the independent clock capability", async () => {
+	const session = newSession();
+	await startReady(session);
+	await expect(session.sampleClock()).rejects.toThrow("unavailable");
+	expect(helper.stdinWrites.some((command) => command.startsWith("clock "))).toBe(false);
+	session.discard();
+	helper.emit("exit", null, "SIGTERM");
+});
+it("bounds clock requests and rejects every pending query on helper exit", async () => {
+	const session = newSession();
+	const start = session.start();
+	await Promise.resolve();
+	helper.emitEvent({ event: "ready", clockSnapshotVersion: 1, timestampMs: 1000 });
+	await start;
+	const pending = Array.from({ length: 4 }, () => session.sampleClock());
+	const failed = pending.map((query) => expect(query).rejects.toThrow("session ended"));
+	await expect(session.sampleClock()).rejects.toThrow("capacity");
+	helper.emit("exit", 1, null);
+	await Promise.all(failed);
+});
+it("times out a clock request without changing recording input or inventing a clock point", async () => {
+	const session = newSession();
+	const start = session.start();
+	await Promise.resolve();
+	helper.emitEvent({ event: "ready", clockSnapshotVersion: 1, timestampMs: 1000 });
+	await start;
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	const query = session.sampleClock();
+	const failed = expect(query).rejects.toThrow("timed out");
+	await vi.advanceTimersByTimeAsync(1000);
+	await failed;
+	expect(helper.killed).toBe(false);
+	vi.useRealTimers();
+	session.discard();
+	helper.emit("exit", null, "SIGTERM");
+});
