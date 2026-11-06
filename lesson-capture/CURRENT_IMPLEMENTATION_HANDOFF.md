@@ -1,4 +1,21 @@
-# Slice26 review25 follow-up — confined completion scope
+# Accepted slice26 source-identity checkpoint — 6 November 2026
+
+Actual [review26](CLAUDE_POST_RESTART_REVIEW_26.md) accepts exact
+`d017e4b881abb3279d26ee663b46f2f54f11d32f` against93518c36 with no
+High/Medium/Low findings or material blocker. L26-3/T26-2/N26-5 are CLOSED.
+Independent97focused tests/7files pass,0skip;34mutants leave only5known
+redundant/equivalent survivors, with no timeout/load failures. Review25 probes
+now refuse cross-project refresh. All52prior reports and111prior files remain
+unchanged; original real native edit/refusal/exact-revert proof remains valid.
+
+Coordinator saves this review and pushes the feature checkpoint; main stays
+fd2775e2. No next roadmap phase has started. Source pins establish content equality
+at observations, not immutable/authenticated history. User-facing entry points,
+timed player, audio, physical/platform/hardware acceptance and N24-2/N26-1/
+L23-1/L23-W1 remain open. Worker/full counts below belong to their exact slices;
+the narrow follow-up did not repeat the full suite/build/native proof.
+
+## Historical slice26 review25 follow-up account
 
 Actual [review25](CLAUDE_POST_RESTART_REVIEW_25.md) accepts93518c36 with no
 High/Medium/material blocker. Coordinator requests bounded L26-3/T26-2/N26-5

@@ -2,7 +2,11 @@
 
 Status: actual [Claude review25](CLAUDE_POST_RESTART_REVIEW_25.md) accepts exact
 93518c36916492c67b52f95d783bda19d35e8446 with no High/Medium/material blocker.
-Its bounded follow-up is locally in progress, awaiting separate exact-SHA review.
+Actual [review26](CLAUDE_POST_RESTART_REVIEW_26.md) accepts the bounded follow-up
+atd017e4b881abb3279d26ee663b46f2f54f11d32f with no findings, closing
+L26-3/T26-2/N26-5. Independent97focused/7files pass,0skip, with34mutation
+controls leaving only5known redundant/equivalent survivors; prior native proof
+and inventoried evidence remain unchanged. No broader acceptance is inferred.
 This is a bounded Linux backend prerequisite, without a GUI/IPC/CLI/MCP capture or
 materialization entry point. Ordinary application adapters remain optional.
 
