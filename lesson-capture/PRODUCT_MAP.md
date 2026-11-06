@@ -77,9 +77,11 @@ claims that every listed operation exists.
    accepts91b59b1d with no High/Medium. Its
    [guard/provenance follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) is accepted at361fde51
    by actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md), no High/Medium.
-   LowL25-1 descendant-pipe settlement and T25-1 provenance tests accompany the
-   next source-identity slice. Historical
-   authored source identity/availability and remaining guard coverage still precede
+   The separate [slice25 follow-up](CLAUDE_POST_RESTART_FOLLOWUP_23.md) addresses
+   L25-1 descendant-pipe settlement and T25-1 provenance tests, pending exact-SHA
+   review. [Authored source identity](AUTHORED_SOURCE_IDENTITY_PLAN.md) is inspected
+   and planned, not implemented; it remains a distinct prerequisite after the
+   requested post-task pause/resumption. Source identity/availability still precedes
    user-facing materialization with cancellation and authority controls. Timed Next/Previous/Replay/
    loop/speed, captions and local progress remain unimplemented.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,

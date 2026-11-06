@@ -96,8 +96,14 @@ with no High/Medium, within Linux software synthetic/offscreen scope.
 adds bounded stored-sample timing and actual decoded-frame evidence; actual
 [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts91b59b1d with
 no High/Medium. Its [guard/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md)
-awaits exact-SHA review. Historical authored source identity
-remains the next prerequisite before user-facing materialization or timed delivery. Earlier pause/pending notes below are
+is accepted by actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
+at361fde51, no High/Medium. The
+[settlement/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_23.md)
+addresses L25-1/T25-1 and awaits its own exact-SHA review.
+[Historical authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY_PLAN.md)
+remains the next prerequisite before user-facing materialization or timed delivery.
+The user requested a new pause after this current task; finish review/checkpoint,
+then pause before any next roadmap item. Earlier pause/pending notes below are
 historical snapshots, not new authority to stop or claims of current approval.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3

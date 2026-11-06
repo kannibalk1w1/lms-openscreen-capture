@@ -8,8 +8,9 @@ Actual [review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts
 [review22 follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md) strengthens
 guards and decoder provenance. Actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
 accepts361fde51 with no High/Medium and closes the review22 findings within scope.
-Existing source and
-destination authority, explicit folder cancellation, native-stat checks and
+[Slice25 settlement/provenance fixes](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_23.md)
+address review23 Lows L25-1/T25-1 and await their own exact-SHA review.
+Existing source and destination authority, explicit folder cancellation, native-stat checks and
 incomplete-artifact retention remain. No player or GUI/CLI/MCP entry point exists.
 
 ## Evidence and supported subset
@@ -171,5 +172,16 @@ but fails the full validator, while all four rebuilt outputs pass with path-free
 decoder provenance. Full follow-up details and initial corrected diagnostics are
 in the linked report and its uniquely named evidence directory.
 
-Review23 also records LowT25-1 for unpinned decoder provenance guards; these and
-LowL25-1 settlement behavior accompany the next authored-source identity slice.
+Review23 L25-1/T25-1 are addressed by the separate slice25 follow-up, pending
+review: failures settle without waiting for descendant-held pipes, release our
+read ends and signal only the direct child; success still requires complete
+`close` output. Provenance guard tests cover canonical symlinks, path-like version
+tokens and independent executable hash byte/size/inode conditions. The deadline
+limits apply to process settlement, subject to scheduling, not preceding hash IO.
+This does not terminate or sandbox wrapper descendants.
+
+[Historical authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY_PLAN.md)
+remains unimplemented and is a distinct next backend slice. Current per-operation
+hashes must never be presented as author-time identity. The user requested a pause
+after this task: coordinator review/checkpoint/push precede explicit pause, with no
+new roadmap item until resumption.

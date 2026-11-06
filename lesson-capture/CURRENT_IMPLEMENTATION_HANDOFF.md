@@ -1,3 +1,36 @@
+# Slice25 task boundary — review/checkpoint then requested pause
+
+User steering via coordinator msg_8ef0dda7d830 requests a pause after this current
+coherent task. Finish only the settlement/provenance slice, validation and local
+commit; coordinator obtains exact-SHA review, handles material completion findings,
+pushes the accepted checkpoint, then explicitly pauses. Do not start another
+roadmap item. Original07:30/08:00 cutoffs remain revoked; this is a new task boundary.
+
+[Slice25 follow-up](CLAUDE_POST_RESTART_FOLLOWUP_23.md) addresses review23 L25-1
+and T25-1: failure settlement no longer waits for descendant-held pipes, only owned
+child/read streams are cleaned up, and independent provenance guards are tested.
+It awaits independent exact-SHA review. No schema or authored identity is added.
+The [inspected identity plan](AUTHORED_SOURCE_IDENTITY_PLAN.md) records the next
+separate backend dependency, explicit legacy/refresh/relink semantics and required
+real source edit/revert proof; those are not claimed as delivered. Current range
+materialization remains experimental with per-operation hashes only and no
+GUI/API/player integration. Resume identity implementation only when authorized.
+
+Main stays fd2775e2dbc540306b46085eb0301fa06a6a3aaa; worker does not push.
+The accepted pre-task remote checkpoint is f3311e8e562a18c8c4f347457b1ee9806151583b.
+Original reports and previous evidence remain untouched. Final validation:
+159focused/6files and5731full/428files pass,0skip; root/test TS, lint35existing
+warnings, docs/i18n/92lesson links pass. Final12controls are assertion kills with
+source restored; the provisional run against a faulty new test is not counted.
+All7descendant regression cases use marked-PID cleanup with observed exit, plus
+a successful same-user symlink wrapper and existing real FFmpeg integration.
+All111prior evidence files remain unchanged; no owned app/server/render process
+was started or remains. Full details, corrected initial diagnostics, identities
+and cleanup limits are in the follow-up report. Historical source identity is
+still open and must not be described as implemented by this task.
+
+## Historical accepted review23 checkpoint
+
 # Accepted review23 checkpoint — 6 November 2026
 
 Actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md) accepts exact361fde51 with

@@ -320,29 +320,50 @@ function runDecoder(
 		let output = "",
 			outBytes = 0,
 			errBytes = 0,
-			failed = false;
+			settled = false;
+		// `close` can wait forever for descendant-held pipes. Failure settles
+		// independently, closes only our read ends, and kills only our child.
+		// Success still waits for close, so exit cannot truncate buffered output.
 		const stop = () => {
-			failed = true;
-			child.kill("SIGKILL");
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			try {
+				child.kill("SIGKILL");
+			} catch {
+				/* Failure still releases our streams and settles. */
+			}
+			child.stdout?.destroy();
+			child.stderr?.destroy();
+			reject(fail());
 		};
 		const timer = setTimeout(stop, bounds.timeoutMs);
 		child.stdout!.on("data", (chunk: Buffer) => {
+			if (settled) return;
 			outBytes += chunk.length;
 			if (outBytes > bounds.stdoutBytes) stop();
 			else output += chunk.toString("utf8");
 		});
 		child.stderr!.on("data", (chunk: Buffer) => {
+			if (settled) return;
 			errBytes += chunk.length;
 			if (errBytes > bounds.stderrBytes) stop();
 		});
-		child.once("error", () => {
-			clearTimeout(timer);
-			reject(fail());
+		child.stdout!.on("error", stop);
+		child.stderr!.on("error", stop);
+		child.once("error", stop);
+		child.once("exit", (code) => {
+			if (code !== 0 || errBytes) stop();
 		});
 		child.once("close", (code) => {
+			if (settled) return;
+			if (code !== 0 || errBytes) {
+				stop();
+				return;
+			}
+			settled = true;
 			clearTimeout(timer);
-			if (failed || code !== 0 || errBytes) reject(fail());
-			else resolve(output);
+			resolve(output);
 		});
 	});
 }

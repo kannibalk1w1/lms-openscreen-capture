@@ -273,8 +273,8 @@ it.skipIf(process.platform !== "linux")(
 		// Let actual file IO reach spawn before advancing the process deadline.
 		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(2));
 		await vi.advanceTimersByTimeAsync(30_000);
-		await rejected;
 		expect(processes[1].kill).toHaveBeenCalledWith("SIGKILL");
+		await rejected;
 	},
 );
 it.skipIf(process.platform !== "linux")(
@@ -427,8 +427,8 @@ it.skipIf(process.platform !== "linux")(
 		const rejected = expect(validateRangeVideo(file, expected)).rejects.toThrow();
 		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1));
 		await vi.advanceTimersByTimeAsync(3000);
-		await rejected;
 		expect(processes[0].kill).toHaveBeenCalledWith("SIGKILL");
+		await rejected;
 		expect(mocks.spawn).toHaveBeenCalledTimes(1);
 	},
 );
@@ -540,5 +540,160 @@ it.skipIf(process.platform !== "linux").each(["empty", "oversized", "directory"]
 			/^range-video-validation-failed$/,
 		);
 		expect(mocks.spawn).not.toHaveBeenCalled();
+	},
+);
+
+it.skipIf(process.platform !== "linux")(
+	"hashes the canonical target of a symlinked decoder",
+	async () => {
+		const link = path.join(root, "decoder-link");
+		await fs.symlink(executable, link);
+		mocks.resolve.mockReturnValue(link);
+		child();
+		const result = await validateRangeVideo(file, expected);
+		expect(result.decoded.decoder.sha256).toBe(
+			createHash("sha256")
+				.update(await fs.readFile(executable))
+				.digest("hex"),
+		);
+		expect(mocks.spawn.mock.calls.every(([target]) => target === executable)).toBe(true);
+	},
+);
+it
+	.skipIf(process.platform !== "linux")
+	.each(["/private/local/tool", "release/private/local/tool", "C:\\private\\tool"])(
+	"excludes a path-like version token %s from portable evidence",
+	async (version) => {
+		mocks.spawn.mockImplementation(() => {
+			const proc = processStub();
+			queueMicrotask(() => {
+				proc.stdout.write(`ffmpeg version ${version} Copyright\n`);
+				proc.emit("close", 0);
+			});
+			return proc;
+		});
+		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
+			/^range-video-validation-failed$/,
+		);
+		expect(mocks.spawn).toHaveBeenCalledTimes(1);
+	},
+);
+// Isolate each hash-file guard from the later two-pass comparison. The stat
+// views model a concurrent replacement/size change without editing timestamps.
+it
+	.skipIf(process.platform !== "linux")
+	.each(["short-read", "named-inode", "after-size", "oversized-before-read"])(
+	"independently pins executable %s accounting before any process",
+	async (kind) => {
+		const open = fs.open.bind(fs),
+			lstat = fs.lstat.bind(fs);
+		const executableReads = vi.fn();
+		if (kind === "named-inode")
+			vi.spyOn(fs, "lstat").mockImplementation(async (...args) => {
+				const value = await lstat(...args);
+				if (args[0] === executable)
+					value.ino = typeof value.ino === "bigint" ? value.ino + 1n : value.ino + 1;
+				return value;
+			});
+		vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+			const handle = await open(...args);
+			if (args[0] === executable) {
+				const stat = handle.stat.bind(handle),
+					read = handle.read.bind(handle);
+				let stats = 0;
+				vi.spyOn(handle, "stat").mockImplementation(async () => {
+					const value = await stat();
+					stats++;
+					if (kind === "short-read") value.size += 1;
+					if (kind === "after-size" && stats === 2) value.size += 1;
+					if (kind === "oversized-before-read") value.size = 256 * 1024 * 1024 + 1;
+					return value;
+				});
+				vi.spyOn(handle, "read").mockImplementation(async (...readArgs) => {
+					executableReads();
+					if (kind === "oversized-before-read")
+						throw new Error("Oversized executable must be refused before reading");
+					return read(...readArgs);
+				});
+			}
+			return handle;
+		});
+		child();
+		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
+			/^range-video-validation-failed$/,
+		);
+		expect(mocks.spawn).not.toHaveBeenCalled();
+		if (kind === "oversized-before-read") expect(executableReads).not.toHaveBeenCalled();
+	},
+);
+it.skipIf(process.platform !== "linux")(
+	"fails and destroys owned pipes without waiting for close, even when direct-child kill throws",
+	async () => {
+		vi.useFakeTimers();
+		const processes = child("success", "hang");
+		let outcome = "pending";
+		let reason: unknown;
+		const result = validateRangeVideo(file, expected).then(
+			() => {
+				outcome = "resolved";
+			},
+			(error) => {
+				outcome = "rejected";
+				reason = error;
+			},
+		);
+		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1));
+		processes[0].kill.mockImplementation(() => {
+			throw new Error("PRIVATE_KILL_FAILURE");
+		});
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(processes[0].stdout.destroyed).toBe(true);
+		expect(processes[0].stderr.destroyed).toBe(true);
+		// Public validation also awaits closing its owned input descriptor.
+		await vi.waitFor(() => expect(outcome).toBe("rejected"), { timeout: 500, interval: 20 });
+		expect(reason).toBeInstanceOf(Error);
+		expect((reason as Error).message).toBe("range-video-validation-failed");
+		await result;
+	},
+);
+it.skipIf(process.platform !== "linux")(
+	"waits for successful close and all buffered output rather than accepting on exit",
+	async () => {
+		mocks.spawn.mockImplementation((_exe, args: string[]) => {
+			const proc = processStub();
+			queueMicrotask(() => {
+				if (args.includes("-version")) {
+					proc.stdout.write(versionListing);
+					proc.emit("exit", 0);
+					proc.emit("close", 0);
+				} else {
+					const output = listing(),
+						split = output.indexOf("0, 1, 1");
+					proc.stdout.write(output.slice(0, split));
+					proc.emit("exit", 0);
+					queueMicrotask(() => {
+						proc.stdout.write(output.slice(split));
+						proc.emit("close", 0);
+					});
+				}
+			});
+			return proc;
+		});
+		expect((await validateRangeVideo(file, expected)).decoded.frames).toBe(2);
+	},
+);
+
+it.skipIf(process.platform !== "linux").each(["stdout", "stderr"])(
+	"owned %s stream errors settle without child close",
+	async (pipe) => {
+		const processes = child("success", "hang");
+		const rejected = expect(validateRangeVideo(file, expected)).rejects.toThrow(
+			/^range-video-validation-failed$/,
+		);
+		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1));
+		processes[0][pipe as "stdout" | "stderr"].emit("error", new Error("PRIVATE_PIPE_ERROR"));
+		await rejected;
+		expect(processes[0].stdout.destroyed).toBe(true);
+		expect(processes[0].stderr.destroyed).toBe(true);
 	},
 );
