@@ -444,7 +444,8 @@
 		"codexHint": "Codex 從環境變數 {{env}} 讀取權杖。請在啟動 Codex 的終端機中設定。",
 		"copied": "已複製到剪貼簿",
 		"copyFailed": "無法複製",
-		"updateFailed": "無法更新 MCP 伺服器"
+		"updateFailed": "無法更新 MCP 伺服器",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "沒有相容的 GPU，正在使用 CPU 算繪，因此播放較慢。",

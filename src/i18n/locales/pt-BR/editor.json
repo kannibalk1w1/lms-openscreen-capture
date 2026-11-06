@@ -444,7 +444,8 @@
 		"codexHint": "O Codex lê o token da variável de ambiente {{env}}. Defina-a no terminal em que você inicia o Codex.",
 		"copied": "Copiado para a área de transferência",
 		"copyFailed": "Não foi possível copiar",
-		"updateFailed": "Não foi possível atualizar o servidor MCP"
+		"updateFailed": "Não foi possível atualizar o servidor MCP",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Sem GPU compatível — a renderização ocorre na CPU, então a reprodução fica mais lenta.",

@@ -444,7 +444,8 @@
 		"codexHint": "يقرأ Codex الرمز من متغير البيئة {{env}}. اضبطه في الطرفية التي تشغّل منها Codex.",
 		"copied": "تم النسخ إلى الحافظة",
 		"copyFailed": "تعذّر النسخ",
-		"updateFailed": "تعذّر تحديث خادم MCP"
+		"updateFailed": "تعذّر تحديث خادم MCP",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "لا توجد بطاقة رسومات متوافقة — تتم المعالجة على المعالج، لذا يكون التشغيل أبطأ.",

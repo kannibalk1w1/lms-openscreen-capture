@@ -403,3 +403,68 @@ assertion; slice19 waits for busy drain and mutation-confirms that the same-ID
 regression fails without the generation fence. [Disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_15.md).
 [Explicit-file CLI/MCP query/export](LESSON_CAPTURE_COMMANDS.md) now shares this
 reader/review/export workflow; it exposes no recovery-store discovery or mutation.
+
+
+## Slice20: offline reading navigation and print flow
+
+HTML guides now include a contents list, a skip-to-first-step link, Previous/Next
+links and a return-to-contents link. Targets use validated stable step UUIDs,
+remaining stable when a selected subset is renumbered. Only selected steps appear;
+the original lesson, source order and derived lineage stay unchanged. Empty
+source titles get a neutral numbered navigation label without rewriting the
+source. English system navigation is marked en/ltr; authored link text retains
+the chosen language/direction. Focus targets are headings with tabindex=-1, links
+have visible focus and at least44px height, and there is no animated scrolling.
+
+These are ordinary local fragment links with the existing restrictive no-script
+CSP. There are no scripts, network requests, storage/progress or accounts. This
+is a reading guide, not timed video playback, an auto-pausing player, a competence
+assessment or a substitute for source review. Markdown and the manifest contract
+remain unchanged. A source title/profile language remains the author's choice;
+the exporter does not translate or simplify content.
+
+Print hides navigation/skip links, retains profile font sizes, uses16mm page
+margins, permits long instructions/code/sections to flow across pages and keeps
+headings/figures together where possible. The browser owns pagination; other
+browsers/printer drivers, physical printing and screen-reader acceptance remain
+open. Print-to-PDF proof is bounded to tested Chromium, not a PDF export feature.
+
+A disposable offline file:// probe uses a copy of an earlier synthetic1280px
+native illustration,3 selected steps plus1 excluded source step,80 code lines,
+long instructions/CJK title and four profiles (standard, large-print,
+high-contrast and RTL). At1100/360px all8 cases support native browser Tab/Enter
+skip, Next, Previous and contents navigation with focus reaching the intended
+heading. All links are at least44px tall; no horizontal overflow, scripts or
+HTTP requests occur. Reduced-motion context keeps scrolling auto. Accessibility
+snapshots and screenshots are preserved; they are not screen-reader proof.
+
+Four print PDFs retain all three selected-content canaries and the last code
+line, omit navigation and excluded-step canaries, and preserve the chosen font
+sizes: standard5pages, high-contrast6, large-print/RTL8 each in the initial run.
+Final artifact rerun follows the contents-link display adjustment found during
+visual inspection. The mobile and first printed large-text page were inspected.
+Evidence: `slice-20-*`, `lesson-navigation-fixture/` and final
+`lesson-navigation-fixture-final/` in the preserved overnight evaluation tree.
+The initially missing Playwright-default browser was not installed; these tests
+use the already installed Chromium151 binary explicitly and record its version.
+No Electron/native recording, physical OS input or actual printer was tested.
+
+Slice20 also addresses actual review16 LowL19-1: HTTP lesson-file queries require
+MCP edits before filesystem access. Existing CLI/stdio/app-channel authority stays;
+no recovery inventory/location/store APIs are exposed. Settings/tool guidance
+match this conservative boundary. [Commands](LESSON_CAPTURE_COMMANDS.md) and
+[review16 disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_16.md) carry details.
+
+Slice20 validation:full **5,580tests/423files,0skipped**,133.19s; final focused
+69/4 overlap. The full run started before the final contents-link display-only
+adjustment; final focused tests, offline8-case browser/4-PDF rerun and final Vite
+build cover that adjustment. Root/test TypeScript, final renderer/main/preload,
+whole lint35 existing warnings, i18n1244 and docs/diff pass. Final PDFs retain the
+same5/6/8/8 page counts, selected content and last code line; inspected final
+mobile contents alignment is corrected. Browser version151.0.7922.34 is recorded.
+HTTP query fixed-versus-read-before-gate mutation logs preserve1 selected test
+and its intentional deselections; these are not a second full run.
+No Rust/native source/binary changed or native/physical acceptance was rerun.
+Actual review17 must assess the committed SHA. Next: remaining explicit step/media
+package prerequisites; timed player, captions/progress, autosave and physical/
+platform acceptance remain open.

@@ -1110,30 +1110,35 @@ describe("the HTTP guard", () => {
 	});
 });
 
-it("serves selected lesson query over authenticated HTTP with edits off and gates guide output", async () => {
+it("gates selected lesson query and output over authenticated HTTP before file access with edits off", async () => {
 	const mcp = await connect(new FakeEditor(), { editsAllowed: false });
-	const step = { ...newStep("Selected lesson step"), instructions: "PRIVATE_LESSON_INSTRUCTIONS" };
+	const step = newStep("Selected lesson step");
 	const source = path.join(dir, "explicit-lesson.json");
 	writeFileSync(source, JSON.stringify({ ...newLesson(), steps: [step] }));
-	const query = await mcp.callTool({
-		name: "queryLessonFile",
-		arguments: { manifestPath: source },
-	});
-	expect(query.isError).toBeFalsy();
-	expect(JSON.parse(resultText(query))).toMatchObject({
-		matchingSteps: 1,
-		steps: [{ id: step.id }],
-	});
-	expect(resultText(query)).not.toContain("PRIVATE_LESSON_INSTRUCTIONS");
-	expect(resultText(query)).not.toContain(source);
-	const denied = await mcp.callTool({
-		name: "exportLessonGuide",
-		arguments: { manifestPath: source, outputDirectory: dir, stepIds: [step.id] },
-	});
-	expect(denied.isError).toBe(true);
-	expect(resultText(denied)).toContain("consent_required");
-	expect((await fsPromises.readdir(dir)).filter((name) => name.startsWith("lesson-"))).toEqual([]);
-	expect(mcp.getInstructions()).toContain("No lesson discovery");
+	const stat = vi.spyOn(fsPromises, "lstat"),
+		open = vi.spyOn(fsPromises, "open");
+	try {
+		const query = await mcp.callTool({
+			name: "queryLessonFile",
+			arguments: { manifestPath: source },
+		});
+		expect(query.isError).toBe(true);
+		expect(resultText(query)).toContain("consent_required");
+		expect(stat).not.toHaveBeenCalled();
+		expect(open).not.toHaveBeenCalled();
+		const denied = await mcp.callTool({
+			name: "exportLessonGuide",
+			arguments: { manifestPath: source, outputDirectory: dir, stepIds: [step.id] },
+		});
+		expect(denied.isError).toBe(true);
+		expect(resultText(denied)).toContain("consent_required");
+		expect(stat).not.toHaveBeenCalled();
+		expect(open).not.toHaveBeenCalled();
+		expect(mcp.getInstructions()).toContain("HTTP lesson-file queries require MCP edits");
+	} finally {
+		stat.mockRestore();
+		open.mockRestore();
+	}
 });
 it("writes a selected guide through authenticated HTTP only when MCP edits are enabled", async () => {
 	const mcp = await connect(new FakeEditor());
@@ -1141,6 +1146,13 @@ it("writes a selected guide through authenticated HTTP only when MCP edits are e
 	const source = path.join(dir, "explicit-lesson.json"),
 		bytes = JSON.stringify({ ...newLesson(), steps: [step, newStep("OMIT_THIS")] });
 	writeFileSync(source, bytes);
+	const query = await mcp.callTool({
+		name: "queryLessonFile",
+		arguments: { manifestPath: source },
+	});
+	expect(query.isError).toBeFalsy();
+	expect(JSON.parse(resultText(query))).toMatchObject({ matchingSteps: 2 });
+	expect(resultText(query)).not.toContain(source);
 	const result = await mcp.callTool({
 		name: "exportLessonGuide",
 		arguments: { manifestPath: source, outputDirectory: dir, stepIds: [step.id] },

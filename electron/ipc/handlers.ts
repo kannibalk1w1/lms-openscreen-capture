@@ -4972,7 +4972,9 @@ export function registerIpcHandlers(
 	// function and must never bind the port a running app is listening on.
 	// `main.ts` starts it. Its writes have their own switch, off by default and
 	// read on every call: "MCP edits", separate from the in-app agent's "Agent edits",
-	// so turning the server on grants a client read access and nothing more.
+	// so enabling HTTP grants project reads only. Arbitrary-path lesson queries
+	// require MCP edits too, before file access; stdio/app-channel retain their
+	// existing explicit-launch authority.
 	const mcpSettings = new McpSettingsStore(app.getPath("userData"), safeStorage);
 	const mcpToolDeps: McpToolDeps = {
 		transport: "http",

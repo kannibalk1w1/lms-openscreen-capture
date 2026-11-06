@@ -444,7 +444,8 @@
 		"codexHint": "Codex lit le jeton dans la variable d’environnement {{env}}. Définissez-la dans le terminal depuis lequel vous lancez Codex.",
 		"copied": "Copié dans le presse-papiers",
 		"copyFailed": "Impossible de copier",
-		"updateFailed": "Impossible de mettre à jour le serveur MCP"
+		"updateFailed": "Impossible de mettre à jour le serveur MCP",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Aucun GPU compatible — rendu sur CPU, la lecture est donc plus lente.",

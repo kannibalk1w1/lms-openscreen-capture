@@ -444,7 +444,8 @@
 		"codexHint": "Codex čte token z proměnné prostředí {{env}}. Nastavte ji v terminálu, ze kterého Codex spouštíte.",
 		"copied": "Zkopírováno do schránky",
 		"copyFailed": "Kopírování se nezdařilo",
-		"updateFailed": "MCP server se nepodařilo aktualizovat"
+		"updateFailed": "MCP server se nepodařilo aktualizovat",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Běží bez kompatibilního GPU, takže renderování probíhá na CPU a přehrávání je pomalejší.",

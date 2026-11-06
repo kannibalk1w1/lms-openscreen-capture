@@ -138,7 +138,7 @@ export function McpServerSettings({ open }: { open: boolean }) {
 				<ToggleField
 					label={te("mcpServer.editsLabel")}
 					text={te("mcpServer.allowEdits")}
-					hint={te("mcpServer.editsHint")}
+					hint={`${te("mcpServer.editsHint")} ${te("mcpServer.lessonFilesHint")}`}
 					testId="mcp-edits-toggle"
 					on={status.allowEdits}
 					disabled={busy}

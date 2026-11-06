@@ -444,7 +444,8 @@
 		"codexHint": "Codex는 {{env}} 환경 변수에서 토큰을 읽습니다. Codex를 실행하는 셸에서 설정하세요.",
 		"copied": "클립보드에 복사됨",
 		"copyFailed": "복사할 수 없습니다",
-		"updateFailed": "MCP 서버를 업데이트할 수 없습니다"
+		"updateFailed": "MCP 서버를 업데이트할 수 없습니다",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "호환되는 GPU가 없어 CPU로 렌더링합니다. 재생이 느려집니다.",

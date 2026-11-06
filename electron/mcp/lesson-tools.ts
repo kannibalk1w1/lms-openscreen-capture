@@ -2,7 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonFileSchema, queryLessonFileSchema } from "../lesson/fileContracts";
 
-export function registerLessonTools(server: McpServer, editsAllowed: () => boolean) {
+export function registerLessonTools(
+	server: McpServer,
+	{ transport, editsAllowed }: { transport: "http" | "stdio"; editsAllowed: () => boolean },
+) {
 	const failure = (code: string) => ({
 		isError: true as const,
 		content: [{ type: "text" as const, text: code }],
@@ -11,11 +14,13 @@ export function registerLessonTools(server: McpServer, editsAllowed: () => boole
 		"queryLessonFile",
 		{
 			description:
-				"Query one explicitly selected server-local editable lesson file by absolute manifestPath. Returns step IDs, titles, review findings and source kinds only; no instructions, code, images or paths. Does not discover files or look up application/recovery storage. Title matching uses NFKC plus lowercase substring; review findings are advisory.",
+				"Query one explicitly selected server-local editable lesson file by absolute manifestPath. Returns step IDs, titles, review findings and source kinds only; no instructions, code, images or paths. Does not discover files or look up application/recovery storage. On HTTP, requires MCP edits permission before file access; stdio uses its existing explicit-launch authority. Title matching uses NFKC plus lowercase substring; review findings are advisory.",
 			inputSchema: queryLessonFileSchema,
 			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 		},
 		async (args: unknown) => {
+			if (transport === "http" && !editsAllowed())
+				return failure("consent_required: Enable MCP edits to query a selected lesson file.");
 			try {
 				return {
 					content: [{ type: "text" as const, text: JSON.stringify(await queryLessonFile(args)) }],

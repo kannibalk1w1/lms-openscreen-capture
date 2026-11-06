@@ -444,7 +444,8 @@
 		"codexHint": "Codex は環境変数 {{env}} からトークンを読み取ります。Codex を起動するシェルで設定してください。",
 		"copied": "クリップボードにコピーしました",
 		"copyFailed": "コピーできませんでした",
-		"updateFailed": "MCP サーバーを更新できませんでした"
+		"updateFailed": "MCP サーバーを更新できませんでした",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "対応 GPU がないため CPU で描画しています。再生が遅くなります。",

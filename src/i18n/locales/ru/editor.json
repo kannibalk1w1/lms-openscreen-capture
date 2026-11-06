@@ -444,7 +444,8 @@
 		"codexHint": "Codex читает токен из переменной окружения {{env}}. Задайте её в оболочке, из которой запускаете Codex.",
 		"copied": "Скопировано в буфер обмена",
 		"copyFailed": "Не удалось скопировать",
-		"updateFailed": "Не удалось обновить MCP-сервер"
+		"updateFailed": "Не удалось обновить MCP-сервер",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Совместимый GPU не найден — отрисовка на CPU, поэтому воспроизведение медленнее.",

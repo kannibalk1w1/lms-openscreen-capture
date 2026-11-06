@@ -121,8 +121,10 @@ are preserved; ordinary capture remains adapter-free while privacy coverage expa
    profiles, source review filters and explicit manual recovery copies.
    [Slice19](LESSON_CAPTURE_COMMANDS.md) adds explicit-file CLI/MCP query/export
    parity without recovery-store discovery. Actual review15 accepts414823d6
-   with no High/Medium; the new command slice still requires its own review.
-   Next: learner-facing navigation/presentation debt over this portable contract,
+   with no High/Medium; actual review16 accepts74d58a5a with no High/Medium. Slice20 tightens HTTP lesson
+   query permission before file access and adds script-free offline guide
+   navigation/print flow; it still needs its own review.
+   Next: remaining learner media/package dependencies over this portable contract,
    with physical/native/platform acceptance still open.
 5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
    including original rolling buffer, retakes and real Enemy handoff proof.

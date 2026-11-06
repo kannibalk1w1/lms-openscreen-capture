@@ -301,7 +301,7 @@ export function mcpInstructions(options: {
 		...(media ? [media] : []),
 		...CORE_PREAMBLES[transport],
 		CHECKPOINT_LIFETIMES[transport],
-		"Portable lessons are separate from video projects: queryLessonFile reads only an explicitly selected absolute manifestPath and returns minimal authored step metadata. exportLessonGuide requires explicit stepIds/outputDirectory and MCP edits permission. No lesson discovery, recovery inventory or app-data location is exposed; request a source file from the user instead of guessing paths. Source review labels are advisory, not approval.",
+		"Portable lessons are separate from video projects: queryLessonFile reads only an explicitly selected absolute manifestPath and returns minimal authored step metadata. exportLessonGuide requires explicit stepIds/outputDirectory and MCP edits permission; HTTP lesson-file queries require MCP edits too before accessing an arbitrary path. No lesson discovery, recovery inventory or app-data location is exposed; request a source file from the user instead of guessing paths. Source review labels are advisory, not approval.",
 		...(media && !editsAllowed
 			? [
 					`startRecording, exportVideo, exportAudio and createProject are refused too while ${MCP_EDITS_SETTING} is off.`,
@@ -941,7 +941,10 @@ export function createOpenScreenMcpServer(
 		);
 	}
 	media?.register(server);
-	registerLessonTools(server, () => deps.editsAllowed());
+	registerLessonTools(server, {
+		transport: deps.transport,
+		editsAllowed: () => deps.editsAllowed(),
+	});
 	// The effect contract: too long for addEffect's description, and versioned with the contract.
 	server.registerResource(
 		"effects-contract",

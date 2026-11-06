@@ -38,8 +38,12 @@ Low illustration/restore race and baseline late-text overwrite, with focused
 state regression coverage. Actual review15 accepts414823d6 with no High/Medium; slice19 fixes its Low async
 regression gap and records the disabled-fieldset reachability correction. Slice19
 adds shared explicit-file CLI/MCP query/export with no recovery-store API. Exact
-coverage is in ../LESSON_CAPTURE_COMMANDS.md. Next: actual review16, then
-independent learner-facing navigation/presentation debt; standalone learner/player and autosave remain later. No extra application adapters are authorized.
+coverage is in ../LESSON_CAPTURE_COMMANDS.md. Actual review16 accepts74d58a5a with no High/Medium. Slice20 addresses its Low
+HTTP authority wording/boundary by gating arbitrary-path lesson queries before
+file access; explicit CLI/stdio/app-channel authority stays. It adds static
+offline guide navigation, heading focus and print flow, with bounded browser/PDF
+proof (not a timed media player). Next: actual review17, then remaining learner
+media/package work or independent roadmap items; standalone learner/player and autosave remain later. No extra application adapters are authorized.
 
 Native helper/Rust source unchanged since slice11:134Rust pass/1existing ignored,
 helper SHA f7c5055fb322ebc201a01ef0122d0222b56d354dfee5ce2b9b2bbfe1a37b4d3c.

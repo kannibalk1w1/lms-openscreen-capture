@@ -2,6 +2,7 @@
 
 Slice19 shares the lesson reader, validators, review filters and verified guide
 export service with the existing CLI and both existing MCP server transports.
+Slice20 tightens HTTP arbitrary-path query authority as described below.
 This is file access over an already authored lesson, independent of integrations,
 Godot, recording, video projects or native rendering. It adds no application
 adapter, live collection, server enablement, authentication or configuration change.
@@ -22,7 +23,8 @@ automatic destination, directory scan or source-file replacement. Relative CLI
 paths resolve from the command's current directory. Query options are title
 (max300 characters), status `all|draft|reviewed`, source
 `all|authored|recording-flag|typing-section`, and `--problems-only`. Missing query
-fields use the same UI defaults. Invalid/unknown options and unsupported manifests
+fields use the same UI defaults. Repeated query flags use the last supplied value;
+repeated output directories are refused. Invalid/unknown options and unsupported manifests
 fail. Title search is NFKC plus default lowercase substring, not full Unicode case
 folding or locale-aware search. Findings and source reviewed labels are advisory.
 
@@ -48,12 +50,14 @@ The existing enabled/authenticated HTTP server and explicitly launched
 `openscreen mcp` stdio server both register:
 
 - `queryLessonFile({manifestPath, query?})`: an absolute server-local path and the
-  same bounded filters. Returns the minimal summary above and works with MCP
-  edits disabled. It has read-only/non-destructive annotations.
+  same bounded filters. Returns the minimal summary above. On HTTP, MCP edits
+  permission is required before arbitrary-path file access. Stdio/app-channel
+  retain their existing explicit-launch authority. Read-only/non-destructive
+  annotations describe the operation, not a permission bypass.
 - `exportLessonGuide({manifestPath, outputDirectory, stepIds})`: both paths
   absolute, explicit unique IDs required. The existing MCP edits permission must
   allow writes; refusal happens before file access. The HTTP setting is checked
-  for each call; stdio uses its existing explicit-launch write authority. The
+  for both lesson tools on every call; stdio uses its existing explicit-launch write authority. The
   tool is a write, annotated non-destructive because it creates new files only.
 
 Missing/invalid tool arguments are refused by the existing SDK schema validation;
@@ -69,7 +73,8 @@ valid lesson file located in a recovery directory, the same single-file reader
 can read that file; this is not recovery-store discovery or a sandbox against a
 client that already has local filesystem authority. No recovery location or OS
 username is automatically included in responses. Server access remains governed
-by existing MCP enablement/authentication; no new network listener is introduced.
+by existing MCP enablement/authentication; with HTTP MCP edits off, arbitrary-path
+lesson queries and guide outputs are refused, preserving project-only reads; no new network listener is introduced.
 
 ## Output and safety bounds
 
@@ -86,7 +91,10 @@ selected editable manifest, referenced JPEGs and a completion receipt. SHA256
 readback verification precedes the receipt. Excluded code/image/alt/assets and
 unknown extensions are omitted from all derived files. Selected instructions
 remain part of learner output. Every export creates a new UUID folder inside the
-selected existing parent; existing files are not overwritten. Failure can leave
+selected existing parent; existing files are not overwritten. An explicitly
+selected destination directory symlink is followed, matching the GUI picker; the
+source leaf-symlink restriction is separate. A missing parent fails without
+creating it recursively. Failure can leave
 a partial folder without a completion receipt; the tool does not silently delete
 or label it complete. Source labels are not privacy approval or learning proof.
 
@@ -98,8 +106,11 @@ selected output,0images/code under source exclusions,3 receipt hashes verified,
 unknown selection refused and source/prior evidence byte-identical. It launches
 neither Electron nor native media. SDK in-memory protocol tests cover schemas,
 minimal responses, fixed errors, permission revocation between calls and fresh
-output; real authenticated HTTP tests exercise query with edits off and export
-with edits on. CLI dispatch tests verify early routing before media services.
+output; slice19 authenticated HTTP tests exercised query with edits off and export
+with edits on. Review16 LowL19-1 found that edits-off query widened the project-read
+authority beyond the settings wording. Slice20 conservatively gates HTTP queries
+and exports before file access; current HTTP zero-read/revocation tests and a
+read-before-gate mutation cover that correction. CLI dispatch tests verify early routing before media services.
 
 Slice19 also repairs review15 LowT18-1: Restore assertions now await busy drain.
 A pinned Node22 immutable414823d6 snapshot outside checkout passes11/11 with the
@@ -134,3 +145,18 @@ No Rust/helper/compositor source or binary changed, and no native test/build or
 physical acceptance was rerun. Review16 must assess this exact committed slice;
 review15's acceptance covers414823d6 only. Next concrete item: accessible offline
 guide navigation and print presentation, with media-player acceptance still open.
+
+
+Actual review16 found no High/Medium at74d58a5a, with167focused/11files,4TS configs,
+touched Biome and mutation probes, not full/Vite/desktop. Its LowL19-1 is addressed
+in slice20 by the HTTP query gate, truthful settings/tool/IPC guidance and tests.
+[Disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_16.md). CLI explicit-file
+semantics and native binaries remain unchanged. Query/source metadata must still
+be shared only with an authorized client; full local filesystem authority is not
+an OS sandbox. Fine-grained file grants remain a separate future design.
+
+Slice20 final evidence:5,580/423 full,0skip,133.19s;69/4 final focused overlap;
+both root/test TS, final Vite renderer/main/preload, lint35 existing warnings,
+i18n1244, docs/diff pass. HTTP gate mutation confirms that returning consent after
+an early read still fails the zero-read regression. Query annotations remain
+read-only because queries do not write; authorization is independently enforced.

@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { registerLessonTools } from "./lesson-tools";
 
@@ -16,7 +16,7 @@ beforeEach(async () => {
 	root = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-mcp-"));
 	allowed = false;
 	server = new McpServer({ name: "lesson-test", version: "0" });
-	registerLessonTools(server, () => allowed);
+	registerLessonTools(server, { transport: "http", editsAllowed: () => allowed });
 	client = new Client({ name: "test", version: "0" });
 	const [a, b] = InMemoryTransport.createLinkedPair();
 	await Promise.all([server.connect(a), client.connect(b)]);
@@ -25,6 +25,7 @@ afterEach(async () => {
 	await client.close();
 	await server.close();
 	await fs.rm(root, { recursive: true, force: true });
+	vi.restoreAllMocks();
 });
 function text(result: Awaited<ReturnType<Client["callTool"]>>) {
 	return (result.content as { text?: string }[]).map((part) => part.text ?? "").join("");
@@ -38,7 +39,7 @@ it("registers only selected-file query/export tools and no recovery channel", as
 	expect(tools[1].inputSchema.required).toEqual(["manifestPath", "outputDirectory", "stepIds"]);
 	expect(JSON.stringify(tools)).not.toContain("lessonDraft");
 });
-it("allows minimal query with edits off and gates export before filesystem access", async () => {
+it("allows minimal HTTP query with permission and gates export before filesystem access", async () => {
 	const step = {
 		...newStep("Chosen"),
 		instructions: "PRIVATE_INSTRUCTIONS",
@@ -47,6 +48,7 @@ it("allows minimal query with edits off and gates export before filesystem acces
 	const source = path.join(root, "source.json"),
 		raw = JSON.stringify({ ...newLesson(), steps: [step, newStep("OMITTED_TITLE")] });
 	await fs.writeFile(source, raw);
+	allowed = true;
 	const query = await client.callTool({
 		name: "queryLessonFile",
 		arguments: { manifestPath: source, query: { title: "Chosen" } },
@@ -55,6 +57,7 @@ it("allows minimal query with edits off and gates export before filesystem acces
 	expect(JSON.parse(text(query))).toMatchObject({ matchingSteps: 1, steps: [{ id: step.id }] });
 	expect(text(query)).not.toMatch(/PRIVATE_INSTRUCTIONS|PRIVATE_CODE|OMITTED_TITLE/);
 	expect(text(query)).not.toContain(source);
+	allowed = false;
 	const args = { manifestPath: source, outputDirectory: root, stepIds: [step.id] };
 	const denied = await client.callTool({ name: "exportLessonGuide", arguments: args });
 	expect(denied.isError).toBe(true);
@@ -85,6 +88,7 @@ it("allows minimal query with edits off and gates export before filesystem acces
 it("refuses malformed requests and hides raw parser/OS/source errors", async () => {
 	const source = path.join(root, "PRIVATE_USERNAME.json");
 	await fs.writeFile(source, '{"secret":"PRIVATE_SECRET"}');
+	allowed = true;
 	const bad = await client.callTool({
 		name: "queryLessonFile",
 		arguments: { manifestPath: source },
@@ -118,4 +122,43 @@ it("refuses malformed requests and hides raw parser/OS/source errors", async () 
 		).toBe(true);
 	}
 	expect(await fs.readdir(root)).toEqual(["PRIVATE_USERNAME.json"]);
+});
+
+it("gates HTTP lesson queries before any filesystem read and honors later revocation", async () => {
+	const source = path.join(root, "selected.json");
+	await fs.writeFile(source, JSON.stringify({ ...newLesson(), steps: [newStep("Selected")] }));
+	const stat = vi.spyOn(fs, "lstat"),
+		open = vi.spyOn(fs, "open");
+	const request = { name: "queryLessonFile", arguments: { manifestPath: source } };
+	const denied = await client.callTool(request);
+	expect(denied.isError).toBe(true);
+	expect(text(denied)).toContain("consent_required");
+	expect(stat).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+	allowed = true;
+	expect((await client.callTool(request)).isError).toBeFalsy();
+	expect(open).toHaveBeenCalled();
+	stat.mockClear();
+	open.mockClear();
+	allowed = false;
+	expect(text(await client.callTool(request))).toContain("consent_required");
+	expect(stat).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+});
+it("keeps stdio selected-file query under its existing explicit-launch authority", async () => {
+	await client.close();
+	await server.close();
+	server = new McpServer({ name: "stdio-authority-test", version: "0" });
+	registerLessonTools(server, { transport: "stdio", editsAllowed: () => false });
+	client = new Client({ name: "stdio-test", version: "0" });
+	const [a, b] = InMemoryTransport.createLinkedPair();
+	await Promise.all([server.connect(a), client.connect(b)]);
+	const source = path.join(root, "explicit.json");
+	await fs.writeFile(source, JSON.stringify({ ...newLesson(), steps: [newStep("Known")] }));
+	const result = await client.callTool({
+		name: "queryLessonFile",
+		arguments: { manifestPath: source },
+	});
+	expect(result.isError).toBeFalsy();
+	expect(JSON.parse(text(result)).matchingSteps).toBe(1);
 });

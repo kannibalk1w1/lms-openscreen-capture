@@ -74,6 +74,9 @@ describe("McpServerSettings", () => {
 		renderSection();
 		const toggle = await screen.findByTestId("mcp-edits-toggle");
 		expect(toggle).toHaveAttribute("aria-pressed", "false");
+		expect(
+			screen.getByText(/Lesson-file queries and guide exports also require MCP edits/),
+		).toBeInTheDocument();
 		fireEvent.click(toggle);
 		await waitFor(() => expect(bridge.mcpSetAllowEdits).toHaveBeenCalledWith(true));
 		await waitFor(() =>

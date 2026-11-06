@@ -444,7 +444,8 @@
 		"codexHint": "Codex liest das Token aus der Umgebungsvariable {{env}}. Setze sie in der Shell, aus der du Codex startest.",
 		"copied": "In die Zwischenablage kopiert",
 		"copyFailed": "Kopieren fehlgeschlagen",
-		"updateFailed": "MCP-Server konnte nicht aktualisiert werden"
+		"updateFailed": "MCP-Server konnte nicht aktualisiert werden",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Läuft ohne kompatible GPU — das Rendering erfolgt auf der CPU, die Wiedergabe ist daher langsamer.",

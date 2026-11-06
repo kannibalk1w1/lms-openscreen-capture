@@ -444,7 +444,8 @@
 		"codexHint": "Codex reads the token from the {{env}} environment variable. Set it in the shell you start Codex from.",
 		"copied": "Copied to clipboard",
 		"copyFailed": "Could not copy",
-		"updateFailed": "Could not update the MCP server"
+		"updateFailed": "Could not update the MCP server",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Running without a compatible GPU — rendering on CPU, so playback is slower.",

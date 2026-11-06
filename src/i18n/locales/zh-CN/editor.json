@@ -444,7 +444,8 @@
 		"codexHint": "Codex 从环境变量 {{env}} 读取令牌。请在启动 Codex 的终端中设置它。",
 		"copied": "已复制到剪贴板",
 		"copyFailed": "无法复制",
-		"updateFailed": "无法更新 MCP 服务器"
+		"updateFailed": "无法更新 MCP 服务器",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "没有兼容的 GPU，正在使用 CPU 渲染，因此播放较慢。",

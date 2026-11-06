@@ -444,7 +444,8 @@
 		"codexHint": "Codex belirteci {{env}} ortam değişkeninden okur. Codex'i başlattığınız kabukta ayarlayın.",
 		"copied": "Panoya kopyalandı",
 		"copyFailed": "Kopyalanamadı",
-		"updateFailed": "MCP sunucusu güncellenemedi"
+		"updateFailed": "MCP sunucusu güncellenemedi",
+		"lessonFilesHint": "Lesson-file queries and guide exports also require MCP edits on this HTTP server. Enabling it lets clients read a lesson file by an explicit absolute path, including a known recovery-copy path, and create guide folders. No lesson or recovery-file discovery is provided."
 	},
 	"cpuCompositor": {
 		"notice": "Uyumlu GPU yok — işleme CPU üzerinde yapılıyor, bu yüzden oynatma daha yavaş.",
