@@ -325,3 +325,87 @@ it.each([
 ])("refuses the incomplete or unsupported authoring command %j", (...args) => {
 	expect(parseCliArgs(["electron", "app", "lesson", ...args], 2, root)?.kind).toBe("error");
 });
+it("edits and removes a step from the command line into new files only", async () => {
+	const step = { ...newStep("Old title"), slideRef: "old", code: { language: "plain", text: "x" } },
+		other = newStep("Other");
+	await fs.writeFile(
+		path.join(root, "a.json"),
+		JSON.stringify({ ...newLesson(), steps: [step, other] }),
+	);
+	const run = async (...args: string[]) => {
+		const chunks: string[] = [];
+		const command = parseCliArgs(["electron", "app", "lesson", ...args, "--json"], 2, root);
+		if (command?.kind !== "lesson") throw new Error(JSON.stringify(command));
+		const code = await runLessonCommand(command, (value) => chunks.push(value));
+		return { code, event: JSON.parse(chunks.join("").trim().split("\n").at(-1)!) };
+	};
+	expect(
+		await run(
+			"edit-step",
+			"a.json",
+			"--step",
+			step.id,
+			"--title",
+			"New title",
+			"--clear-slide-ref",
+			"--clear-code",
+			"--out",
+			"b.json",
+		),
+	).toMatchObject({
+		code: 0,
+		event: { result: { step: { title: "New title", status: "draft" } } },
+	});
+	expect(await run("remove-step", "b.json", "--step", other.id, "--out", "c.json")).toMatchObject({
+		code: 0,
+		event: { result: { totalSteps: 1 } },
+	});
+	const final = JSON.parse(await fs.readFile(path.join(root, "c.json"), "utf8"));
+	expect(final.steps).toHaveLength(1);
+	expect(final.steps[0]).toMatchObject({ id: step.id, title: "New title" });
+	expect(final.steps[0].slideRef ?? final.steps[0].code).toBeUndefined();
+	expect(await run("remove-step", "b.json", "--step", other.id, "--out", "c.json")).toEqual({
+		code: 1,
+		event: { event: "error", message: "lesson-file-operation-failed" },
+	});
+});
+it.each([
+	["edit-step", "a.json", "--step", "00000000-0000-4000-8000-000000000000", "--out", "b.json"],
+	["edit-step", "a.json", "--title", "T", "--out", "b.json"],
+	["edit-step", "a.json", "--step", "not-a-uuid", "--title", "T", "--out", "b.json"],
+	["edit-step", "a.json", "--step", "00000000-0000-4000-8000-000000000000", "--title", "T"],
+	[
+		"edit-step",
+		"a.json",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--out",
+		"b.json",
+		"--slide-ref",
+		"x",
+		"--clear-slide-ref",
+	],
+	[
+		"edit-step",
+		"a.json",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--out",
+		"b.json",
+		"--code-text",
+		"x",
+	],
+	["remove-step", "a.json", "--out", "b.json"],
+	[
+		"remove-step",
+		"a.json",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--out",
+		"b.json",
+		"--title",
+		"T",
+	],
+])("refuses the incomplete or contradictory step command %j", (...args) => {
+	expect(parseCliArgs(["electron", "app", "lesson", ...args], 2, root)?.kind).toBe("error");
+});

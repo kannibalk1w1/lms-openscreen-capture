@@ -32,6 +32,10 @@ import {
 	type CreateLessonFileRequest,
 	createLessonFileSchema,
 	exportLessonFileSchema,
+	type RemoveLessonStepFileRequest,
+	removeLessonStepFileSchema,
+	type UpdateLessonStepFileRequest,
+	updateLessonStepFileSchema,
 } from "../lesson/fileContracts";
 import {
 	type ConfirmLessonFileRangeRequest,
@@ -45,6 +49,8 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "export-range"; request: ExportLessonRangeFileRequest }
 	| { action: "new"; request: CreateLessonFileRequest }
 	| { action: "add-step"; request: AddLessonStepsFileRequest }
+	| { action: "edit-step"; request: UpdateLessonStepFileRequest }
+	| { action: "remove-step"; request: RemoveLessonStepFileRequest }
 	| { action: "query"; query: LessonQuery }
 	| { action: "export"; outputDirectory: string; stepIds: string[] }
 );
@@ -130,6 +136,12 @@ Usage:
   openscreen lesson add-step <lesson.json> --title <text> [--instructions <text>] [--slide-ref <LMS slide label>]
                      [--code-language <name> --code-text <text>] --out <new-lesson.json> [--json]
                             Append one draft step and save a new editable copy; the selected file is unchanged
+  openscreen lesson edit-step <lesson.json> --step <UUID> [--title <text>] [--instructions <text>]
+                     [--slide-ref <label> | --clear-slide-ref] [--code-language <name> --code-text <text> | --clear-code]
+                     --out <new-lesson.json> [--json]
+                            Change one step's text and save a new copy; changed teaching text becomes draft
+  openscreen lesson remove-step <lesson.json> --step <UUID> --out <new-lesson.json> [--json]
+                            Remove one step and save a new copy; the selected file is unchanged
   openscreen lesson query <lesson.json> [--title <text>] [--status <all|draft|reviewed>]
                      [--source <all|authored|recording-flag|typing-section>] [--problems-only] [--json]
   openscreen lesson export <lesson.json> --out <existing-dir> --step <UUID> [--step <UUID> ...] [--json]
@@ -623,6 +635,73 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
 
+	if (action === "edit-step" || action === "remove-step") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const valued =
+			action === "remove-step"
+				? ["--step", "--out"]
+				: [
+						"--step",
+						"--out",
+						"--title",
+						"--instructions",
+						"--slide-ref",
+						"--code-language",
+						"--code-text",
+					];
+		const bare = action === "edit-step" ? ["--clear-slide-ref", "--clear-code"] : [];
+		const values: Record<string, string> = {};
+		const flags = new Set<string>();
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) json = true;
+			else if (bare.includes(flag) && !flags.has(flag)) flags.add(flag);
+			else if (valued.includes(flag) && !(flag in values)) {
+				const [value, next] = takeValue(args, i, flag);
+				i = next;
+				values[flag] = value;
+			} else throw new Error("Unexpected lesson option");
+		}
+		const manifestPath = resolvePath(file, cwd),
+			outputPath = values["--out"] === undefined ? undefined : resolvePath(values["--out"], cwd);
+		if (action === "remove-step") {
+			const parsed = removeLessonStepFileSchema.safeParse({
+				manifestPath,
+				outputPath,
+				stepId: values["--step"],
+			});
+			if (!parsed.success)
+				throw new Error("lesson remove-step requires --step <UUID> and --out <new-lesson.json>");
+			return { kind: "lesson", action, manifestPath, request: parsed.data, json };
+		}
+		const code = values["--code-language"] !== undefined || values["--code-text"] !== undefined;
+		if (
+			(code && flags.has("--clear-code")) ||
+			(values["--slide-ref"] !== undefined && flags.has("--clear-slide-ref"))
+		)
+			throw new Error("Choose either a new value or its clear option");
+		const parsed = updateLessonStepFileSchema.safeParse({
+			manifestPath,
+			outputPath,
+			stepId: values["--step"],
+			changes: {
+				title: values["--title"],
+				instructions: values["--instructions"],
+				slideRef: flags.has("--clear-slide-ref") ? null : values["--slide-ref"],
+				code: flags.has("--clear-code")
+					? null
+					: code
+						? { language: values["--code-language"], text: values["--code-text"] }
+						: undefined,
+			},
+		});
+		if (!parsed.success)
+			throw new Error(
+				"lesson edit-step requires --step <UUID>, --out <new-lesson.json> and at least one valid change",
+			);
+		return { kind: "lesson", action, manifestPath, request: parsed.data, json };
+	}
 	if (action === "new" || action === "add-step") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
 		const allowed =

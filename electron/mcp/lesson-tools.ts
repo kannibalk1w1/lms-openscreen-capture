@@ -5,12 +5,16 @@ import {
 	createLessonFile,
 	exportLessonFile,
 	queryLessonFile,
+	removeLessonStepFile,
+	updateLessonStepFile,
 } from "../lesson/fileCommands";
 import {
 	addLessonStepsFileSchema,
 	createLessonFileSchema,
 	exportLessonFileSchema,
 	queryLessonFileSchema,
+	removeLessonStepFileSchema,
+	updateLessonStepFileSchema,
 } from "../lesson/fileContracts";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import { exportLessonRangeFileSchema } from "../lesson/fileExportContracts";
@@ -207,6 +211,20 @@ export function registerLessonTools(
 				"Append 1-50 authored steps (title, optional instructions, optional slideRef LMS slide label, optional code) to one explicitly selected editable lesson file and save the result as a NEW file at an explicit absolute outputPath. The selected file is unchanged and no file is replaced. Every added step is a draft that needs human review; this records text only and does not demonstrate, capture or verify anything on screen. Returns the new step IDs. Requires MCP edits.",
 			inputSchema: addLessonStepsFileSchema,
 			run: addLessonStepsFile,
+		},
+		{
+			name: "updateLessonStep",
+			description:
+				"Change one existing step's title, instructions, slideRef or code in an explicitly selected editable lesson file (null clears slideRef or code) and save the result as a NEW file at an explicit absolute outputPath. Changed teaching text returns the step to draft for human review; a slideRef change alone keeps its status. The selected file is unchanged and no file is replaced. Requires MCP edits.",
+			inputSchema: updateLessonStepFileSchema,
+			run: updateLessonStepFile,
+		},
+		{
+			name: "removeLessonStep",
+			description:
+				"Remove one step (and any illustration no other step uses) from an explicitly selected editable lesson file and save the result as a NEW file at an explicit absolute outputPath. The selected file is unchanged and no file is replaced. Requires MCP edits.",
+			inputSchema: removeLessonStepFileSchema,
+			run: removeLessonStepFile,
 		},
 	] as const)
 		server.registerTool(

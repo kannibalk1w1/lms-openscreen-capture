@@ -50,6 +50,31 @@ export const addLessonStepsFileSchema = z
 		steps: z.array(newLessonStepSchema).min(1).max(50),
 	})
 	.strict();
+const stepCode = z
+	.object({ language: z.string().max(40), text: z.string().min(1).max(40000) })
+	.strict();
+/** Changes one existing step's authored text; null clears an optional field. Saves a new copy. */
+export const updateLessonStepFileSchema = z
+	.object({
+		manifestPath: absolutePath,
+		outputPath: absolutePath,
+		stepId: z.string().uuid(),
+		changes: z
+			.object({
+				title: title.optional(),
+				instructions: z.string().max(12000).optional(),
+				slideRef: lmsReferenceSchema.nullable().optional(),
+				code: stepCode.nullable().optional(),
+			})
+			.strict()
+			.refine((value) => Object.values(value).some((item) => item !== undefined)),
+	})
+	.strict();
+export const removeLessonStepFileSchema = z
+	.object({ manifestPath: absolutePath, outputPath: absolutePath, stepId: z.string().uuid() })
+	.strict();
+export type UpdateLessonStepFileRequest = z.infer<typeof updateLessonStepFileSchema>;
+export type RemoveLessonStepFileRequest = z.infer<typeof removeLessonStepFileSchema>;
 export type CreateLessonFileRequest = z.infer<typeof createLessonFileSchema>;
 export type AddLessonStepsFileRequest = z.infer<typeof addLessonStepsFileSchema>;
 export type QueryLessonFileRequest = z.infer<typeof queryLessonFileSchema>;

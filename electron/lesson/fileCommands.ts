@@ -7,6 +7,8 @@ import {
 	createLessonFileSchema,
 	exportLessonFileSchema,
 	queryLessonFileSchema,
+	removeLessonStepFileSchema,
+	updateLessonStepFileSchema,
 } from "./fileContracts";
 import { readLessonFile } from "./readLessonFile";
 import { LessonService } from "./service";
@@ -100,5 +102,55 @@ export async function addLessonStepsFile(input: unknown) {
 			number: next.steps.findIndex((value) => value.id === step.id) + 1,
 			title: step.title,
 		})),
+	};
+}
+/** Same rule as the editor: changed teaching text returns the step to draft; a destination label does not. */
+export async function updateLessonStepFile(input: unknown) {
+	const request = updateLessonStepFileSchema.parse(input);
+	const lesson = await readLessonFile(request.manifestPath);
+	const { title, instructions, slideRef, code } = request.changes;
+	if (!lesson.steps.some((step) => step.id === request.stepId)) throw new Error("Unknown step");
+	const steps = lesson.steps.map((step) => {
+		if (step.id !== request.stepId) return step;
+		const content = title !== undefined || instructions !== undefined || code !== undefined;
+		return {
+			...step,
+			...(title !== undefined ? { title } : {}),
+			...(instructions !== undefined ? { instructions } : {}),
+			...(slideRef !== undefined ? { slideRef: slideRef ?? undefined } : {}),
+			...(code !== undefined ? { code: code ?? undefined } : {}),
+			status: content ? ("draft" as const) : step.status,
+		};
+	});
+	const next = await validateLesson(reviseLesson(lesson, { steps }));
+	await writeNewLesson(request.outputPath, next);
+	const step = next.steps.find((value) => value.id === request.stepId)!;
+	return {
+		status: "saved" as const,
+		path: request.outputPath,
+		lessonId: next.id,
+		revision: next.revision,
+		step: { id: step.id, title: step.title, status: step.status },
+	};
+}
+/** Removes one step and any illustration no remaining step uses, as the editor does. */
+export async function removeLessonStepFile(input: unknown) {
+	const request = removeLessonStepFileSchema.parse(input);
+	const lesson = await readLessonFile(request.manifestPath);
+	if (!lesson.steps.some((step) => step.id === request.stepId)) throw new Error("Unknown step");
+	const steps = lesson.steps.filter((step) => step.id !== request.stepId);
+	const next = await validateLesson(
+		reviseLesson(lesson, {
+			steps,
+			assets: lesson.assets.filter((asset) => steps.some((step) => step.imageId === asset.id)),
+		}),
+	);
+	await writeNewLesson(request.outputPath, next);
+	return {
+		status: "saved" as const,
+		path: request.outputPath,
+		lessonId: next.id,
+		revision: next.revision,
+		totalSteps: next.steps.length,
 	};
 }

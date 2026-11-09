@@ -194,3 +194,29 @@ through the real stdio transport only as far as `listTools`.
   MCP tool takes up to 50 steps in one call for that reason.
 - These commands write text an agent supplies. They are not the spec's "demonstrate the real
   learner-facing interface"; nothing here drives or observes an application.
+
+Slice 6 commit: `be758ca7`.
+
+### Slice 7 — headless step editing and removal
+
+**What changed.** CLI `openscreen lesson edit-step` and `openscreen lesson remove-step`; MCP
+`updateLessonStep` and `removeLessonStep` (registered last, needing MCP edits). An agent can
+now change a step's title, instructions, slide reference or code, clear the optional ones,
+and remove a step, without hand-editing JSON. Same rules as slice 6: explicit paths, a new
+file every time, the selected file unchanged, fixed error text. Changed teaching text returns
+the step to `draft`; a slide-reference change alone keeps its status, as in the editor.
+Removing a step drops an illustration no other step uses. A request cannot set `reviewed`.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/lesson/fileCommands.test.ts electron/cli electron/mcp` | 308 tests pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run docs:check` | pass; 35 baseline; OK |
+| `npx vite build`; required startup smoke | pass; `success: true` |
+| Real production CLI under Xvfb (`slice7/cli-edit-remove.jsonl`): `edit-step`, `remove-step`, `query` on the slice 6 lesson | saved at revisions 3 and 4; the query shows one remaining step |
+
+No mutation controls and no full-suite run for this slice.
+
+**Limits.** No headless illustration, reordering or review-status change. One new file per
+call.

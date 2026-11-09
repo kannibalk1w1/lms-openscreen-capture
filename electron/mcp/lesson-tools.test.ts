@@ -41,6 +41,8 @@ it("registers only selected-file query/export tools and no recovery channel", as
 		"exportLessonGuide",
 		"createLessonFile",
 		"addLessonSteps",
+		"updateLessonStep",
+		"removeLessonStep",
 	]);
 	tools.splice(0, 4);
 	expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
@@ -222,4 +224,33 @@ it("lets an agent start a lesson and append draft steps only with edits enabled,
 		text(await client.callTool({ name: "queryLessonFile", arguments: { manifestPath: second } })),
 	);
 	expect(query).toMatchObject({ lessonRef: "RPG C1 / L1", steps: [{ slideRef: "slide 12" }, {}] });
+});
+it("updates and removes a step through MCP only with edits enabled, into new files", async () => {
+	const step = { ...newStep("Old"), status: "reviewed" as const },
+		source = path.join(root, "source.json"),
+		raw = JSON.stringify({ ...newLesson(), steps: [step, newStep("Other")] });
+	await fs.writeFile(source, raw);
+	const update = {
+			manifestPath: source,
+			outputPath: path.join(root, "updated.json"),
+			stepId: step.id,
+			changes: { instructions: "Agent text", slideRef: "slide 2" },
+		},
+		remove = { manifestPath: source, outputPath: path.join(root, "removed.json"), stepId: step.id };
+	allowed = false;
+	expect(text(await client.callTool({ name: "updateLessonStep", arguments: update }))).toContain(
+		"consent_required",
+	);
+	expect(text(await client.callTool({ name: "removeLessonStep", arguments: remove }))).toContain(
+		"consent_required",
+	);
+	allowed = true;
+	expect(
+		JSON.parse(text(await client.callTool({ name: "updateLessonStep", arguments: update }))),
+	).toMatchObject({ status: "saved", step: { id: step.id, status: "draft" } });
+	expect(
+		JSON.parse(text(await client.callTool({ name: "removeLessonStep", arguments: remove }))),
+	).toMatchObject({ status: "saved", totalSteps: 1 });
+	expect(await fs.readFile(source, "utf8")).toBe(raw);
+	expect((await fs.readdir(root)).sort()).toEqual(["removed.json", "source.json", "updated.json"]);
 });

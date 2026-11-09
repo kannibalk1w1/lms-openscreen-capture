@@ -5,7 +5,12 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { imageFixture } from "../../src/lib/lesson/fixtures.test-support";
 import { type LessonManifest, parseLesson } from "../../src/lib/lesson/schema";
-import { exportLessonFile, queryLessonFile } from "./fileCommands";
+import {
+	exportLessonFile,
+	queryLessonFile,
+	removeLessonStepFile,
+	updateLessonStepFile,
+} from "./fileCommands";
 
 let root: string;
 beforeEach(async () => {
@@ -208,4 +213,100 @@ it("reports only the presence of an authored media selection without leaking its
 	expect(result.steps[0].hasMediaSelection).toBe(true);
 	expect(JSON.stringify(result)).not.toContain("PRIVATE_RANGE_PROJECT");
 	expect(JSON.stringify(result)).not.toContain("keptSpans");
+});
+it("edits and removes a step into new files, demoting changed teaching text but not a relabelled destination", async () => {
+	const image = await imageFixture(),
+		kept = { ...newStep("Kept"), status: "reviewed" as const, slideRef: "old" },
+		illustrated = {
+			...newStep("Illustrated"),
+			status: "reviewed" as const,
+			imageId: image.id,
+			imageAlt: "Alt",
+			code: { language: "plain", text: "old code" },
+		},
+		source = path.join(root, "selected.json"),
+		raw = JSON.stringify({ ...newLesson("L"), steps: [kept, illustrated], assets: [image] });
+	await fs.writeFile(source, raw);
+	const out = (name: string) => path.join(root, name);
+	const read = async (name: string) => parseLesson(await fs.readFile(out(name), "utf8"));
+	// A destination label alone keeps the review status.
+	expect(
+		await updateLessonStepFile({
+			manifestPath: source,
+			outputPath: out("a.json"),
+			stepId: kept.id,
+			changes: { slideRef: "slide 3" },
+		}),
+	).toMatchObject({ status: "saved", revision: 1, step: { id: kept.id, status: "reviewed" } });
+	expect((await read("a.json")).steps[0]).toMatchObject({
+		slideRef: "slide 3",
+		status: "reviewed",
+	});
+	// Changed teaching text needs review again; null clears optional fields.
+	await updateLessonStepFile({
+		manifestPath: out("a.json"),
+		outputPath: out("b.json"),
+		stepId: illustrated.id,
+		changes: { title: "Renamed", instructions: "New text", code: null },
+	});
+	await updateLessonStepFile({
+		manifestPath: out("b.json"),
+		outputPath: out("c.json"),
+		stepId: kept.id,
+		changes: { slideRef: null },
+	});
+	const edited = await read("c.json");
+	expect(edited.steps[1]).toMatchObject({
+		title: "Renamed",
+		instructions: "New text",
+		status: "draft",
+	});
+	expect(edited.steps[1].code).toBeUndefined();
+	expect(edited.steps[1].imageId).toBe(image.id);
+	expect(edited.steps[0].slideRef).toBeUndefined();
+	expect(edited.steps[0].status).toBe("reviewed");
+	// Removing the illustrated step also drops its now unused image.
+	expect(
+		await removeLessonStepFile({
+			manifestPath: out("c.json"),
+			outputPath: out("d.json"),
+			stepId: illustrated.id,
+		}),
+	).toMatchObject({ status: "saved", totalSteps: 1 });
+	const removed = await read("d.json");
+	expect(removed.steps.map((step) => step.id)).toEqual([kept.id]);
+	expect(removed.assets).toEqual([]);
+	// Unknown step, empty change, unknown field, existing output: refused, nothing written or changed.
+	for (const request of [
+		{ stepId: crypto.randomUUID(), changes: { title: "X" } },
+		{ stepId: kept.id, changes: {} },
+		{ stepId: kept.id, changes: { status: "reviewed" } },
+		{ stepId: kept.id, changes: { title: "" } },
+	])
+		await expect(
+			updateLessonStepFile({ manifestPath: source, outputPath: out("e.json"), ...request }),
+		).rejects.toThrow();
+	await expect(
+		updateLessonStepFile({
+			manifestPath: source,
+			outputPath: out("a.json"),
+			stepId: kept.id,
+			changes: { title: "Overwrite" },
+		}),
+	).rejects.toThrow();
+	await expect(
+		removeLessonStepFile({
+			manifestPath: source,
+			outputPath: out("e.json"),
+			stepId: crypto.randomUUID(),
+		}),
+	).rejects.toThrow();
+	expect((await fs.readdir(root)).sort()).toEqual([
+		"a.json",
+		"b.json",
+		"c.json",
+		"d.json",
+		"selected.json",
+	]);
+	expect(await fs.readFile(source, "utf8")).toBe(raw);
 });
