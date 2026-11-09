@@ -1,3 +1,23 @@
+# Accepted portable package checkpoint — 9 November 2026
+
+Actual [review38](CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts exact
+17bed4e69963ac8d78ad3a9d44954c05f1e8bd87 against36d30d24 with no new findings;
+L37-1 CLOSED. Independent110focused/6files,0skip and8own predicate/operand
+mutants pin coherent re-signed privacy-policy refusals. Real CLI rejects7matching
+forgeries and accepts benign package. Preservation112/1873/78 matches; production
+unchanged in follow-up, prior full6060/450 and moved-source native proof belong
+ to36d30d24, not a new full acceptance run.
+
+Coordinator checkpoints/pushes selected derived lesson/static guide/JPEG-policy/
+validated MP4 packaging and standalone verify/reopen, then proceeds to verified
+GUI package opening and safe new-copy/reseal integration. Full native projects,
+raw evidence/history, fonts/branches/audio edits and full courses remain excluded
+or external; no timed player/physical/platform/audio readiness is claimed.
+Autonomous private-feature authority persists; main staysfd2775e2. Opaque-error/
+equivalent-guard nits remain documented. Original sources/reports/userreport kept.
+
+## Historical package follow-up account
+
 # Review37 verify-side privacy follow-up — 9 November 2026
 
 Actual [review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts exact36d30d24 with

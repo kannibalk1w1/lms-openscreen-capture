@@ -1,5 +1,13 @@
 # Portable selected lesson package v1 — 9 November 2026
 
+Actual [review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts36d30d24
+with no High/Medium. [Review38](CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts
+17bed4e69963ac8d78ad3a9d44954c05f1e8bd87 and closesL37-1 with no new findings.
+Independent110focused/6files,0skip,8predicate/operand controls and real CLI
+forgery/benign verification pass. Production unchanged by follow-up; no fresh
+full/build/native acceptance implied. Coordinator owns the private checkpoint
+push before verified GUI import/reseal or player dependency work.
+
 Implementation design/scope, resumed from accepted/pushedf0eacc95 after review36
 closesM35-1/L35-1. This is a derived static lesson/media directory, not a native
 editor project, portable course or timed player. Existing legacy pack rejects
