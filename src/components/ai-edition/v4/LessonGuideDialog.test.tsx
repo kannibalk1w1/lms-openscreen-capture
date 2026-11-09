@@ -379,7 +379,7 @@ it("attaches an explicit saved-project range, saves it only in the lesson and pe
 	fireEvent.click(screen.getByLabelText("I have reviewed this step"));
 	fireEvent.click(attach);
 	await screen.findByText(
-		"Stored reference: 2–4 ruler seconds, 1 kept spans. Source media availability and frame accuracy are unverified.",
+		"Stored range: 2–4 ruler seconds, 1 kept spans. Review the source before sharing.",
 	);
 	expect(plan.mock.calls[0][0]).toMatchObject({ projectId: "p", startSec: 2, endSec: 4 });
 	expect((screen.getByLabelText("I have reviewed this step") as HTMLInputElement).checked).toBe(

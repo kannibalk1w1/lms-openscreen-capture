@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	lessonDraftList: () => ipcRenderer.invoke("lesson:draft-list"),
 	lessonDraftRead: (id: string) => ipcRenderer.invoke("lesson:draft-read", id),
 	lessonDraftRemove: (id: string) => ipcRenderer.invoke("lesson:draft-remove", id),
+	lessonConfirmRange: (input: unknown) => ipcRenderer.invoke("lesson:confirm-range", input),
+	lessonCancelRange: (id: string) => ipcRenderer.invoke("lesson:cancel-range", id),
 	lessonPlanRange: (input: unknown) => ipcRenderer.invoke("lesson:plan-range", input),
 	lessonFrame: (input: unknown) => ipcRenderer.invoke("lesson:frame", input),
 	lessonSave: (input: unknown) => ipcRenderer.invoke("lesson:save", input),

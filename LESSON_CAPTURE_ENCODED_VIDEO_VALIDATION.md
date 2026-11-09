@@ -12,7 +12,9 @@ accepts361fde51 with no High/Medium and closes the review22 findings within scop
 address review23 Lows L25-1/T25-1. Actual
 [review24](lesson-capture/CLAUDE_POST_RESTART_REVIEW_24.md) acceptsfd749b82 with
 no High/Medium/material blocker and closes both findings. The user-requested
-pause follows the coordinator checkpoint; authored source identity remains plan-only.
+pause followed that checkpoint; subsequent [source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY.md)
+is delivered and accepted through review26. Explicit user resumption on 9 November
+adds [editor confirmation](lesson-capture/RANGE_AUTHORING_2026-11-09.md), pending review.
 Existing source and destination authority, explicit folder cancellation, native-stat checks and
 incomplete-artifact retention remain. No player or GUI/CLI/MCP entry point exists.
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AxcutDocument } from "../../src/lib/ai-edition/schema";
+import { LessonOperationError } from "../../src/lib/lesson/api";
 import {
 	type LessonRangeRequest,
 	lessonMediaSelectionSchema,
@@ -76,7 +77,7 @@ export async function captureLessonSourceIdentity(options: {
 			previousSelections: history,
 		});
 	} catch (error) {
-		if (error instanceof RangeMediaError) throw error;
+		if (error instanceof RangeMediaError || error instanceof LessonOperationError) throw error;
 		throw new RangeMediaError("range-media-unsupported");
 	}
 }

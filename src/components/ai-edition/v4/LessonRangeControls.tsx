@@ -6,12 +6,16 @@ export function LessonRangeControls({
 	selection,
 	available,
 	onAttach,
+	onConfirm,
+	confirmAvailable,
 	onRemove,
 }: {
 	selection?: LessonMediaSelection;
 	available: boolean;
 	onAttach: (startSec: number, endSec: number) => void;
 	onRemove: () => void;
+	confirmAvailable: boolean;
+	onConfirm: (startSec: number, endSec: number) => void;
 }) {
 	const t = useScopedT("timeline");
 	const storedStart = selection?.startSec ?? 0,
@@ -70,9 +74,22 @@ export function LessonRangeControls({
 			>
 				{t("lesson.range.useEnd")}
 			</button>
-			<button type="button" disabled={!available || !valid} onClick={() => onAttach(from, to)}>
+			<button
+				type="button"
+				disabled={!available || !valid || selection?.version === 2}
+				onClick={() => onAttach(from, to)}
+			>
 				{t("lesson.range.attach")}
 			</button>
+			<p>{t("lesson.range.confirmScope")}</p>
+			<button
+				type="button"
+				disabled={!confirmAvailable || !valid}
+				onClick={() => onConfirm(from, to)}
+			>
+				{t(selection ? "lesson.range.refresh" : "lesson.range.confirm")}
+			</button>
+			<p>{t(selection?.version === 2 ? "lesson.range.confirmed" : "lesson.range.unconfirmed")}</p>
 			{selection && (
 				<>
 					<p>

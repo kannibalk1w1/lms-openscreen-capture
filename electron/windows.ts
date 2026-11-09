@@ -21,6 +21,7 @@ import {
 	sameRect,
 } from "./hudWindowBounds";
 import { keepAlwaysOnTop, reassertAlwaysOnTop } from "./keepOnTop";
+import { editorRangeSessions } from "./lesson/editorRangeSession";
 import { followAcrossSpaces } from "./macSpaces";
 import { markSheetless } from "./messageBox";
 import { usesWaylandBackend } from "./wayland";
@@ -710,9 +711,15 @@ export function createEditorWindow(query: Record<string, string> = {}): BrowserW
 
 	const routing = { windowType: "editor", ...query };
 	if (VITE_DEV_SERVER_URL) {
-		win.loadURL(`${VITE_DEV_SERVER_URL}?${new URLSearchParams(routing).toString()}`);
+		const url = `${VITE_DEV_SERVER_URL}?${new URLSearchParams(routing).toString()}`;
+		editorRangeSessions.register(win.webContents, new URL(url).toString());
+		win.loadURL(url);
 	} else {
-		win.loadFile(path.join(RENDERER_DIST, "index.html"), { query: routing });
+		const file = path.join(RENDERER_DIST, "index.html");
+		const url = new URL(pathToFileURL(file).toString());
+		url.search = new URLSearchParams(routing).toString();
+		editorRangeSessions.register(win.webContents, url.toString());
+		win.loadFile(file, { query: routing });
 	}
 
 	return win;

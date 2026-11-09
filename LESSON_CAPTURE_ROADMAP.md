@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture roadmap
 
-Updated 5 November 2026. **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026. **Record once. Produce multiple editable teaching resources.**
 This fork extends OpenScreen into a local-first teaching-content toolkit for coding,
 game development and technology lessons, including SEND learners. Primary targets
 are Windows and Linux, particularly CachyOS/KDE. Keep inherited macOS behavior
@@ -81,6 +81,16 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+**9 November resumption:** [editor source confirmation](lesson-capture/RANGE_AUTHORING_2026-11-09.md)
+adds explicit current-source attachment and same-project refresh, bounded editor
+caller/project authority, cancellation and stale-safe attachment. It is a coherent
+prerequisite, pending exact-SHA coordinator review; selected MP4 export is still
+backend-only. Next: shared native render-job ownership, explicit native destination
+selection, progress/cancel/status and accepted materializer/actual validator integration.
+CLI/MCP source confirmation and selected MP4 export remain absent. Timed player,
+portable course packaging, verified audio and physical/other-platform acceptance
+remain separate. No old pause or schedule blocks this explicit user resumption.
+
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;
 continue authorized coherent implementation/reviews under the unchanged authority
@@ -107,7 +117,7 @@ enforcement, accepted at93518c36 by actual [review25](lesson-capture/CLAUDE_POST
 Its [bounded follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_25.md) tightens
 same-project refresh and pins six guards. Actual
 [review26](lesson-capture/CLAUDE_POST_RESTART_REVIEW_26.md) acceptsd017e4b8
-with no findings and closesL26-3/T26-2/N26-5. It remains backend-only;
+with no findings and closesL26-3/T26-2/N26-5. Its accepted source-identity scope was backend-only;
 user-facing materialization and timed delivery are separate remaining work.
 Earlier pause/pending notes below are historical snapshots.
 

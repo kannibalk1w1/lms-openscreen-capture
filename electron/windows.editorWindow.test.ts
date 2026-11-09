@@ -363,3 +363,24 @@ describe("editor window on Windows", () => {
 		expect(saved()).toMatchObject({ y: 0, width: 1920, height: 1040, maximized: false });
 	});
 });
+
+it.each([
+	undefined,
+	"http://localhost:5173/",
+])("registers source-confirmation authority only for the exact editor page (dev URL %s)", async (devURL) => {
+	if (devURL) vi.stubEnv("VITE_DEV_SERVER_URL", devURL);
+	else vi.stubEnv("VITE_DEV_SERVER_URL", "");
+	const { createEditorWindow } = await load("linux");
+	const { editorRangeSessions } = await import("./lesson/editorRangeSession");
+	const register = vi.spyOn(editorRangeSessions, "register");
+	createEditorWindow({ videoPath: "/tmp/selected source.mp4" });
+	const win = electron.state.windows.at(-1)!;
+	expect(register).toHaveBeenCalledOnce();
+	const [owner, url] = register.mock.calls[0];
+	expect(owner).toBe(win.webContents);
+	const parsed = new URL(url);
+	expect(parsed.searchParams.get("windowType")).toBe("editor");
+	expect(parsed.searchParams.get("videoPath")).toBe("/tmp/selected source.mp4");
+	expect(parsed.protocol).toBe(devURL ? "http:" : "file:");
+	register.mockRestore();
+});

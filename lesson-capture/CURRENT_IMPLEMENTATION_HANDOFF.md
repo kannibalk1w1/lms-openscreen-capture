@@ -1,3 +1,37 @@
+# Resumed authoring prerequisite — 9 November 2026
+
+The user explicitly resumed from clean existing `7b6f4a73` on
+`lesson-capture/input-boundaries`. Orca worker inspection found only this current
+implementation dispatch active in this workspace; completed/unverifiable old
+handles were treated as historical and no process was killed. Earlier pause
+records below are historical; original time cutoffs remain revoked.
+
+[Editor range source confirmation](RANGE_AUTHORING_2026-11-09.md) implements explicit
+current-content attachment / same-project refresh with saved-project, registered
+editor/main-frame/source-file authority, single active confirmation, cancellation,
+lifecycle invalidation and stale-safe attachment. Existing metadata-only reference
+planning remains separate. No render, destination or source write is added.
+Shared service is reusable by future transports; CLI/MCP wrappers are not added.
+Validation:128focused tests/10files and5814full tests/435files pass,0skip; both TS,
+production Vite, lint35existing warnings, docs37 and i18n pass. Retained real-file
+Node proof confirms/reopens/refreshes with history and refuses stale/cancelled
+attachment;8integrated jsdom UI tests drive real handlers/services. No Electron
+transport/native-picker/physical proof is claimed. All112inventoried prior files
+and56tracked reports plus the external user report remain unchanged. Exact
+commands/evidence are in the linked report; actual coordinator-dispatched exact-SHA
+Claude review and feature push are pending.
+
+Next coherent slice: shared native render-job ownership, explicit native destination
+picker and progress/cancel/status around accepted `materializeLessonRange` and the
+actual encoded-video validator. Selected MP4 UI/CLI/MCP, portable courses, timed
+player, verified audio, physical and other-platform acceptance remain open.
+Do not proceed before coordinator review/fixes/push. Local/private main remains
+fd2775e2dbc540306b46085eb0301fa06a6a3aaa; worker does not push or launch workers.
+Prior accepted source identity is delivered in its bounded Linux content-equality
+scope, not immutable/authenticated history. Original reports/evidence are preserved.
+
+## Historical accepted slice26 checkpoint
+
 # Accepted slice26 source-identity checkpoint — 6 November 2026
 
 Actual [review26](CLAUDE_POST_RESTART_REVIEW_26.md) accepts exact

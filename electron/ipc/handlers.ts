@@ -77,6 +77,8 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
+import { editorRangeSessions } from "../lesson/editorRangeSession";
+import { RangeAuthoringService } from "../lesson/rangeAuthoring";
 import { LessonService } from "../lesson/service";
 import {
 	DEFAULT_RECORDINGS_DIR,
@@ -180,6 +182,7 @@ import { registerLessonHandlers } from "./lesson";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
+import { registerRangeAuthoringHandlers } from "./rangeAuthoring";
 import { registerRecordingPrefsHandlers } from "./recordingPrefs";
 import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./recordingStream";
 import { type SelectSourceContext, selectSourceWithOwnership } from "./selectSourceOwnership";
@@ -5113,13 +5116,24 @@ export function registerIpcHandlers(
 	// never unmarks the project a newer one holds.
 	let markedBy: WebContents | null = null;
 	const watchedEditors = new WeakSet<WebContents>();
+	registerRangeAuthoringHandlers(
+		new RangeAuthoringService((id) => aiEditionDocuments.getSavedProject(id)),
+		(event) => ({
+			...editorRangeSessions.capture(event.sender, () => editorHasUnsavedChanges?.() ?? false),
+			canReadSource: (source) => !!readableApprovedPath(source),
+		}),
+	);
 	ipcMain.on(AI_EDITION_OPEN_PROJECT_CHANNEL, (event, projectId: unknown) => {
-		const id = typeof projectId === "string" ? projectId : null;
+		const id =
+			typeof projectId === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(projectId) ? projectId : null;
+		if (event.senderFrame === event.sender.mainFrame) editorRangeSessions.select(event.sender, id);
 		if (id === null && markedBy !== null && markedBy !== event.sender) return;
 		markedBy = id === null ? null : event.sender;
 		aiEditionDocuments.markOpenInEditor(id);
 		if (watchedEditors.has(event.sender)) return;
 		watchedEditors.add(event.sender);
+		event.sender.on("did-start-navigation", () => editorRangeSessions.invalidate(event.sender));
+		event.sender.on("render-process-gone", () => editorRangeSessions.invalidate(event.sender));
 		event.sender.once("destroyed", () => {
 			if (markedBy !== event.sender) return;
 			markedBy = null;

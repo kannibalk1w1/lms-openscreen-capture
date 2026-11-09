@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 6 November 2026 (review22 accepts runtime video validation at91b59b1d; guard/provenance follow-up awaits review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation prerequisite pending coordinator review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -36,7 +36,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | C Privacy-safe capture, storage and export | Partial | Default-off Linux button gates, scope suppression, source-bound receipts/recovery exclusions; full redaction/allowlists remain | Critical, phase 0; broad capture gate |
 | A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Manual steps, neutral flag/typing drafts, native stills, editable source, selected HTML/Markdown and bounded print proof; semantic generation remains | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
-| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print and authored range references; no timed controls/progress | High, phase 3 |
+| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references and explicit Linux source confirmation; selected MP4 UI and timed controls/progress remain | High, phase 3 |
 | E Accessible differentiated outputs | Partial | Unified lesson Standard/Large print/High contrast, language/direction and image/code exclusions; reviewed simplification/narration/slow profiles remain | High, phase 1 defaults + phase 3 delivery |
 | F Recording script/checklist | Planned | Notes and flags; no source-linked recording checklist established | Medium-high, phase 4; small earlier slice allowed |
 | G Quality review | Partial | Probes/health plus source review labels/findings and bounded title/status/source queries; unified media QC remains | High, preflight now; unified report phase 4 |
@@ -78,12 +78,17 @@ claims that every listed operation exists.
    [guard/provenance follow-up](CLAUDE_POST_RESTART_FOLLOWUP_22.md) is accepted at361fde51
    by actual [review23](CLAUDE_POST_RESTART_REVIEW_23.md), no High/Medium.
    The separate [slice25 follow-up](CLAUDE_POST_RESTART_FOLLOWUP_23.md) addresses
-   L25-1 descendant-pipe settlement and T25-1 provenance tests, pending exact-SHA
-   review. [Authored source identity](AUTHORED_SOURCE_IDENTITY_PLAN.md) is inspected
-   and planned, not implemented; it remains a distinct prerequisite after the
-   requested post-task pause/resumption. Source identity/availability still precedes
-   user-facing materialization with cancellation and authority controls. Timed Next/Previous/Replay/
-   loop/speed, captions and local progress remain unimplemented.
+   L25-1 descendant-pipe settlement and T25-1 provenance tests, accepted at
+   fd749b82 by actual review24. [Authored source identity](AUTHORED_SOURCE_IDENTITY.md)
+   is delivered within bounded Linux content-equality observations, accepted by
+   review25 and review26 at d017e4b8; it is not immutable or authenticated history.
+   [Editor confirmation](RANGE_AUTHORING_2026-11-09.md) now explicitly attaches
+   current content or refreshes within the same project, with cancellation and
+   caller/source/stale-target guards; coordinator review is pending. Selected MP4
+   export remains backend-only: shared native render-job ownership, native picker,
+   progress/cancellation/status and actual materializer/validator integration are
+   next. CLI/MCP confirmation/export parity, timed Next/Previous/Replay/loop/speed,
+   captions and local progress remain unimplemented.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
    Source clocks/claims stay distinguishable; imported references must be revalidated.
@@ -251,8 +256,11 @@ model and broad undo/mapping acceptance remain; arbitrary authored text is not r
 projection and SHA256 readback receipts. Authored range plans retain source pins,
 not playable media. Reviews20/21 accept the bounded backend and Linux native
 timing; review22 accepts slice24 runtime sample/decode proof at91b59b1d. Its
-guard/provenance follow-up awaits review. Historical authored
-source identity, full editor/course packaging and timed output acceptance remain.
+guard/provenance and settlement follow-ups are accepted through review24.
+Bounded Linux authored source content identity is accepted through review26;
+[explicit editor confirmation](RANGE_AUTHORING_2026-11-09.md) is now implemented,
+pending review. Selected MP4 export UI/CLI/MCP, full editor/course packaging and
+timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.

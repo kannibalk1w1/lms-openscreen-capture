@@ -325,7 +325,12 @@
 			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced.",
 			"local-draft-limit": "The local recovery limit is reached. Delete unwanted local copies or save a new editable file elsewhere. Existing copies are preserved.",
 			"local-draft-unavailable": "The local recovery operation could not finish. Existing source lessons remain unchanged. Check the visible storage location and retry.",
-			"range-unavailable": "Choose a positive range whose start and end are in kept, probed video. Removed boundaries, overlapping spans or too many cuts cannot be planned."
+			"range-unavailable": "Choose a positive range whose start and end are in kept, probed video. Removed boundaries, overlapping spans or too many cuts cannot be planned.",
+			"range-target-changed": "The lesson step or its saved range changed. Review the current step and try again. To use another video project, remove the old range first.",
+			"range-source-unavailable": "A source video is missing or has not been approved for this editor. Open or import it through the video project, save, then retry.",
+			"range-source-unsupported": "Source confirmation supports Linux video-only ranges from 1/30 second to 120 seconds, up to 32 kept spans and 8 source files (8 GiB total). Use a simple range without webcam, added audio, image backgrounds or image annotations; check that its source files are readable.",
+			"range-source-changed": "The source video or saved project changed during confirmation. Review the current video, save the project, then explicitly refresh the range and current source.",
+			"range-source-cancelled": "Source confirmation was cancelled. The lesson range was not changed."
 		},
 		"output": {
 			"title": "Guide output settings",
@@ -409,7 +414,17 @@
 			"useEnd": "Use playhead as range end",
 			"attach": "Attach range from saved project",
 			"stored": "Stored reference: {{start}}–{{end}} ruler seconds, {{spans}} kept spans. Source media availability and frame accuracy are unverified.",
-			"remove": "Remove video range reference"
+			"remove": "Remove video range reference",
+			"confirmScope": "Confirming reads the selected source video files and records their current contents with this step. Linux only: video-only ranges from 1/30 second to 120 seconds, up to 32 kept spans, 8 files and 8 GiB total; no webcam, added audio or image assets. Source audio is not verified. This does not export or play video. Include this step and save the video project first.",
+			"confirm": "Confirm current source and attach range",
+			"refresh": "Refresh range and current source",
+			"confirmed": "Source contents recorded at your last confirmation. Current availability and later changes have not been checked. Refresh only after reviewing the current video; previous selections are retained.",
+			"unconfirmed": "Source contents have not been confirmed for this range.",
+			"confirmedNotice": "Current source confirmed and attached. Save an editable lesson copy or a local recovery copy to keep it.",
+			"cancel": "Cancel source confirmation",
+			"cancelled": "Source confirmation cancelled; the lesson range was not changed.",
+			"working": "Reading selected source videos… This may take a while for large files.",
+			"cancelling": "Cancelling source confirmation… Waiting for the current file read to finish."
 		}
 	}
 }

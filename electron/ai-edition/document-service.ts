@@ -429,6 +429,15 @@ export class DocumentService {
 		return (await this.getProjectForUpdate(projectId)).document;
 	}
 
+	/** Exact current saved document for explicit lesson operations. No relink, source
+	 * inspection, approval callback, migration or write; shares the existing save queue. */
+	async getSavedProject(projectId: string): Promise<AxcutDocument> {
+		safeProjectId(projectId);
+		return this.enqueue(projectId, async () =>
+			documentSchema.parse(JSON.parse(await this.readProjectFile(projectId))),
+		);
+	}
+
 	/** `getProject`, plus the version to hand `saveProjectIfUnchanged`. */
 	async getProjectForUpdate(
 		projectId: string,

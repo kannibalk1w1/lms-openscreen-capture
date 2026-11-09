@@ -7,8 +7,10 @@ atd017e4b881abb3279d26ee663b46f2f54f11d32f with no findings, closing
 L26-3/T26-2/N26-5. Independent97focused/7files pass,0skip, with34mutation
 controls leaving only5known redundant/equivalent survivors; prior native proof
 and inventoried evidence remain unchanged. No broader acceptance is inferred.
-This is a bounded Linux backend prerequisite, without a GUI/IPC/CLI/MCP capture or
-materialization entry point. Ordinary application adapters remain optional.
+The accepted slice26 scope is a bounded Linux backend prerequisite. The subsequent
+[9 November editor slice](RANGE_AUTHORING_2026-11-09.md) adds explicit GUI/authorized
+IPC confirmation and same-project refresh; selected MP4 export UI and CLI/MCP
+confirmation/materialization remain absent. Ordinary application adapters remain optional.
 
 ## Explicit observations and legacy behavior
 

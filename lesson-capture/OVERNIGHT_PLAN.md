@@ -1,3 +1,20 @@
+# Explicit user resumption — 9 November 2026
+
+The user explicitly resumes the roadmap from clean existing feature checkpoint
+`7b6f4a73f6e3c700d968114ba3f891f8c1ed2a07`. Earlier pauses below are historical;
+original time cutoffs remain revoked. Actual review26 accepts d017e4b8 without
+findings within the bounded Linux source-content backend scope.
+
+The sole implementation worker delivers one coherent authoring prerequisite:
+explicit saved-project source confirmation / same-project refresh and stale-safe
+lesson attachment through shared service and authorized editor IPC. Stop after
+local validation/commit for coordinator exact-SHA Claude review and feature push;
+no other workers or pushes from the implementation worker. Selected MP4 export,
+shared native-render job ownership and CLI/MCP parity remain the next slice.
+See [delivery and evidence](RANGE_AUTHORING_2026-11-09.md). No real lessons, paid
+APIs, auth/configuration, main/upstream/releases/Actions or original reports change.
+Local/private main remains fd2775e2dbc540306b46085eb0301fa06a6a3aaa.
+
 # Explicit resumption — slice26, 6 November 2026
 
 The user said “continue” after the accepted slice25 pause. Implement the planned

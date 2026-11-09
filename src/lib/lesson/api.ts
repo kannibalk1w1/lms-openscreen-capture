@@ -5,6 +5,11 @@ export type LessonErrorCode =
 	| "project-changed"
 	| "frame-unavailable"
 	| "range-unavailable"
+	| "range-target-changed"
+	| "range-source-unavailable"
+	| "range-source-unsupported"
+	| "range-source-changed"
+	| "range-source-cancelled"
 	| "render-busy"
 	| "destination-exists"
 	| "local-draft-limit"
@@ -18,6 +23,14 @@ export type LessonResult<T> =
 	| { success: true; result: T }
 	| { success: false; code: LessonErrorCode };
 export interface LessonApi {
+	lessonConfirmRange?: (input: {
+		operationId: string;
+		lesson: LessonManifest;
+		stepId: string;
+		range: LessonRangeRequest;
+		intent: "author-current" | "refresh-current";
+	}) => Promise<LessonResult<LessonMediaSelection>>;
+	lessonCancelRange?: (operationId: string) => Promise<LessonResult<boolean>>;
 	lessonPlanRange?: (input: LessonRangeRequest) => Promise<LessonResult<LessonMediaSelection>>;
 	lessonFrame?: (input: {
 		projectId: string;

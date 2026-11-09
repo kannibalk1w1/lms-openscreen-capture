@@ -19,7 +19,10 @@ import {
 	reviseLesson,
 } from "@/lib/lesson/authoring";
 import { lessonRenderFingerprint } from "@/lib/lesson/frameSource";
-import { lessonMediaSelectionSchema } from "@/lib/lesson/mediaSelection";
+import {
+	lessonMediaSelectionSchema,
+	lessonMediaSelectionV2Schema,
+} from "@/lib/lesson/mediaSelection";
 import { lessonOutput } from "@/lib/lesson/output";
 import { emptyLessonQuery, queryLesson, stepFindings } from "@/lib/lesson/review";
 import {
@@ -60,6 +63,19 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		setQuery(emptyLessonQuery());
 	};
 	const busyRef = useRef(false);
+	const rangeOperation = useRef<{ id: string; cancelled: boolean } | null>(null);
+	const [confirmingRange, setConfirmingRange] = useState(false);
+	const [cancellingRange, setCancellingRange] = useState(false);
+	useEffect(
+		() => () => {
+			const operation = rangeOperation.current;
+			if (operation) {
+				operation.cancelled = true;
+				void window.electronAPI?.lessonCancelRange?.(operation.id);
+			}
+		},
+		[],
+	);
 	useEffect(() => {
 		epoch.current = { projectId };
 		return () => {
@@ -108,7 +124,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 				setError(error instanceof LessonOperationError ? error.code : "lesson-operation-failed");
 		} finally {
 			busyRef.current = false;
-			if (epoch.current === projectEpoch) setBusy(false);
+			setBusy(false);
 		}
 	};
 	const active = selected.filter((id) => lesson.steps.some((step) => step.id === id));
@@ -345,6 +361,82 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									key={`${lesson.id}-${step.id}-${generation.current}`}
 									selection={step.mediaSelection}
 									available={!!document && !!projectId && !!window.electronAPI?.lessonPlanRange}
+									confirmAvailable={
+										!!document &&
+										!!projectId &&
+										active.includes(step.id) &&
+										!!window.electronAPI?.lessonConfirmRange &&
+										!!window.electronAPI?.lessonCancelRange
+									}
+									onConfirm={(startSec, endSec) =>
+										void run(async (current) => {
+											const store = useProjectStore.getState(),
+												snapshot = store.document;
+											if (!snapshot || !store.projectId || store.dirty)
+												throw new LessonOperationError("project-changed");
+											const operation = { id: crypto.randomUUID(), cancelled: false };
+											rangeOperation.current = operation;
+											setConfirmingRange(true);
+											setCancellingRange(false);
+											const request = {
+												lessonId: lesson.id,
+												stepId: step.id,
+												revision: lesson.revision,
+												previous: step.mediaSelection,
+											};
+											const isCurrent = () =>
+												current() &&
+												!operation.cancelled &&
+												useProjectStore.getState().document === snapshot &&
+												useProjectStore.getState().projectId === store.projectId &&
+												!useProjectStore.getState().dirty;
+											try {
+												const documentSha256 = await lessonRenderFingerprint(snapshot);
+												if (!isCurrent()) return;
+												const result = await window.electronAPI.lessonConfirmRange!({
+													operationId: operation.id,
+													lesson,
+													stepId: step.id,
+													range: { projectId: store.projectId, documentSha256, startSec, endSec },
+													intent: step.mediaSelection ? "refresh-current" : "author-current",
+												});
+												if (!isCurrent()) return;
+												if (!result.success) throw new LessonOperationError(result.code);
+												const selection = lessonMediaSelectionV2Schema.parse(result.result);
+												if (
+													selection.projectId !== store.projectId ||
+													selection.documentSha256 !== documentSha256 ||
+													selection.startSec !== startSec ||
+													selection.endSec !== endSec
+												)
+													throw new LessonOperationError("project-changed");
+												setLesson((latest) => {
+													if (!isCurrent()) return latest;
+													try {
+														const attached = attachLessonMediaSelection(latest, request, selection);
+														queueMicrotask(() => {
+															if (isCurrent()) {
+																if (attached === latest) setError("range-target-changed");
+																else setNotice(t("lesson.range.confirmedNotice"));
+															}
+														});
+														return attached;
+													} catch {
+														queueMicrotask(() => {
+															if (isCurrent()) setError("lesson-operation-failed");
+														});
+														return latest;
+													}
+												});
+											} finally {
+												if (rangeOperation.current === operation) rangeOperation.current = null;
+												setConfirmingRange(false);
+												setCancellingRange(false);
+												if (operation.cancelled && current())
+													setNotice(t("lesson.range.cancelled"));
+											}
+										})
+									}
 									onRemove={() => update(step.id, { mediaSelection: undefined })}
 									onAttach={(startSec, endSec) =>
 										void run(async (current) => {
@@ -523,7 +615,28 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						);
 					})}
 				</fieldset>
-				<p role="status">{busy ? t("lesson.busy") : ""}</p>
+				{confirmingRange && (
+					<button
+						type="button"
+						disabled={cancellingRange}
+						onClick={() => {
+							const operation = rangeOperation.current;
+							if (!operation) return;
+							operation.cancelled = true;
+							setCancellingRange(true);
+							void window.electronAPI?.lessonCancelRange?.(operation.id).catch(() => undefined);
+						}}
+					>
+						{t("lesson.range.cancel")}
+					</button>
+				)}
+				<p role="status" aria-live="polite">
+					{confirmingRange
+						? t(cancellingRange ? "lesson.range.cancelling" : "lesson.range.working")
+						: busy
+							? t("lesson.busy")
+							: ""}
+				</p>
 				{error && <p role="alert">{t(`lesson.errors.${error}`)}</p>}
 				<p role="status" style={{ overflowWrap: "anywhere" }}>
 					{notice}
