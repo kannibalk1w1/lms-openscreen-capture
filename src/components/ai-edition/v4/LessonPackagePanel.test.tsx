@@ -520,3 +520,18 @@ it("discarding a draft whose verification was lost closes the unusable snapshot 
 			.disabled,
 	).toBe(false);
 });
+it("edits LMS references in a package draft and submits them with the new package", async () => {
+	opened.lesson = { ...opened.lesson, lessonRef: "Old lesson ref" };
+	await startDraft();
+	fireEvent.change(screen.getByLabelText("LMS lesson reference (optional)"), {
+		target: { value: "RPG C1 / L1" },
+	});
+	fireEvent.change(screen.getByLabelText("LMS slide reference (optional)"), {
+		target: { value: "slide 12" },
+	});
+	save();
+	await screen.findByText(/New package checked and saved/);
+	const sent = vi.mocked(api.lessonPackageReseal).mock.calls[0][0].lesson;
+	expect(sent.lessonRef).toBe("RPG C1 / L1");
+	expect(sent.steps[0]).toMatchObject({ slideRef: "slide 12", status: "draft" });
+});

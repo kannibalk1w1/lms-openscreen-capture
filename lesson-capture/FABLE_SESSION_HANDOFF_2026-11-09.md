@@ -149,3 +149,48 @@ picker takes the destination. Until now this needed the CLI or MCP.
 - Harness note: my probe's Electron did not exit on `app.close()` because the new
   close guard asked about the unsaved lesson and the harness had no dialog handler by then. I
   stopped that one process by its recorded PID. Future probes must accept the dialog.
+
+Slice 5 commit: `d9aba4c6`.
+
+### Slice 6 — headless lesson authoring, references in queries and in package re-editing
+
+**What changed**
+
+- CLI: `openscreen lesson new <new-lesson.json> --title <text> [--lesson-ref <label>]` and
+  `openscreen lesson add-step <lesson.json> --title <text> [--instructions <text>]
+  [--slide-ref <label>] [--code-language <name> --code-text <text>] --out <new-lesson.json>`.
+- MCP: `createLessonFile` and `addLessonSteps` (1 to 50 steps per call). Both need MCP edits
+  on either transport. They are registered after the existing lesson tools, so earlier tool
+  positions do not move.
+- Both follow the existing headless rule: explicit absolute paths, new files only (`wx`,
+  mode `0600`), the selected lesson file is never changed, fixed error text. Added steps are
+  always `draft`; a request cannot claim `reviewed`. The tool description says the tool
+  records text and does not demonstrate or verify anything on screen.
+- `lesson query` / `queryLessonFile` now return `lessonRef` and each step's `slideRef` when
+  set. Instructions, code, images and paths are still not returned.
+- Package re-editing: the draft panel has the two LMS reference inputs and
+  `validatePackageEdit` accepts changes to them. The new package's `lesson-mapping.json`
+  reflects them.
+- `technical-documentation/architecture/mcp-server.md`: the tool list names the two tools.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/lesson electron/cli electron/mcp src/lib/lesson src/components/ai-edition/v4 electron/ipc/lessonPackageOpen.test.ts electron/ipc/lesson.test.ts` | 1,212 tests / 75 files pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run i18n:check`; `npm run docs:check` | pass; 35 baseline; pass; OK (37 files) |
+| `npx vite build`; required startup smoke (its `listTools` output includes `addLessonSteps`) | pass; `success: true` |
+| Real production CLI under Xvfb (`slice6/cli-authoring.jsonl`): `new`, `add-step` twice, a second `new` onto the existing file, `query` | created; saved at revisions 1 and 2; the overwrite attempt returns `lesson-file-operation-failed`; the query shows `lessonRef` and `slideRef` |
+
+No mutation controls were run for this slice and the full suite was not rerun (last full run:
+slice 5). The MCP tools were exercised through the SDK in-memory transport in tests, and
+through the real stdio transport only as far as `listTools`.
+
+**Limits**
+
+- There is still no headless way to attach an illustration (a project frame) or to edit or
+  remove an existing step; an agent must still edit the JSON for those.
+- `add-step` writes a new file per call, so a long CLI session leaves a trail of files. The
+  MCP tool takes up to 50 steps in one call for that reason.
+- These commands write text an agent supplies. They are not the spec's "demonstrate the real
+  learner-facing interface"; nothing here drives or observes an application.

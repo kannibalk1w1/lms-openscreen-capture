@@ -223,3 +223,105 @@ it("reports unavailable verification tooling distinctly with fixed actionable de
 	expect(chunks.join("")).not.toContain("PRIVATE_SOURCE");
 	expect(await fs.readdir(error.artifactPath)).not.toContain("range-export.json");
 });
+it("authors a lesson headlessly through new, add-step, query and export without replacing any file", async () => {
+	const run = async (...args: string[]) => {
+		const chunks: string[] = [];
+		const command = parseCliArgs(["electron", "app", "lesson", ...args, "--json"], 2, root);
+		if (command?.kind !== "lesson") throw new Error(JSON.stringify(command));
+		const code = await runLessonCommand(command, (value) => chunks.push(value));
+		return { code, event: JSON.parse(chunks.join("").trim().split("\n").at(-1)!) };
+	};
+	const first = path.join(root, "first.json"),
+		second = path.join(root, "second.json"),
+		third = path.join(root, "third.json");
+	const created = await run("new", "first.json", "--title", "Enemy", "--lesson-ref", "RPG C1 / L1");
+	expect(created).toMatchObject({ code: 0, event: { result: { status: "created", path: first } } });
+	const firstBytes = await fs.readFile(first, "utf8");
+	expect((await fs.stat(first)).mode & 0o777).toBe(0o600);
+	const one = await run(
+		"add-step",
+		"first.json",
+		"--title",
+		"Add a Node2D",
+		"--instructions",
+		"Click +\nChoose Node2D",
+		"--slide-ref",
+		"slide 12",
+		"--out",
+		"second.json",
+	);
+	expect(one).toMatchObject({
+		code: 0,
+		event: { result: { status: "saved", path: second, totalSteps: 1, revision: 1 } },
+	});
+	const two = await run(
+		"add-step",
+		"second.json",
+		"--title",
+		"Attach a script",
+		"--code-language",
+		"gdscript",
+		"--code-text",
+		"extends Node2D",
+		"--out",
+		"third.json",
+	);
+	expect(two.event.result.addedSteps).toMatchObject([{ number: 2, title: "Attach a script" }]);
+	expect(await fs.readFile(first, "utf8")).toBe(firstBytes);
+	const lesson = JSON.parse(await fs.readFile(third, "utf8"));
+	expect(lesson).toMatchObject({
+		title: "Enemy",
+		lessonRef: "RPG C1 / L1",
+		steps: [
+			{ instructions: "Click +\nChoose Node2D", slideRef: "slide 12", status: "draft" },
+			{ code: { language: "gdscript", text: "extends Node2D" }, status: "draft" },
+		],
+	});
+	// Existing files are never replaced, and refusals name no path or content.
+	for (const args of [
+		["new", "first.json", "--title", "Again"],
+		["add-step", "first.json", "--title", "X", "--out", "second.json"],
+	]) {
+		const refused = await run(...args);
+		expect(refused).toEqual({
+			code: 1,
+			event: { event: "error", message: "lesson-file-operation-failed" },
+		});
+	}
+	expect(await fs.readFile(first, "utf8")).toBe(firstBytes);
+	const query = await run("query", "third.json");
+	expect(query.event.result).toMatchObject({
+		lessonRef: "RPG C1 / L1",
+		steps: [{ slideRef: "slide 12" }, { title: "Attach a script" }],
+	});
+	expect(query.event.result.steps[1].slideRef).toBeUndefined();
+	expect(JSON.stringify(query.event)).not.toContain("Click +");
+	await fs.mkdir(path.join(root, "out"));
+	const exported = await run(
+		"export",
+		"third.json",
+		"--out",
+		"out",
+		...lesson.steps.flatMap((step: { id: string }) => ["--step", step.id]),
+	);
+	const mapping = JSON.parse(
+		await fs.readFile(path.join(exported.event.result.path, "lesson-mapping.json"), "utf8"),
+	);
+	expect(mapping).toMatchObject({
+		lessonRef: "RPG C1 / L1",
+		steps: [{ slideRef: "slide 12" }, {}],
+	});
+});
+it.each([
+	["new", "a.json"],
+	["new", "a.json", "--title", ""],
+	["new", "a.json", "--title", "T", "--lesson-ref", "two\nlines"],
+	["new", "a.json", "--title", "T", "--title", "U"],
+	["new", "a.json", "--title", "T", "--out", "b.json"],
+	["add-step", "a.json", "--title", "T"],
+	["add-step", "a.json", "--out", "b.json"],
+	["add-step", "a.json", "--title", "T", "--out", "b.json", "--code-language", "gd"],
+	["add-step", "a.json", "--title", "T", "--out", "b.json", "--status", "reviewed"],
+])("refuses the incomplete or unsupported authoring command %j", (...args) => {
+	expect(parseCliArgs(["electron", "app", "lesson", ...args], 2, root)?.kind).toBe("error");
+});

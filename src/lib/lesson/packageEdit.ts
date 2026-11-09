@@ -6,7 +6,7 @@ export function beginPackageEdit(lesson: LessonManifest) {
 		steps: lesson.steps.map((s) => ({ ...s, status: "draft" as const })),
 	});
 }
-/** Allow text/alt/existing code text and order only. IDs, complete membership, assets and policy stay exact. */
+/** Allow text/alt/existing code text, LMS destination labels and order only. IDs, complete membership, assets and policy stay exact. */
 export async function validatePackageEdit(original: LessonManifest, input: unknown) {
 	const draft = await validateLesson(input);
 	if (draft.steps.length !== original.steps.length || draft.revision < original.revision)
@@ -14,6 +14,7 @@ export async function validatePackageEdit(original: LessonManifest, input: unkno
 	const expected = await validateLesson({
 		...original,
 		title: draft.title,
+		lessonRef: draft.lessonRef,
 		revision: draft.revision,
 		steps: draft.steps.map((step) => {
 			const previous = original.steps.find((s) => s.id === step.id);
@@ -23,6 +24,7 @@ export async function validatePackageEdit(original: LessonManifest, input: unkno
 				title: step.title,
 				instructions: step.instructions,
 				imageAlt: step.imageAlt,
+				slideRef: step.slideRef,
 				code: previous.code ? { ...previous.code, text: step.code?.text } : undefined,
 				status: "draft",
 			};

@@ -26,7 +26,13 @@ import {
 	MP4_FRAME_RATES,
 } from "../../src/lib/exporter/types";
 import { type LessonQuery, lessonQuerySchema } from "../../src/lib/lesson/review";
-import { exportLessonFileSchema } from "../lesson/fileContracts";
+import {
+	type AddLessonStepsFileRequest,
+	addLessonStepsFileSchema,
+	type CreateLessonFileRequest,
+	createLessonFileSchema,
+	exportLessonFileSchema,
+} from "../lesson/fileContracts";
 import {
 	type ConfirmLessonFileRangeRequest,
 	confirmLessonFileRangeSchema,
@@ -37,6 +43,8 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "verify-package"; directory: string }
 	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
 	| { action: "export-range"; request: ExportLessonRangeFileRequest }
+	| { action: "new"; request: CreateLessonFileRequest }
+	| { action: "add-step"; request: AddLessonStepsFileRequest }
 	| { action: "query"; query: LessonQuery }
 	| { action: "export"; outputDirectory: string; stepIds: string[] }
 );
@@ -117,6 +125,11 @@ Usage:
   openscreen captions <project.openscreen>           Transcribe (on-device Whisper) and turn captions on
                      [--min-words <1-12>] [--max-words <1-12>]
   openscreen info <project.openscreen> [--json]      Inspect a project file
+  openscreen lesson new <new-lesson.json> --title <text> [--lesson-ref <LMS lesson label>] [--json]
+                            Create a new empty editable lesson; never replaces a file
+  openscreen lesson add-step <lesson.json> --title <text> [--instructions <text>] [--slide-ref <LMS slide label>]
+                     [--code-language <name> --code-text <text>] --out <new-lesson.json> [--json]
+                            Append one draft step and save a new editable copy; the selected file is unchanged
   openscreen lesson query <lesson.json> [--title <text>] [--status <all|draft|reviewed>]
                      [--source <all|authored|recording-flag|typing-section>] [--problems-only] [--json]
   openscreen lesson export <lesson.json> --out <existing-dir> --step <UUID> [--step <UUID> ...] [--json]
@@ -609,6 +622,58 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+
+	if (action === "new" || action === "add-step") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const allowed =
+			action === "new"
+				? ["--title", "--lesson-ref"]
+				: ["--title", "--instructions", "--slide-ref", "--code-language", "--code-text", "--out"];
+		const values: Record<string, string> = {};
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (!allowed.includes(flag) || flag in values) throw new Error("Unexpected lesson option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		const target = resolvePath(file, cwd);
+		if (action === "new") {
+			const parsed = createLessonFileSchema.safeParse({
+				outputPath: target,
+				title: values["--title"],
+				lessonRef: values["--lesson-ref"],
+			});
+			if (!parsed.success)
+				throw new Error("lesson new requires a new file path and --title (1–300 characters)");
+			return { kind: "lesson", action, manifestPath: target, request: parsed.data, json };
+		}
+		const code = values["--code-language"] !== undefined || values["--code-text"] !== undefined;
+		const parsed = addLessonStepsFileSchema.safeParse({
+			manifestPath: target,
+			outputPath: values["--out"] === undefined ? undefined : resolvePath(values["--out"], cwd),
+			steps: [
+				{
+					title: values["--title"],
+					instructions: values["--instructions"],
+					slideRef: values["--slide-ref"],
+					...(code
+						? { code: { language: values["--code-language"], text: values["--code-text"] } }
+						: {}),
+				},
+			],
+		});
+		if (!parsed.success)
+			throw new Error(
+				"lesson add-step requires --title, --out <new-lesson.json> and, for code, both --code-language and --code-text",
+			);
+		return { kind: "lesson", action, manifestPath: target, request: parsed.data, json };
+	}
 
 	if (action === "verify-package") {
 		if (

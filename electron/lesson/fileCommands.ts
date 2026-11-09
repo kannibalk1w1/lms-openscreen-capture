@@ -1,9 +1,17 @@
+import fs from "node:fs/promises";
+import { newLesson, newStep, reviseLesson } from "../../src/lib/lesson/authoring";
 import { queryLesson, stepFindings } from "../../src/lib/lesson/review";
-import { exportLessonFileSchema, queryLessonFileSchema } from "./fileContracts";
+import { type LessonManifest, MAX_LESSON_BYTES, validateLesson } from "../../src/lib/lesson/schema";
+import {
+	addLessonStepsFileSchema,
+	createLessonFileSchema,
+	exportLessonFileSchema,
+	queryLessonFileSchema,
+} from "./fileContracts";
 import { readLessonFile } from "./readLessonFile";
 import { LessonService } from "./service";
 
-/** Minimal authored metadata, never instructions, code, images, extensions or source paths. */
+/** Minimal authored metadata and LMS destination labels, never instructions, code, images, extensions or source paths. */
 export async function queryLessonFile(input: unknown) {
 	const request = queryLessonFileSchema.parse(input);
 	const lesson = await readLessonFile(request.manifestPath);
@@ -14,6 +22,7 @@ export async function queryLessonFile(input: unknown) {
 		lessonId: lesson.id,
 		revision: lesson.revision,
 		title: lesson.title,
+		...(lesson.lessonRef ? { lessonRef: lesson.lessonRef } : {}),
 		totalSteps: lesson.steps.length,
 		matchingSteps: matches.length,
 		steps: matches.map((step) => ({
@@ -21,6 +30,7 @@ export async function queryLessonFile(input: unknown) {
 			number: lesson.steps.findIndex((value) => value.id === step.id) + 1,
 			title: step.title,
 			status: step.status,
+			...(step.slideRef ? { slideRef: step.slideRef } : {}),
 			sources: [
 				...new Set(step.evidence.length ? step.evidence.map((value) => value.kind) : ["authored"]),
 			],
@@ -45,4 +55,50 @@ export async function exportLessonFile(input: unknown) {
 	};
 	const service = new LessonService(unavailable, unavailable);
 	return service.exportGuide(lesson, request.stepIds, async () => request.outputDirectory);
+}
+/** New files only: an existing lesson, project or export is never replaced. */
+async function writeNewLesson(target: string, lesson: LessonManifest) {
+	const bytes = Buffer.from(JSON.stringify(lesson, null, 2) + "\n");
+	if (bytes.length > MAX_LESSON_BYTES) throw new Error("Lesson exceeds limit");
+	await fs.writeFile(target, bytes, { flag: "wx", mode: 0o600 });
+}
+/** Headless start of the same editable lesson the editor authors; no project or media access. */
+export async function createLessonFile(input: unknown) {
+	const request = createLessonFileSchema.parse(input);
+	const lesson = await validateLesson({
+		...newLesson(request.title),
+		...(request.lessonRef ? { lessonRef: request.lessonRef } : {}),
+	});
+	await writeNewLesson(request.outputPath, lesson);
+	return {
+		status: "created" as const,
+		path: request.outputPath,
+		lessonId: lesson.id,
+		revision: lesson.revision,
+	};
+}
+/** Appends authored draft steps and saves a new editable copy; every added step needs human review. */
+export async function addLessonStepsFile(input: unknown) {
+	const request = addLessonStepsFileSchema.parse(input);
+	const lesson = await readLessonFile(request.manifestPath);
+	const added = request.steps.map((step) => ({
+		...newStep(step.title),
+		instructions: step.instructions ?? "",
+		...(step.slideRef ? { slideRef: step.slideRef } : {}),
+		...(step.code ? { code: step.code } : {}),
+	}));
+	const next = await validateLesson(reviseLesson(lesson, { steps: [...lesson.steps, ...added] }));
+	await writeNewLesson(request.outputPath, next);
+	return {
+		status: "saved" as const,
+		path: request.outputPath,
+		lessonId: next.id,
+		revision: next.revision,
+		totalSteps: next.steps.length,
+		addedSteps: added.map((step) => ({
+			id: step.id,
+			number: next.steps.findIndex((value) => value.id === step.id) + 1,
+			title: step.title,
+		})),
+	};
 }

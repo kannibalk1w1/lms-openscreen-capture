@@ -39,6 +39,8 @@ it("registers only selected-file query/export tools and no recovery channel", as
 		"confirmLessonRangeFile",
 		"queryLessonFile",
 		"exportLessonGuide",
+		"createLessonFile",
+		"addLessonSteps",
 	]);
 	tools.splice(0, 4);
 	expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
@@ -170,4 +172,54 @@ it("keeps stdio selected-file query under its existing explicit-launch authority
 	});
 	expect(result.isError).toBeFalsy();
 	expect(JSON.parse(text(result)).matchingSteps).toBe(1);
+});
+it("lets an agent start a lesson and append draft steps only with edits enabled, always as new files", async () => {
+	const first = path.join(root, "first.json"),
+		second = path.join(root, "second.json");
+	const create = { outputPath: first, title: "Enemy", lessonRef: "RPG C1 / L1" },
+		add = {
+			manifestPath: first,
+			outputPath: second,
+			steps: [
+				{ title: "Add a Node2D", instructions: "Click +", slideRef: "slide 12" },
+				{ title: "Attach a script", code: { language: "gdscript", text: "extends Node2D" } },
+			],
+		};
+	allowed = false;
+	for (const [name, args] of [
+		["createLessonFile", create],
+		["addLessonSteps", add],
+	] as const)
+		expect(text(await client.callTool({ name, arguments: args }))).toContain("consent_required");
+	expect(await fs.readdir(root)).toEqual([]);
+	allowed = true;
+	const created = await client.callTool({ name: "createLessonFile", arguments: create });
+	expect(JSON.parse(text(created))).toMatchObject({ status: "created", path: first });
+	const before = await fs.readFile(first, "utf8");
+	const added = JSON.parse(text(await client.callTool({ name: "addLessonSteps", arguments: add })));
+	expect(added).toMatchObject({
+		status: "saved",
+		totalSteps: 2,
+		addedSteps: [{ number: 1 }, { number: 2 }],
+	});
+	expect(await fs.readFile(first, "utf8")).toBe(before);
+	const lesson = JSON.parse(await fs.readFile(second, "utf8"));
+	expect(lesson.steps.map((step: { status: string }) => step.status)).toEqual(["draft", "draft"]);
+	expect(lesson.steps[0].id).toBe(added.addedSteps[0].id);
+	// No overwrite, no unknown fields such as a claimed review status, fixed error text.
+	for (const args of [
+		add,
+		{ ...add, outputPath: path.join(root, "x.json"), steps: [{ title: "T", status: "reviewed" }] },
+	])
+		expect(text(await client.callTool({ name: "addLessonSteps", arguments: args }))).not.toContain(
+			"saved",
+		);
+	expect(text(await client.callTool({ name: "createLessonFile", arguments: create }))).toBe(
+		"lesson-file-operation-failed",
+	);
+	expect((await fs.readdir(root)).sort()).toEqual(["first.json", "second.json"]);
+	const query = JSON.parse(
+		text(await client.callTool({ name: "queryLessonFile", arguments: { manifestPath: second } })),
+	);
+	expect(query).toMatchObject({ lessonRef: "RPG C1 / L1", steps: [{ slideRef: "slide 12" }, {}] });
 });

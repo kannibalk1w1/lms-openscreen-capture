@@ -1,7 +1,17 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
-import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
-import { exportLessonFileSchema, queryLessonFileSchema } from "../lesson/fileContracts";
+import {
+	addLessonStepsFile,
+	createLessonFile,
+	exportLessonFile,
+	queryLessonFile,
+} from "../lesson/fileCommands";
+import {
+	addLessonStepsFileSchema,
+	createLessonFileSchema,
+	exportLessonFileSchema,
+	queryLessonFileSchema,
+} from "../lesson/fileContracts";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import { exportLessonRangeFileSchema } from "../lesson/fileExportContracts";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
@@ -146,7 +156,7 @@ export function registerLessonTools(
 		"queryLessonFile",
 		{
 			description:
-				"Query one explicitly selected server-local editable lesson file by absolute manifestPath. Returns step IDs, titles, review findings and source kinds only; no instructions, code, images or paths. Does not discover files or look up application/recovery storage. On HTTP, requires MCP edits permission before file access; stdio uses its existing explicit-launch authority. Title matching uses NFKC plus lowercase substring; review findings are advisory.",
+				"Query one explicitly selected server-local editable lesson file by absolute manifestPath. Returns step IDs, titles, review findings, source kinds and author-entered LMS lessonRef/slideRef labels only; no instructions, code, images or paths. Does not discover files or look up application/recovery storage. On HTTP, requires MCP edits permission before file access; stdio uses its existing explicit-launch authority. Title matching uses NFKC plus lowercase substring; review findings are advisory.",
 			inputSchema: queryLessonFileSchema,
 			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 		},
@@ -182,4 +192,40 @@ export function registerLessonTools(
 			}
 		},
 	);
+	// Registered last so earlier tool positions stay stable for existing clients.
+	for (const tool of [
+		{
+			name: "createLessonFile",
+			description:
+				"Create a NEW empty editable lesson file at an explicit absolute outputPath with a title and optional lessonRef (your own LMS lesson label, not checked against any LMS). Never replaces an existing file. No project, media, discovery or recovery-store access. Requires MCP edits.",
+			inputSchema: createLessonFileSchema,
+			run: createLessonFile,
+		},
+		{
+			name: "addLessonSteps",
+			description:
+				"Append 1-50 authored steps (title, optional instructions, optional slideRef LMS slide label, optional code) to one explicitly selected editable lesson file and save the result as a NEW file at an explicit absolute outputPath. The selected file is unchanged and no file is replaced. Every added step is a draft that needs human review; this records text only and does not demonstrate, capture or verify anything on screen. Returns the new step IDs. Requires MCP edits.",
+			inputSchema: addLessonStepsFileSchema,
+			run: addLessonStepsFile,
+		},
+	] as const)
+		server.registerTool(
+			tool.name,
+			{
+				description: tool.description,
+				inputSchema: tool.inputSchema,
+				annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+			},
+			async (args: unknown) => {
+				if (!editsAllowed())
+					return failure("consent_required: Enable MCP edits to write a lesson file.");
+				try {
+					return {
+						content: [{ type: "text" as const, text: JSON.stringify(await tool.run(args)) }],
+					};
+				} catch {
+					return failure("lesson-file-operation-failed");
+				}
+			},
+		);
 }

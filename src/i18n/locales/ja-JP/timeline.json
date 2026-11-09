@@ -508,7 +508,7 @@
 			"resealed": "New package checked and saved: {{path}}. The source package is unchanged. Review edited text against the retained media before sharing. Open that new folder explicitly to continue editing.",
 			"discardDraft": "Discard package draft",
 			"draftDiscardedClosed": "Draft discarded. The package view was closed because it was no longer checked. Open the package folder again to inspect or edit it.",
-			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
+			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions, LMS lesson and slide references, and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
 			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged.",
 			"editsKept": "Your unsaved text, code, order and image descriptions are kept. Retry explicitly, reopen the same unchanged package to restore verification, or discard the draft.",
 			"authorityLost": "Verification authority is no longer current. Your draft is kept. Save/reload or select a clean current project, then explicitly reopen the same unchanged package before retrying. Changed media or inventory cannot be rebased automatically.",

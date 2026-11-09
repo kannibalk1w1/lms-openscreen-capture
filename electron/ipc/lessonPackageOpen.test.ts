@@ -1149,3 +1149,34 @@ it("a failed creation never revokes a separately opened package capability", asy
 		result: { status: "packaged" },
 	});
 });
+it("reseals changed, added and cleared LMS references into the new package and its mapping file", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	const withRefs = {
+		...draft,
+		lessonRef: "RPG C1 / L1",
+		steps: draft.steps.map((step) => ({ ...step, slideRef: "slide 12" })),
+	};
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	const first = (await edited(opened.token, withRefs)) as { result: { path: string } };
+	expect(first).toMatchObject({ success: true, result: { status: "packaged" } });
+	const mapping = JSON.parse(
+		await fs.readFile(path.join(first.result.path, "lesson-mapping.json"), "utf8"),
+	);
+	expect(mapping).toMatchObject({ lessonRef: "RPG C1 / L1", steps: [{ slideRef: "slide 12" }] });
+	const inspected = await inspectLessonPackage(
+		{ directory: first.result.path },
+		{
+			assertCurrent() {
+				/* Explicit test authority. */
+			},
+		},
+	);
+	expect(inspected.lesson.steps[0].slideRef).toBe("slide 12");
+	// An invalid label is still refused before any destination picker.
+	host.open.mockClear();
+	expect(
+		await edited(opened.token, { ...withRefs, lessonRef: "two\nlines" } as typeof withRefs),
+	).toMatchObject({ success: false });
+	expect(host.open).not.toHaveBeenCalled();
+});

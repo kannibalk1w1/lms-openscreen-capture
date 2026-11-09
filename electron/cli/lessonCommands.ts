@@ -1,5 +1,10 @@
 import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
-import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
+import {
+	addLessonStepsFile,
+	createLessonFile,
+	exportLessonFile,
+	queryLessonFile,
+} from "../lesson/fileCommands";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
@@ -90,13 +95,17 @@ export async function runLessonCommand(
 							/* Explicit launch and file arguments supply CLI authority; no editor state is claimed. */
 						},
 					})
-				: command.action === "query"
-					? await queryLessonFile({ manifestPath: command.manifestPath, query: command.query })
-					: await exportLessonFile({
-							manifestPath: command.manifestPath,
-							outputDirectory: command.outputDirectory,
-							stepIds: command.stepIds,
-						});
+				: command.action === "new"
+					? await createLessonFile(command.request)
+					: command.action === "add-step"
+						? await addLessonStepsFile(command.request)
+						: command.action === "query"
+							? await queryLessonFile({ manifestPath: command.manifestPath, query: command.query })
+							: await exportLessonFile({
+									manifestPath: command.manifestPath,
+									outputDirectory: command.outputDirectory,
+									stepIds: command.stepIds,
+								});
 		out(
 			JSON.stringify(
 				command.json ? { event: "done", result } : result,

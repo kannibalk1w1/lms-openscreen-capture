@@ -305,6 +305,16 @@ export function LessonPackagePanel({
 									onCommit={(title) => edit(() => reviseLesson(draft, { title }))}
 								/>
 							</label>
+							<label>
+								{t("lesson.lessonRef")}
+								<input
+									maxLength={200}
+									value={draft.lessonRef ?? ""}
+									onChange={(e) =>
+										edit(() => reviseLesson(draft, { lessonRef: e.target.value || undefined }))
+									}
+								/>
+							</label>
 							{draft.steps.map((step, index) => (
 								<div key={step.id}>
 									<label>
@@ -312,6 +322,14 @@ export function LessonPackagePanel({
 										<LessonTitleInput
 											value={step.title}
 											onCommit={(title) => update(step, { title })}
+										/>
+									</label>
+									<label>
+										{t("lesson.slideRef")}
+										<input
+											maxLength={200}
+											value={step.slideRef ?? ""}
+											onChange={(e) => update(step, { slideRef: e.target.value || undefined })}
 										/>
 									</label>
 									<label>
