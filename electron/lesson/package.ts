@@ -24,6 +24,7 @@ import {
 	assertPackageTree,
 	copyPinned,
 	digest,
+	type PinnedBinary,
 	pinBinary,
 	pinDirectory,
 	pinMetadata,
@@ -180,7 +181,7 @@ export async function inspectLessonPackage(input: unknown, authority: PackageAut
 			new Set([...required, "lesson-package.json", "package-receipt.json"]),
 			current,
 		);
-		const pinned = [];
+		const pinned: PinnedBinary[] = [];
 		for (const entry of manifest.files) {
 			current();
 			const source = await pinBinary(
@@ -221,6 +222,13 @@ export async function inspectLessonPackage(input: unknown, authority: PackageAut
 		editable.assertCurrent();
 		for (const p of pinned) p.assertCurrent();
 		return {
+			assertCurrent: () => {
+				current();
+				completion.assertCurrent();
+				metadata.assertCurrent();
+				editable.assertCurrent();
+				for (const p of pinned) p.assertCurrent();
+			},
 			lesson,
 			manifest,
 			videoEvidence,

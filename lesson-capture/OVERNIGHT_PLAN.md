@@ -1,3 +1,18 @@
+# Current verified GUI package prerequisite authority — 9 November 2026
+
+Autonomous resumption from accepted/pushedb0463121 after review38 closesL37-1.
+Deliver [verified package inspection and static new-copy UI](VERIFIED_PACKAGE_OPEN_2026-11-09.md),
+validate/build/real production startup and bounded Electron transport proof, commit
+locally, then stop for coordinator actual exact-SHA Claude review/fixes/private push.
+Video packages stay read-only until explicit media-preserving reseal; no player,
+format migration or native-project import. Original reports/evidence/user work,
+native bytes and main/private-main stay unchanged. No other workers, worker push,
+checkout/reset/stash/discard/main/upstream/release/Actions/publication/real-lesson/
+auth/config/paid-API changes, user-app termination or shared-cache purge. Old pause
+records are superseded and time cutoffs revoked; prior accounts remain historical.
+
+## Prior checkpoint accounts
+
 # Current review37 test follow-up authority — 9 November 2026
 
 Complete only [L37-1 verify-side privacy tests and controls](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md)

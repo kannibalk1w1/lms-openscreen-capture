@@ -37,6 +37,7 @@ import {
 } from "@/lib/lesson/schema";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
+import { LessonPackagePanel } from "./LessonPackagePanel";
 import { LessonRangeControls } from "./LessonRangeControls";
 import { LessonReviewControls } from "./LessonReviewControls";
 import { LessonTitleInput } from "./LessonTitleInput";
@@ -214,6 +215,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					<DialogDescription>{t("lesson.scope")}</DialogDescription>
 				</DialogHeader>
 				<p>{t("lesson.unsaved")}</p>
+				<LessonPackagePanel />
 				<fieldset
 					className={styles.form}
 					disabled={busy}

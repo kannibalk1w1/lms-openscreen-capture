@@ -53,6 +53,15 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Current implementation and exact limits
 
+[Portable package v1](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md) and its
+privacy follow-up are accepted through review38, pushed atb0463121. The current
+[verified GUI package inspection/static new-copy slice](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
+provides explicit directory selection, strict verification, safe read-only display
+and static editable copies without replacing current work. Video bindings remain
+read-only; media-preserving reseal and player dependencies are next after exact-SHA
+review/private push. Native source projects/full courses/audio/platform/physical
+acceptance remain outside this scope.
+
 - [Narration captions](LESSON_CAPTURE.md): reuse local Whisper and transcript/caption
   editing, including recorded/imported narration. Hardware microphone acceptance
   differs from tested imported-audio/native export.
@@ -77,29 +86,21 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
   complete CJK/clipping and cross-platform acceptance remain open.
 - Existing upstream CLI/MCP, checkpoints, presets and relinking are reused.
   Legacy pack supports sidecars but explicitly rejects current editor projects;
-  complete checksummed lesson portability is not delivered.
+  bounded derived packages are delivered separately; complete native-project/course
+  portability remains incomplete.
 
 ## Active work and next concrete slices
 
-Actual [review37](lesson-capture/CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts
-36d30d24's bounded portable package within scope, with no High/Medium and one Low
-verify-side privacy test gap. [The test-only follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md)
-now independently pins re-signed pin/history/evidence/extension/code/image-policy
-refusals while preserving benign inclusion and v1 compatibility. Production and
-format are unchanged. Coordinator exact-SHA follow-up/fixes/private push is next;
-GUI verified import/reseal or timed-player work remains a separate later slice.
-Earlier pending notes below are historical checkpoint accounts.
-
-Actual [review36](lesson-capture/CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts
-e45e4b34 and closesM35-1/L35-1; headless MP4 parity is accepted/pushed atf0eacc95.
-[P1.4 portable lesson/media integrity prerequisite](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)
-now delivers explicit CLI/MCP derived static lesson/JPEG policy and already validated
-selected MP4 packaging, relative safe paths/checksums/readback/receipt-last and
-standalone verification/reopen after original paths move away. Raw journals,
-source projects and refresh history stay excluded/external; no native editability
-or lossless/full-course claim. Exact-SHA coordinator Claude review/fixes/private
-push is next; verified GUI import/reseal and timed-player dependencies follow only
-after acceptance. Earlier pending accounts below are historical snapshots.
+Actual [review38](lesson-capture/CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts
+17bed4e6 and closes review37's L37-1, with no new findings; checkpointb0463121 is
+pushed. [Portable v1 packaging](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)
+and CLI/MCP selected-MP4 parity are delivered within their bounded Linux scope.
+[Verified GUI inspection/static editable copies](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
+now implement the next prerequisite and await independent exact-SHA review/private
+push. Imported packages and unsaved current lessons remain unchanged. Video bindings
+stay read-only; media-preserving editing/reseal is next before timed-player work.
+Full native-project/course portability, audio and physical/platform acceptance remain.
+Earlier accounts below retain their historical checkpoint context.
 
 Actual [review35](lesson-capture/CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts
 bbe56356's bounded CLI/MCP selected-MP4 architecture, with requiredM35-1: its

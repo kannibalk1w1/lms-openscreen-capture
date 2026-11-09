@@ -446,6 +446,34 @@
 				"rendering": "Rendering this step’s selected video…",
 				"validating": "Checking the exported video and source again…"
 			}
+		},
+		"package": {
+			"title": "Portable lesson package",
+			"scope": "Inspect a derived lesson without replacing your current work. Native projects, source media, raw history, fonts, annotations, added audio and branches are not included. Package HTML is never opened inside the app.",
+			"dirty": "Save and reload the current video project before inspecting a package.",
+			"open": "Open and check a package folder",
+			"checking": "Checking package files and any included video. This may take a while.",
+			"checked": "Files matched the package checks when opened. This is a read-only snapshot, not a signature or content approval. Files are checked again before saving a copy.",
+			"cancel": "Cancel package operation",
+			"cancelled": "Package selection cancelled.",
+			"cancelling": "Cancelling. Any active verification must settle before another operation.",
+			"saved": "New editable copy saved: {{path}}. Use Open editable lesson to edit it; your current lesson is unchanged.",
+			"noImages": "No images were included.",
+			"imageProvenance": "Images were explicitly included with external source identifiers and timing. Original source projects remain unavailable.",
+			"videosReadOnly": "This package contains rendered videos. Their bindings are preserved for inspection; editable copying and resealing with video are not supported yet. No video playback is provided here.",
+			"video": "Included rendered video: {{frames}} frames, {{seconds}} seconds at 30 fps. Embedded audio is not verified.",
+			"copy": "Save a new editable text and image copy",
+			"copyScope": "Static packages only. The new file preserves all included text, code and embedded images with derived provenance. Open it explicitly to edit. The original package and its receipt stay unchanged; this copy is not a resealed package.",
+			"close": "Close package snapshot",
+			"errors": {
+				"lesson-package-invalid": "The package or current editor state changed, or its files could not be checked. Save and reload your project, then choose an intact package folder again.",
+				"lesson-package-cancelled": "Package operation cancelled. No completed copy is claimed; a private incomplete file may remain in the chosen folder.",
+				"lesson-package-unsupported": "Package checking is supported on Linux only.",
+				"lesson-package-tool-unavailable": "The video checking tool is unavailable. Reinstall or update OpenScreen, or ask your administrator to check the configured FFmpeg tool, then retry.",
+				"lesson-package-busy": "Another package operation is still finishing. Wait, then retry.",
+				"lesson-package-video-copy-unsupported": "Editable copying with video bindings is not supported yet. The package remains read-only.",
+				"destination-exists": "That file already exists. Choose a new filename; existing files are never replaced."
+			}
 		}
 	}
 }

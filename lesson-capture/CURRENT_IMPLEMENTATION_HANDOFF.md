@@ -1,3 +1,27 @@
+# Verified GUI package inspection/static-copy slice — 9 November 2026
+
+Actual [review38](CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts17bed4e6,
+closesL37-1 with no new findings; coordinator checkpointb0463121 is pushed.
+[The current bounded GUI slice](VERIFIED_PACKAGE_OPEN_2026-11-09.md) adds an
+explicit directory picker, strict verification before safe read-only React display,
+owner/session cancellation and static-only new editable copies. Current authored
+lesson work and imported package bytes/receipts stay untouched; included JPEG/code
+survive. Video packages keep bindings/read-only inspection and refuse editable
+copying rather than discard media. No HTML/file protocol/source grant or playback.
+
+Actual Electron/preload/production-workflow proof with stubbed dialogs opens copied
+packages without authoring sources, saves/reopens static copies, verifies45sample/
+45decoded-frame video/1.5s and refuses tampering/foreign/dirty callers. This is not
+GUI clicks/native-picker/physical/platform/audio acceptance. Final165focused/9files and6108full/453files pass,0skips; bothTS, Vite,
+lint35baseline/docs37/i18n15/1283 and mandatory real headless startup pass. Seven
+single-guard controls assertion-kill with exact source restoration. Honest initial
+harness/test-typing diagnostics and preservation details are linked in the report. This slice
+awaits coordinator exact-SHA Claude review/fixes/private push; no worker push.
+Next is media-preserving edit/reseal before player integration; mainfd2775e2 and
+native addon/original reports/evidence/user work remain preserved.
+
+## Prior checkpoint accounts
+
 # Accepted portable package checkpoint — 9 November 2026
 
 Actual [review38](CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts exact

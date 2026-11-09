@@ -5,6 +5,7 @@ import { LessonService } from "../lesson/service";
 import type { CompositorViewService } from "../native-bridge/services/compositorViewService";
 import { registerEditorRangeAuthoring } from "./editorRangeAuthoring";
 import { registerEditorLessonHandlers } from "./lesson";
+import { registerLessonPackageOpenHandlers } from "./lessonPackageOpen";
 import { registerLessonRangeExportHandlers } from "./lessonRangeExport";
 /** Main supplies its live dirty provider directly; all lesson routes share this production binding. */
 export function registerLessonWorkflow(options: {
@@ -23,6 +24,9 @@ export function registerLessonWorkflow(options: {
 		options.editorHasUnsavedChanges,
 	);
 	registerEditorRangeAuthoring(options);
+	registerLessonPackageOpenHandlers((event) =>
+		editorRangeSessions.capture(event.sender, options.editorHasUnsavedChanges),
+	);
 	registerLessonRangeExportHandlers(
 		new LessonRangeExportService(
 			(id) => options.documents.getSavedProject(id),

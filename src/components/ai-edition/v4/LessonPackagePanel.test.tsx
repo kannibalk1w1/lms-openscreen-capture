@@ -1,0 +1,175 @@
+// @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/contexts/I18nContext";
+import { createEmptyDocument } from "@/lib/ai-edition/schema";
+import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { newLesson, newStep } from "@/lib/lesson/authoring";
+import type { LessonPackageOpenApi, OpenedLessonPackage } from "@/lib/lesson/packageOpen";
+import { LessonPackagePanel } from "./LessonPackagePanel";
+
+let opened: OpenedLessonPackage;
+let api: Required<LessonPackageOpenApi>;
+beforeEach(() => {
+	vi.stubGlobal("crypto", webcrypto);
+	useProjectStore.setState({
+		projectId: "p",
+		document: createEmptyDocument({ projectId: "p", title: "Current" }),
+		dirty: false,
+	});
+	opened = {
+		status: "opened",
+		token: crypto.randomUUID(),
+		lesson: {
+			...newLesson("Package title"),
+			steps: [
+				{
+					...newStep("Package step"),
+					instructions: "<img src=x onerror=alert(1)>",
+					code: { language: "plain", text: "<script>unsafe()</script>" },
+				},
+			],
+		},
+		images: "exclude",
+		videos: [],
+	};
+	api = {
+		lessonPackageOpen: vi.fn<Required<LessonPackageOpenApi>["lessonPackageOpen"]>(async () => ({
+			success: true,
+			result: opened,
+		})),
+		lessonPackageCopy: vi.fn<Required<LessonPackageOpenApi>["lessonPackageCopy"]>(async () => ({
+			success: true,
+			result: { status: "saved", path: "/explicit/new.json" },
+		})),
+		lessonPackageCancel: vi.fn(async () => true),
+		lessonPackageRelease: vi.fn(async () => true),
+	};
+	vi.stubGlobal("electronAPI", api);
+});
+afterEach(() => {
+	cleanup();
+	useProjectStore.getState().clear();
+	vi.unstubAllGlobals();
+});
+const show = () =>
+	render(
+		<I18nProvider>
+			<LessonPackagePanel />
+		</I18nProvider>,
+	);
+const clickOpen = () => fireEvent.click(screen.getByText("Open and check a package folder"));
+it("renders checked data as safe read-only React text and saves an explicit copy without changing current work", async () => {
+	const current = useProjectStore.getState().document;
+	const view = show();
+	clickOpen();
+	await screen.findByText("Package step");
+	expect(view.container.querySelector("script")).toBeNull();
+	expect(view.container.querySelector("img")).toBeNull();
+	expect(view.container.querySelector("textarea,input,iframe,webview")).toBeNull();
+	fireEvent.click(screen.getByText("Save a new editable text and image copy"));
+	await screen.findByText(/New editable copy saved/);
+	expect(api.lessonPackageCopy).toHaveBeenCalledWith({
+		operationId: expect.any(String),
+		token: opened.token,
+	});
+	expect(useProjectStore.getState().document).toBe(current);
+});
+it("video package stays read-only with no playback paths and preserves visible bindings", async () => {
+	opened.videos = [{ stepId: opened.lesson.steps[0].id, frames: 45, durationSec: 1.5 }];
+	const view = show();
+	clickOpen();
+	await screen.findByText(/45 frames, 1.5 seconds/);
+	const button = screen.getByText("Save a new editable text and image copy") as HTMLButtonElement;
+	expect(button.disabled).toBe(true);
+	fireEvent.click(button);
+	expect(api.lessonPackageCopy).not.toHaveBeenCalled();
+	expect(view.container.querySelector("video,a,iframe")).toBeNull();
+});
+it("dirty provider disables the button and programmatic clicks cannot start inspection", () => {
+	useProjectStore.setState({ dirty: true });
+	show();
+	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
+		true,
+	);
+	clickOpen();
+	expect(api.lessonPackageOpen).not.toHaveBeenCalled();
+});
+it("stale project completion is released and cannot populate inspection", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageOpen).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	show();
+	clickOpen();
+	act(() => useProjectStore.setState({ projectId: "other" }));
+	await act(async () => {
+		settle({ success: true, result: opened });
+	});
+	expect(screen.queryByText("Package step")).toBeNull();
+	expect(api.lessonPackageCancel).toHaveBeenCalled();
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+});
+it("unmount cancels active operation and releases a late capability", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageOpen).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	const view = show();
+	clickOpen();
+	view.unmount();
+	await act(async () => {
+		settle({ success: true, result: opened });
+	});
+	expect(api.lessonPackageCancel).toHaveBeenCalled();
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+});
+it("cancel leaves the button busy until settlement and ignores a late opened result", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageOpen).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	show();
+	clickOpen();
+	fireEvent.click(screen.getByText("Cancel package operation"));
+	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
+		true,
+	);
+	await act(async () => {
+		settle({ success: true, result: opened });
+	});
+	expect(screen.queryByText("Package step")).toBeNull();
+	await waitFor(() =>
+		expect(
+			(screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled,
+		).toBe(false),
+	);
+});
+it("fixed verification errors show no imported content", async () => {
+	vi.mocked(api.lessonPackageOpen).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-tool-unavailable",
+	});
+	show();
+	clickOpen();
+	await screen.findByText(/The video checking tool is unavailable/);
+	expect(screen.queryByText("Package step")).toBeNull();
+});
+it("closing a checked snapshot releases its capability", async () => {
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Close package snapshot"));
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+	expect(screen.queryByText("Package step")).toBeNull();
+});
