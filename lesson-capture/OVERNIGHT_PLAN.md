@@ -1,3 +1,13 @@
+# Current review31 test follow-up — 9 November 2026
+
+Actual review31 acceptsedb74a00 with no High/Medium. Complete only the
+[L31-1/N31-2 independent test follow-up](CLAUDE_ROADMAP_FOLLOWUP_31_2026-11-09.md),
+validate/commit locally and stop for coordinator exact-SHA actual Claude review/
+fixes/private push before CLI/MCP parity. Production/native behavior and all
+existing authority/evidence/real-lesson/private-main restrictions remain unchanged;
+no other worker or implementation-worker push. Old schedules/pause records below
+remain superseded history; original time cutoffs stay revoked.
+
 # Current selected-step MP4 authorization — 9 November 2026
 
 The autonomous coordinator dispatch resumes from accepted/pushed `bc906e39` after

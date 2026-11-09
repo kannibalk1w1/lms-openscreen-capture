@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow test follow-up pending review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -86,8 +86,9 @@ claims that every listed operation exists.
    current content or refreshes within the same project, with cancellation and
    caller/source/stale-target guards; review27 accepts1dad5a7c with no High/Medium; the [bounded follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md) is accepted by actual review28 at897ddceb. The
    [selected-step MP4 editor slice](SELECTED_STEP_MP4_2026-11-09.md) now integrates
-   native picker, owned progress/cancellation/status and actual validator, pending
-   exact-SHA coordinator review. Shared ownership and authority/GIF follow-up are
+   native picker, owned progress/cancellation/status and actual validator, accepted within scope by review31 atedb74a00; the
+   [narrow source-grant/cancel test follow-up](CLAUDE_ROADMAP_FOLLOWUP_31_2026-11-09.md)
+   awaits exact-SHA review. Shared ownership and authority/GIF follow-up are
    accepted through review30 at27136d0f. CLI/MCP confirmation/export parity is next
    after acceptance. Timed Next/Previous/Replay/loop/speed, captions and local
    learner progress remain later work.
@@ -263,7 +264,7 @@ Bounded Linux authored source content identity is accepted through review26;
 [explicit editor confirmation](RANGE_AUTHORING_2026-11-09.md) is now implemented,
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
-implemented within its Linux subset, pending exact-SHA review; CLI/MCP parity,
+accepted within its Linux subset by review31; its narrow test follow-up awaits review; CLI/MCP parity,
 full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current

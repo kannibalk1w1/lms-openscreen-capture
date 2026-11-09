@@ -86,8 +86,10 @@ Actual [review30](lesson-capture/CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts
 follow-up; coordinator checkpointbc906e39 is pushed and verified. The bounded
 [selected-step MP4 editor slice](lesson-capture/SELECTED_STEP_MP4_2026-11-09.md) now
 integrates included confirmed ranges, native destination choice, owned progress/
-cancellation and actual Linux sample/decode/hash validation. It awaits independent
-exact-SHA coordinator review/fixes/private push; original pending notes below are
+cancellation and actual Linux sample/decode/hash validation. Actual [review31](lesson-capture/CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md) accepts
+edb74a00 within scope with no High/Medium; the narrow
+[L31-1/N31-2 test follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_31_2026-11-09.md)
+awaits exact-SHA coordinator follow-up review/fixes/private push; original pending notes below are
 history. Native/real Electron IPC proof is distinguished from GUI/picker/physical
 acceptance. CLI/MCP confirmation/export parity is next after acceptance. Portable
 courses, timed player, audio and other-platform readiness remain unclaimed.

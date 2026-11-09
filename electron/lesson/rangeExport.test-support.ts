@@ -63,10 +63,18 @@ export async function rangeExportFixture(root: string, nativeControls = true) {
 	});
 	const step = { ...newStep("Selected step"), mediaSelection: pin },
 		lesson: LessonManifest = { ...newLesson("Fixture lesson"), steps: [step] };
-	const native = vi.fn(async (_clips: unknown, target: string) => {
-		await fs.writeFile(target, "mock selected MP4");
-		return { frames: 45, fps: 30, wallS: 1, videoDurationS: 1.5 };
-	});
+	const native = vi.fn(
+		async (
+			_clips: unknown,
+			target: string,
+			_scene?: string,
+			_params?: unknown,
+			_progress?: (frames: number) => void,
+		) => {
+			await fs.writeFile(target, "mock selected MP4");
+			return { frames: 45, fps: 30, wallS: 1, videoDurationS: 1.5 };
+		},
+	);
 	const cancel = vi.fn(() => true),
 		frames = vi.fn(async () => null);
 	const compositor = new CompositorViewService({

@@ -1,3 +1,34 @@
+# Review31 bounded follow-up — 9 November 2026
+
+Actual [review31](CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md) accepts exact
+edb74a00f8445d9889db1ec069fb87ebba1b9925 within scope with no High/Medium.
+The sole writer completes the [L31-1/N31-2 test follow-up](CLAUDE_ROADMAP_FOLLOWUP_31_2026-11-09.md):
+lexical approval before resolution, equally approved symlink-ancestor refusal,
+native cancel requests after handle acquisition and cancellation during synchronous
+start/handle acquisition, actual
+native progress filtering, UI operation-ID/bounds and dirty-disabled behavior.
+Production/native code remain unchanged. N31-1 redundant guards are untouched;
+N31-3 lifecycle cancellation is less specific and N31-4 cannot dismiss the native
+picker programmatically, so ownership waits for actual dialog settlement.
+
+458 focused tests/26files pass, zero skips; 49 tests across the two export
+integration files include5new cases. Both TS, Biome (35 baseline warnings), docs37/i18n15/126links pass;14independent
+single-guard assertion controls kill and restore cleanly. Preservation112/482/66
+entries and unchanged addon verified; exact evidence is in the linked report.
+Prior5902/441full and Vite are historical, not rerun for this test-only slice.
+Reviewer's original full-app Electron150frame proof is preserved, distinguished
+from the earlier worker transport harness; all destination dialogs are stubbed,
+with no picker-click/physical/Windows/macOS/audio acceptance. N29-3/N27-3 and the
+old unreproduced observation remain. Original reports/proofs/initial logs and
+stale imported inventory explanation are preserved verbatim.
+
+Coordinator exact-SHA actual Claude follow-up/fixes/private push is pending.
+Stop here; next after acceptance is bounded shared-service CLI/MCP selected-step
+confirmation/refresh/export parity. No new phase, worker or push from this writer;
+main/private-main remainfd2775e2 and all real-lesson/source/evidence limits persist.
+
+## Historical selected-step checkpoint account
+
 # Selected-step MP4 editor slice — 9 November 2026
 
 Resumed from accepted/pushed `bc906e39`; actual [review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md)

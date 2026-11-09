@@ -4,10 +4,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
 import { AI_EDITION_OPEN_PROJECT_CHANNEL } from "../../src/native/contracts";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { validateRangeVideo } from "../lesson/encodedVideo";
 import { rangeExportFixture } from "../lesson/rangeExport.test-support";
+import { planLessonRange } from "../lesson/rangePlan";
+import { captureLessonSourceIdentity } from "../lesson/sourceIdentity";
 import { renderOwnerJobs } from "./exportJobs";
 import { registerLessonWorkflow } from "./lessonWorkflow";
 
@@ -50,11 +53,13 @@ async function setup(nativeControls = true) {
 	const sourceBefore = await fs.readFile(f.source),
 		projectFile = f.documents.filePathFor("p"),
 		projectBefore = await fs.readFile(projectFile);
+	const grants = new Set([f.source]);
+	const approve = vi.fn((source: string) => (approved && grants.has(source) ? source : null));
 	registerLessonWorkflow({
 		documents: f.documents,
 		compositor: f.compositor,
 		editorHasUnsavedChanges: () => dirty,
-		readableApprovedPath: (source) => (approved && source === f.source ? source : null),
+		readableApprovedPath: approve,
 	});
 	const sender = Object.assign(new EventEmitter(), {
 		id: 1,
@@ -76,6 +81,8 @@ async function setup(nativeControls = true) {
 	electron.pick.mockResolvedValue({ canceled: false, filePaths: [root] });
 	return {
 		...f,
+		grants,
+		approve,
 		sender,
 		event,
 		select,
@@ -271,6 +278,7 @@ it.each([
 	if (change === "cancel") await f.cancelExport(request.operationId);
 	else if (change === "navigation") f.sender.emit("did-start-navigation");
 	else f.select("other");
+	expect(f.cancel).toHaveBeenCalledOnce();
 	expect(await f.export(f.request())).toMatchObject({ success: false });
 	finish();
 	const result = await pending;
@@ -494,4 +502,120 @@ it("requires the canonical source grant independently of the lexical grant", asy
 	});
 	expect(f.native).not.toHaveBeenCalled();
 	expect(open).not.toHaveBeenCalled();
+});
+
+it("requires lexical approval before resolving an unapproved source on the filesystem", async () => {
+	const f = await setup();
+	f.setApproved(false);
+	const realpath = vi.spyOn(fs, "realpath"),
+		open = vi.spyOn(fs, "open");
+	expect(await f.export(f.request())).toMatchObject({
+		success: false,
+		code: "range-export-source-unavailable",
+	});
+	expect(electron.pick).toHaveBeenCalledOnce();
+	expect(f.approve).toHaveBeenCalledWith(path.resolve(f.source));
+	expect(realpath).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+	expect(f.native).not.toHaveBeenCalled();
+});
+it("refuses a symlinked source ancestor even when lexical and canonical paths are equally approved", async () => {
+	const f = await setup(),
+		realDirectory = path.join(root, "actual"),
+		aliasDirectory = path.join(root, "alias");
+	await fs.mkdir(realDirectory);
+	const canonical = path.join(realDirectory, "source.mp4"),
+		lexical = path.join(aliasDirectory, "source.mp4");
+	await fs.copyFile(f.source, canonical);
+	await fs.symlink(realDirectory, aliasDirectory, "dir");
+	f.grants.add(lexical);
+	f.grants.add(canonical);
+	f.doc.assets[0].originalPath = lexical;
+	const saved = await f.documents.saveProject(f.doc),
+		reference = await planLessonRange(saved, {
+			projectId: "p",
+			documentSha256: await lessonRenderFingerprint(saved),
+			startSec: 0.5,
+			endSec: 4,
+		});
+	// An imported content pin can match these bytes and render inputs; it grants no path authority.
+	f.step.mediaSelection = await captureLessonSourceIdentity({
+		selection: reference,
+		intent: "author-current",
+		readDocument: (id) => f.documents.getSavedProject(id),
+	});
+	expect(await fs.realpath(lexical)).toBe(canonical);
+	expect(f.approve(lexical)).toBe(lexical);
+	expect(f.approve(canonical)).toBe(canonical);
+	f.approve.mockClear();
+	const resolve = vi.spyOn(fs, "realpath"),
+		open = vi.spyOn(fs, "open");
+	expect(await f.export(f.request())).toMatchObject({
+		success: false,
+		code: "range-export-source-unavailable",
+	});
+	expect(resolve).toHaveBeenCalledWith(lexical);
+	expect(f.approve).toHaveBeenCalledWith(lexical);
+	expect(open).not.toHaveBeenCalled();
+	expect(f.native).not.toHaveBeenCalled();
+	expect((await fs.readdir(root)).some((name) => name.startsWith("lesson-range-"))).toBe(false);
+});
+it("requests native cancellation when cancel arrives synchronously during handle acquisition", async () => {
+	const f = await setup(),
+		request = f.request();
+	let finish!: () => void;
+	f.native.mockImplementationOnce(() => {
+		const pending = new Promise<{
+			frames: number;
+			fps: number;
+			wallS: number;
+			videoDurationS: number;
+		}>((resolve) => {
+			finish = () => resolve({ frames: 45, fps: 30, wallS: 1, videoDurationS: 1.5 });
+		});
+		// The registered stop route runs before CompositorViewService has returned its owned handle.
+		expect(f.cancelExport(request.operationId)).toEqual({ success: true, result: true });
+		expect(f.cancel).not.toHaveBeenCalled();
+		return pending;
+	});
+	const pending = f.export(request);
+	try {
+		await vi.waitFor(() => expect(typeof finish).toBe("function"));
+		expect(f.cancel).toHaveBeenCalledOnce();
+		expect(await f.export(f.request())).toMatchObject({ success: false, code: "render-busy" });
+	} finally {
+		finish();
+		await pending;
+	}
+	expect(await pending).toMatchObject({ success: false, code: "range-export-cancelled" });
+	const directory = (await fs.readdir(root)).find((name) => name.startsWith("lesson-range-"))!;
+	expect(await fs.readdir(path.join(root, directory))).not.toContain("range-export.json");
+	expect((await f.export(f.request())).success).toBe(true);
+	expect(f.cancel).toHaveBeenCalledOnce();
+});
+
+it("filters invalid native progress bounds before the production route sends any frame count", async () => {
+	const f = await setup(),
+		request = f.request();
+	f.native.mockImplementationOnce(async (_clips, file, _scene, _params, progress) => {
+		for (const frames of [0, -1, 1.25, Number.NaN, Number.POSITIVE_INFINITY, 46, 12, 45])
+			progress?.(frames);
+		await fs.writeFile(file, "mock selected MP4");
+		return { frames: 45, fps: 30, wallS: 1, videoDurationS: 1.5 };
+	});
+	expect(await f.export(request)).toMatchObject({
+		success: true,
+		result: { status: "materialized" },
+	});
+	const counts = f.sender.send.mock.calls
+		.map(([, value]) => value)
+		.filter((value) => value.frames !== undefined);
+	expect(counts).toEqual(
+		[0, 12, 45].map((frames) => ({
+			operationId: request.operationId,
+			phase: "rendering",
+			frames,
+			totalFrames: 45,
+		})),
+	);
 });

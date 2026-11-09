@@ -167,6 +167,17 @@ it("shows real phases/counts, rejects invalid/foreign progress, and waits for ca
 	expect(screen.getByText(/12 of 45/)).toBeTruthy();
 	act(() =>
 		f.progress({
+			operationId: crypto.randomUUID(),
+			phase: "rendering",
+			frames: 21,
+			totalFrames: 45,
+		}),
+	);
+	expect(screen.queryByText(/21 of 45/)).toBeNull();
+	expect(screen.getByText(/12 of 45/)).toBeTruthy();
+
+	act(() =>
+		f.progress({
 			operationId: input.operationId,
 			phase: "rendering",
 			frames: 999,
@@ -174,6 +185,16 @@ it("shows real phases/counts, rejects invalid/foreign progress, and waits for ca
 		}),
 	);
 	expect(screen.queryByText(/999/)).toBeNull();
+	for (const bounds of [
+		{ frames: -1, totalFrames: 45 },
+		{ frames: 1.25, totalFrames: 45 },
+		{ frames: 12, totalFrames: 3601 },
+		{ frames: 0, totalFrames: 0 },
+	]) {
+		act(() => f.progress({ operationId: input.operationId, phase: "rendering", ...bounds }));
+		expect(screen.getByText(/12 of 45/)).toBeTruthy();
+	}
+
 	fireEvent.click(screen.getByRole("button", { name: "Cancel MP4 export" }));
 	await screen.findByText(/Waiting for current work to finish/);
 	expect(f.cancel).toHaveBeenCalledOnce();
@@ -254,4 +275,16 @@ it("a previously captured export callback cannot export a step after exclusion",
 	);
 	expect(f.exportStep).not.toHaveBeenCalled();
 	expect(f.native).not.toHaveBeenCalled();
+});
+
+it("disables MP4 export while dirty independently of handler refusal and reenables after save", async () => {
+	const f = await fixture();
+	expect((exportButton() as HTMLButtonElement).disabled).toBe(false);
+	act(() => useProjectStore.setState({ dirty: true }));
+	expect((exportButton() as HTMLButtonElement).disabled).toBe(true);
+	fireEvent.click(exportButton());
+	expect(f.exportStep).not.toHaveBeenCalled();
+	expect(f.native).not.toHaveBeenCalled();
+	act(() => useProjectStore.setState({ dirty: false }));
+	expect((exportButton() as HTMLButtonElement).disabled).toBe(false);
 });
