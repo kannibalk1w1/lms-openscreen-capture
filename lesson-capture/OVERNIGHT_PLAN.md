@@ -1,3 +1,16 @@
+# Current review37 test follow-up authority — 9 November 2026
+
+Complete only [L37-1 verify-side privacy tests and controls](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md)
+from exact36d30d24, validate/commit locally and stop for coordinator actual exact-SHA
+Claude follow-up/fixes/private push. Originalreview37/evidence/user work, production
+format/schema/native bytes and main/private-main stay unchanged. No new GUI/player
+phase, other worker, worker push, checkout/reset/stash/discard, main/upstream/
+release/Actions/publication/real-lesson/auth/config/paid-API changes, user-app
+termination or shared-cache purge. Old schedules/pause records remain superseded;
+cutoffs stay revoked. Prior checkpoint accounts below are historical.
+
+## Prior checkpoint accounts
+
 # Current portable-package prerequisite authority — 9 November 2026
 
 Autonomous resumption from accepted/pushedf0eacc95 after review36 closesM35-1/L35-1.

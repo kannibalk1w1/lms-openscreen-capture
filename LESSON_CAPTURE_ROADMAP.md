@@ -81,6 +81,15 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+Actual [review37](lesson-capture/CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts
+36d30d24's bounded portable package within scope, with no High/Medium and one Low
+verify-side privacy test gap. [The test-only follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md)
+now independently pins re-signed pin/history/evidence/extension/code/image-policy
+refusals while preserving benign inclusion and v1 compatibility. Production and
+format are unchanged. Coordinator exact-SHA follow-up/fixes/private push is next;
+GUI verified import/reseal or timed-player work remains a separate later slice.
+Earlier pending notes below are historical checkpoint accounts.
+
 Actual [review36](lesson-capture/CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts
 e45e4b34 and closesM35-1/L35-1; headless MP4 parity is accepted/pushed atf0eacc95.
 [P1.4 portable lesson/media integrity prerequisite](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)

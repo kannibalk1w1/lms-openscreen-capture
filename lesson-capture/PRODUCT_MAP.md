@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite implemented, pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy test follow-up pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -27,6 +27,13 @@ now supplies bounded explicit CLI/MCP selected derived guide/lesson/JPEG policy 
 validated MP4 packaging/verification, including moved-source reopen. Native projects,
 raw evidence/history and full course/player semantics remain outside this scope;
 GUI import/reseal is later. Exact-SHA review/private push remains required.
+
+[Review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts36d30d24 within its derived
+package scope. [L37-1 test follow-up](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md) pins
+coherent re-signed privacy/policy refusals, benign inclusion and v1 compatibility;
+production/format are unchanged. Exact-SHA follow-up/private push remains before
+GUI import/reseal or player work. Prior pending descriptions retain their checkpoint
+context; full native-project/course portability remains outside delivered scope.
 
 ## Status and evidence rules
 
@@ -286,7 +293,7 @@ Bounded Linux authored source content identity is accepted through review26;
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
-accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite implemented, pending exact-SHA review/push;
+accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy test follow-up pending exact-SHA review/push;
 headless selected-MP4 export parity,
 full editor/course packaging and timed output acceptance remain.
 

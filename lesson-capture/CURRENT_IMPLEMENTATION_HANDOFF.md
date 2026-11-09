@@ -1,3 +1,26 @@
+# Review37 verify-side privacy follow-up — 9 November 2026
+
+Actual [review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts exact36d30d24 with
+no High/Medium; LowL37-1 is a regression-coverage gap, not a live defect.
+[The test-only follow-up](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md) adds coherent
+re-signed verify cases for original pins/refresh history, source evidence/extensions,
+code and image exclusions. Canonical lesson/guide/payload checksums are consistent;
+seven isolated predicate removals each produce a verified promise and an assertion
+kill, with exact source bytes restored. Benign code/image-provenance controls and
+the retained v1 fixture pass. Production/schema/format/error/native behavior stays
+unchanged; no GUI/player scope is added.
+
+Focused110/6,0skips and bothTS pass; lint/docs/evidence details are linked. Actual
+original-build Electron CLI verifies the legitimate include package and refuses
+all7 re-signed privacy cases from a foreign cwd, with source bytes unchanged.
+No new full/Vite/native/startup repetition; prior6060/450 belongs to36d30d24.
+Preservation112/1873/78 and unchanged addon/main are verified in current evidence.
+Opaque-error/equivalent-guard/plain-link nits remain documented. Coordinator actual
+exact-SHA Claude follow-up/fixes/private push is next, before separate GUI verified
+import/reseal or player dependencies. No worker push or further phase.
+
+## Prior checkpoint accounts
+
 # Portable selected lesson/media prerequisite — 9 November 2026
 
 Resumed from accepted/pushedf0eacc95 after actual [review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md)
