@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveFfmpeg } from "../media/audioPeaks";
+import { RangeVideoToolUnavailableError } from "./rangeErrors";
 
 const MAX_BYTES = 128 * 1024 * 1024;
 const MAX_BOXES = 4096;
@@ -11,6 +12,7 @@ const TIMEOUT_MS = 30_000;
 const MAX_STDOUT = 1024 * 1024;
 const MAX_STDERR = 64 * 1024;
 const fail = () => new Error("range-video-validation-failed");
+
 export interface VideoExpectation {
 	width: number;
 	height: number;
@@ -378,8 +380,10 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 	)
 		throw fail();
 	const resolved = resolveFfmpeg();
-	if (!resolved || !path.isAbsolute(resolved)) throw fail();
-	const executable = await fs.realpath(resolved);
+	if (!resolved || !path.isAbsolute(resolved)) throw new RangeVideoToolUnavailableError();
+	const executable = await fs.realpath(resolved).catch(() => {
+		throw new RangeVideoToolUnavailableError();
+	});
 	const file = await fs.open(
 		filePath,
 		constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
@@ -395,17 +399,23 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 			at += read.bytesRead;
 		}
 		const samples = inspectRangeVideo(bytes, expected);
-		const decoderBefore = await hashDecoderExecutable(executable);
-		const versionOutput = await runDecoder(executable, ["-version"], {
-			timeoutMs: 3000,
-			stdoutBytes: 16384,
-			stderrBytes: 16384,
-		});
-		// Retain only the bounded version token, never configuration/build paths.
-		const version = /^ffmpeg version ([A-Za-z0-9][A-Za-z0-9._+~:-]{0,159})(?:[ \t]|$)/.exec(
-			versionOutput.split(/\r?\n/, 1)[0],
-		)?.[1];
-		if (!version) throw fail();
+		let decoderBefore: Awaited<ReturnType<typeof hashDecoderExecutable>>, version: string;
+		try {
+			decoderBefore = await hashDecoderExecutable(executable);
+			const versionOutput = await runDecoder(executable, ["-version"], {
+				timeoutMs: 3000,
+				stdoutBytes: 16384,
+				stderrBytes: 16384,
+			});
+			// Only a bounded version token; configuration/build paths never leave main.
+			const token = /^ffmpeg version ([A-Za-z0-9][A-Za-z0-9._+~:-]{0,159})(?:[ \t]|$)/.exec(
+				versionOutput.split(/\r?\n/, 1)[0],
+			)?.[1];
+			if (!token) throw new RangeVideoToolUnavailableError();
+			version = token;
+		} catch {
+			throw new RangeVideoToolUnavailableError();
+		}
 		const stdout = await runDecoder(
 			executable,
 			[
@@ -492,7 +502,8 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 			bytes: bytes.length,
 			sha256: createHash("sha256").update(bytes).digest("hex"),
 		};
-	} catch {
+	} catch (error) {
+		if (error instanceof RangeVideoToolUnavailableError) throw error;
 		throw fail();
 	} finally {
 		await file.close();
@@ -503,7 +514,8 @@ async function validateLocalVideo(filePath: string, expected: VideoExpectation) 
 export async function validateRangeVideo(filePath: string, expected: VideoExpectation) {
 	try {
 		return await validateLocalVideo(filePath, expected);
-	} catch {
+	} catch (error) {
+		if (error instanceof RangeVideoToolUnavailableError) throw error;
 		throw fail();
 	}
 }

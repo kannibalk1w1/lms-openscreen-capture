@@ -89,7 +89,9 @@ it.skipIf(process.platform !== "linux").each([
 		await wrapper(String(mode));
 		const started = performance.now();
 		await expect(validateRangeVideo(fixture, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			String(mode).startsWith("version-")
+				? /^range-video-tool-unavailable$/
+				: /^range-video-validation-failed$/,
 		);
 		expect(performance.now() - started).toBeLessThan(Number(budget));
 		// The descendant really exists and still owns the inherited pipes until this

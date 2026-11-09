@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4 export implemented, pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4 accepted within scope by review35; required decoder/guard follow-up pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -13,6 +13,13 @@ adapter disabled and Godot absent. Use the three levels and
 [optional capability architecture](APPLICATION_INTEGRATIONS.md). Godot is the first
 deep adapter; Blockbench, Unity, Unreal Engine, MCreator, Roblox Studio and other
 desktop/web tools are generic capture subjects. No other adapters are requested now.
+
+[Review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) found unpackaged decoder lookup
+failed from non-root client directories. [M35-1/L35-1 follow-up](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
+adds stable resolution and actionable tool errors, with real non-root CLI/stdio
+native proofs and independent authority/wiring controls. Exact-SHA review/push is
+required before packaging/player work. Earlier root-only proof accounts retain
+their historical limits.
 
 ## Status and evidence rules
 
@@ -270,7 +277,7 @@ Bounded Linux authored source content identity is accepted through review26;
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
-accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4 export implemented, pending exact-SHA review/push;
+accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4 accepted within scope by review35; required decoder/guard follow-up pending exact-SHA review/push;
 headless selected-MP4 export parity,
 full editor/course packaging and timed output acceptance remain.
 

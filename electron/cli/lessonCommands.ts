@@ -1,3 +1,4 @@
+import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
 import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
@@ -85,11 +86,17 @@ export async function runLessonCommand(
 				? JSON.stringify({
 						event: "error",
 						message: error,
+						...(error === "range-export-tool-unavailable"
+							? { detail: rangeExportToolUnavailableMessage }
+							: {}),
 						...(failure instanceof LessonFileRangeError && failure.artifactPath
 							? { artifactPath: failure.artifactPath }
 							: {}),
 					})
 				: error +
+					(error === "range-export-tool-unavailable"
+						? `\n${rangeExportToolUnavailableMessage}`
+						: "") +
 					(failure instanceof LessonFileRangeError && failure.artifactPath
 						? `\nUnfinished copy: ${failure.artifactPath}`
 						: "")) + "\n",

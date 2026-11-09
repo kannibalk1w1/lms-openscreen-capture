@@ -20,7 +20,7 @@ import type {
 } from "../../src/native/contracts";
 import { buildNativeClipList } from "../../src/native/sceneDescription";
 import { validateRangeVideo } from "./encodedVideo";
-import { RangeMediaError } from "./rangeErrors";
+import { RangeMediaError, RangeVideoToolUnavailableError } from "./rangeErrors";
 import { planLessonRange } from "./rangePlan";
 import {
 	checkSourceCancellation,
@@ -254,7 +254,9 @@ export async function materializeLessonRange(options: {
 				error instanceof RangeMediaError &&
 					(error.code === "range-media-changed" || error.code === "range-media-cancelled")
 					? error.code
-					: "range-media-incomplete",
+					: error instanceof RangeVideoToolUnavailableError
+						? "range-media-tool-unavailable"
+						: "range-media-incomplete",
 				directory,
 			);
 		}

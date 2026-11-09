@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { accessSync, constants as fsConstants, statSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { app } from "electron";
 
 /**
@@ -60,7 +61,7 @@ const DECODE_TIMEOUT_MS = 60_000;
  * packaged (see the `filter` in electron-builder.json5) and the one preferred
  * here.
  */
-export function ffmpegCandidates(here: string = process.cwd()): string[] {
+export function ffmpegCandidates(here?: string): string[] {
 	const tag = `${process.platform}-${process.arch}`;
 	const exe = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
 	const env = process.env.OPENSCREEN_FFMPEG_PATH?.trim();
@@ -75,7 +76,19 @@ export function ffmpegCandidates(here: string = process.cwd()): string[] {
 	})();
 	if (appPath) roots.push(appPath);
 	if (process.resourcesPath) roots.push(process.resourcesPath);
-	roots.push(here);
+	// Production bundles live in dist-electron; source modules live in electron/media.
+	// Keep explicit `here` as the existing isolated resolution/test seam.
+	if (here === undefined) {
+		const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+		const moduleRoot =
+			path.basename(moduleDirectory) === "dist-electron"
+				? path.dirname(moduleDirectory)
+				: path.resolve(moduleDirectory, "../..");
+		if (process.env.APP_ROOT && path.isAbsolute(process.env.APP_ROOT))
+			roots.push(process.env.APP_ROOT);
+		roots.push(moduleRoot);
+	}
+	roots.push(here ?? process.cwd());
 
 	const names =
 		process.platform === "win32"
@@ -90,7 +103,7 @@ export function ffmpegCandidates(here: string = process.cwd()): string[] {
 			: [exe];
 	return [
 		...(env ? [env] : []),
-		...roots.flatMap((root) =>
+		...[...new Set(roots)].flatMap((root) =>
 			names.map((n) => path.join(root, "electron", "native", "bin", tag, n)),
 		),
 	];

@@ -1,3 +1,34 @@
+# Review35 decoder/guard follow-up — 9 November 2026
+
+Actual [review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts bbe56356 within
+scope but requires MediumM35-1 for ordinary non-root CLI/MCP launches and identifies
+LowL35-1. The [bounded follow-up](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md) adds stable
+module/APP_ROOT decoder candidates, fixed actionable tool-unavailable errors and
+independent G3/G9/G17 production-boundary tests. Existing explicit override,
+installed resources, shared audio/STT/extension behavior and all video/native
+ownership guards remain; no new authority or native source change.
+
+Actual previous built CLI and SDK stdio reproduce incomplete from a foreign cwd
+with spaces. Fixed built CLI/stdio both verify45frames/1.5seconds from that same
+cwd without FFmpeg or APP_ROOT hints, with unchanged originals; invalid explicit
+tool probes retain unverified MP4s without receipts and return the distinct error.
+Committed real headless startup smoke also passes from non-root after Vite.
+The previous root-only proof did not establish arbitrary-client-directory use.
+Final5991/447,0skips; focused279/12 plus real process/runtime18/2, bothTS,
+lint35baseline/docs37/i18n15/1265 pass. First full5986pass/5former-error assertions
+failed, corrected without weakening timeout/cleanup checks; final full passes and
+both logs are retained. Six single mutants assertion-kill with exact restore;
+preservation112/1254/74 matches and native addon unchanged. Exact evidence is
+../openscreen-evaluation/review35-followup-2026-11-09T1652Z/.14locale entries use honest
+English fallback for the new tool message, pending human translation.
+
+Coordinator exact-SHA actual Claude review/fixes/private push is next; no worker
+push or package/player phase. Main/private-main remainfd2775e2; existing nits,
+Linux-only/video/audio/GUI/physical/platform/packaging limits and original regression
+history are preserved. Prior checkpoint accounts below are historical.
+
+## Prior checkpoint accounts
+
 # Selected-step MP4 CLI/MCP export — 9 November 2026
 
 Resumed from clean accepted/pushed8a5074f0 after actual review34 acceptsf9dcd8df,

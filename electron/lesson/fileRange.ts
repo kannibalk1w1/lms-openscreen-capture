@@ -132,6 +132,7 @@ export async function confirmLessonFileRange(
 								"range-media-unattested": "range-source-unsupported",
 								"range-media-unsupported": "range-source-unsupported",
 								"range-media-incomplete": "range-source-unsupported",
+								"range-media-tool-unavailable": "range-source-unsupported",
 							} as const
 						)[error.code]
 					: (error as NodeJS.ErrnoException | null)?.code === "EEXIST"

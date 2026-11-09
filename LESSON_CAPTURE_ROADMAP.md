@@ -81,6 +81,15 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+Actual [review35](lesson-capture/CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts
+bbe56356's bounded CLI/MCP selected-MP4 architecture, with requiredM35-1: its
+unpackaged validator resolution failed outside the app root. [The follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
+now adds stable app/module roots, distinct tool errors and independentG3/G9/G17
+controls, with failing baseline and passing actual non-root CLI/stdio native
+sample/full-decode proofs. Coordinator exact-SHA follow-up/fixes/private push is
+next before packaging/player dependencies; prior root-only proofs are not general
+external-client acceptance. Existing platform/audio/GUI/physical limits remain.
+
 Actual [review34](lesson-capture/CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts
 f9dcd8df and closesL33-1; confirmation/new-copy persistence plus the real startup
 smoke and bootstrap fix are pushed at8a5074f0. [Selected-step MP4 CLI/MCP export](lesson-capture/HEADLESS_SELECTED_MP4_2026-11-09.md)

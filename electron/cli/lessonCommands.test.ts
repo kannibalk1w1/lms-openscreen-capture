@@ -191,3 +191,35 @@ it("runs explicit selected MP4 through production CLI parser/command and actual 
 	expect(parseCliArgs([...argv, "--step", f.step.id], 2)).toMatchObject({ kind: "error" });
 	expect(parseCliArgs([...argv, "--out", root], 2)).toMatchObject({ kind: "error" });
 });
+
+it("reports unavailable verification tooling distinctly with fixed actionable detail and an authorized unfinished path", async () => {
+	vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+	const { setup } = await import("../lesson/fileExport.test-support"),
+		f = await setup(root),
+		video = await import("../lesson/encodedVideo"),
+		{ RangeVideoToolUnavailableError } = await import("../lesson/rangeErrors"),
+		chunks: string[] = [];
+	vi.spyOn(video, "validateRangeVideo").mockRejectedValueOnce(new RangeVideoToolUnavailableError());
+	expect(
+		await runLessonCommand(
+			{
+				kind: "lesson",
+				action: "export-range",
+				manifestPath: f.request.manifestPath,
+				request: f.request,
+				json: true,
+			},
+			(s) => chunks.push(s),
+			{ lifecycle: f.lifecycle, render: f.render },
+		),
+	).toBe(1);
+	const error = JSON.parse(chunks.at(-1)!);
+	expect(error).toMatchObject({
+		event: "error",
+		message: "range-export-tool-unavailable",
+		detail: expect.stringContaining("Reinstall or update OpenScreen"),
+	});
+	expect(error.artifactPath).toMatch(/lesson-range-/);
+	expect(chunks.join("")).not.toContain("PRIVATE_SOURCE");
+	expect(await fs.readdir(error.artifactPath)).not.toContain("range-export.json");
+});

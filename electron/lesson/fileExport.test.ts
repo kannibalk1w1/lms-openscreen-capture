@@ -315,3 +315,73 @@ it("refuses a source symlink whose identical-byte real target is separately appr
 		await Promise.all([fs.readFile(f.request.manifestPath), fs.readFile(f.request.projectPath)]),
 	).toEqual(before);
 });
+
+it("refuses an ancestor output symlink with the fixed early error before reading selected inputs/media", async () => {
+	const f = await setup(root),
+		real = path.join(root, "real"),
+		alias = path.join(root, "alias");
+	await fs.mkdir(path.join(real, "destination"), { recursive: true });
+	await fs.symlink(real, alias, "dir");
+	const before = await Promise.all([
+		fs.readFile(f.request.manifestPath),
+		fs.readFile(f.request.projectPath),
+	]);
+	vi.mocked(openSync).mockClear();
+	const open = vi.spyOn(fs, "open");
+	await expect(
+		exportLessonRangeFile(
+			{ ...f.request, outputDirectory: path.join(alias, "destination") },
+			f.authority,
+			f.render,
+		),
+	).rejects.toHaveProperty("code", "range-export-unsupported");
+	expect(openSync).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+	expect(f.native).not.toHaveBeenCalled();
+	expect(await fs.readdir(path.join(real, "destination"))).toEqual([]);
+	expect(
+		await Promise.all([fs.readFile(f.request.manifestPath), fs.readFile(f.request.projectPath)]),
+	).toEqual(before);
+});
+
+it("suppresses a partial path when selected inputs become stale after the service failure but before transport disclosure", async () => {
+	const f = await setup(root),
+		before = await fs.readFile(f.request.manifestPath);
+	const { LessonRangeExportService } = await import("./rangeExport"),
+		start = LessonRangeExportService.prototype.start;
+	let serviceArtifact: string | undefined;
+	vi.mocked(validateRangeVideo).mockRejectedValueOnce(new Error("PRIVATE_DECODER_FAILURE"));
+	vi.spyOn(LessonRangeExportService.prototype, "start").mockImplementation(function (
+		this: import("./rangeExport").LessonRangeExportService,
+		...args
+	) {
+		const job = start.apply(this, args);
+		return {
+			...job,
+			result: job.result.catch(async (error) => {
+				serviceArtifact = error.artifactPath;
+				expect(serviceArtifact).toBeTruthy();
+				await fs.rename(f.request.manifestPath, f.request.manifestPath + ".old");
+				await fs.writeFile(f.request.manifestPath, before);
+				throw error;
+			}),
+		};
+	});
+	const error = await exportLessonRangeFile(f.request, f.authority, f.render).catch((e) => e);
+	expect(error.code).toBe("range-export-incomplete");
+	expect(serviceArtifact).toBeTruthy();
+	expect(error.artifactPath).toBeUndefined();
+	expect(await fs.readFile(f.request.manifestPath)).toEqual(before);
+	expect(await fs.readdir(serviceArtifact!)).not.toContain("range-export.json");
+});
+
+it("keeps a distinct unavailable-tool error and partial evidence without a false receipt", async () => {
+	const f = await setup(root),
+		{ RangeVideoToolUnavailableError } = await import("./rangeErrors");
+	vi.mocked(validateRangeVideo).mockRejectedValueOnce(new RangeVideoToolUnavailableError());
+	const error = await exportLessonRangeFile(f.request, f.authority, f.render).catch((e) => e);
+	expect(error.code).toBe("range-export-tool-unavailable");
+	expect(error.artifactPath).toBeTruthy();
+	expect(await fs.readdir(error.artifactPath)).not.toContain("range-export.json");
+	expect(JSON.stringify(error)).not.toContain("ffmpeg");
+});

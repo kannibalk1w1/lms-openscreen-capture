@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
 import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonFileSchema, queryLessonFileSchema } from "../lesson/fileContracts";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
@@ -79,6 +80,10 @@ export function registerLessonTools(
 									error instanceof LessonFileRangeError
 										? error.code
 										: "lesson-file-operation-failed",
+								...(error instanceof LessonFileRangeError &&
+								error.code === "range-export-tool-unavailable"
+									? { message: rangeExportToolUnavailableMessage }
+									: {}),
 								...(error instanceof LessonFileRangeError && error.artifactPath
 									? { artifactPath: error.artifactPath }
 									: {}),

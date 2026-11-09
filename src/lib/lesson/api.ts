@@ -15,6 +15,7 @@ export type LessonErrorCode =
 	| "range-export-unsupported"
 	| "range-export-changed"
 	| "range-export-incomplete"
+	| "range-export-tool-unavailable"
 	| "range-export-cancelled"
 	| "range-export-source-unavailable"
 	| "destination-exists"
@@ -58,3 +59,7 @@ export interface LessonApi {
 		>
 	>;
 }
+
+/** Fixed transport wording; the editor uses its matching translated catalog key. */
+export const rangeExportToolUnavailableMessage =
+	"The video verification tool is unavailable. Reinstall or update OpenScreen, or ask your administrator to check the configured FFmpeg tool, then retry. Unverified files are kept; this is not a completed export.";

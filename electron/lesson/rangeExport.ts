@@ -197,6 +197,7 @@ export class LessonRangeExportService {
 												"range-media-unsupported": "range-export-unsupported",
 												"range-media-changed": "range-export-changed",
 												"range-media-incomplete": "range-export-incomplete",
+												"range-media-tool-unavailable": "range-export-tool-unavailable",
 												"range-media-cancelled": "range-export-cancelled",
 											} as const
 										)[error.code]

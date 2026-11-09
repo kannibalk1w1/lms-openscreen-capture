@@ -336,7 +336,8 @@
 			"range-export-changed": "The saved project or source video differs from the confirmed range. Review the current video, save the project, then explicitly refresh the range and source before exporting.",
 			"range-export-incomplete": "The MP4 could not be verified. Any new unfinished files are kept for inspection; they are not a completed export. Check the source video and destination, then retry.",
 			"range-export-cancelled": "MP4 export stopped. No completed export was certified after cancellation.",
-			"range-export-source-unavailable": "A source video is missing or not approved for this editor. Open or import it through the video project, save, review and explicitly refresh the range before retrying."
+			"range-export-source-unavailable": "A source video is missing or not approved for this editor. Open or import it through the video project, save, review and explicitly refresh the range before retrying.",
+			"range-export-tool-unavailable": "The video verification tool is unavailable. Reinstall or update OpenScreen, or ask your administrator to check the configured FFmpeg tool, then retry. Unverified files are kept; this is not a completed export."
 		},
 		"output": {
 			"title": "Guide output settings",

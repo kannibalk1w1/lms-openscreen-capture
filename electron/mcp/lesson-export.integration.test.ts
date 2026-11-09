@@ -217,3 +217,68 @@ it("HTTP server shutdown aborts its callers and resolves only after actual nativ
 	await Promise.all([pending, close]);
 	expect(stopped).toBe(true);
 });
+
+it("actual handlers.ts MCP dependency initializer wires HTTP rendering to the shared compositor", async () => {
+	const ts = await import("typescript"),
+		source = await fs.readFile(path.resolve("electron/ipc/handlers.ts"), "utf8"),
+		tree = ts.createSourceFile("handlers.ts", source, ts.ScriptTarget.Latest, true);
+	let expression: import("typescript").Expression | undefined;
+	const visit = (node: import("typescript").Node) => {
+		if (ts.isVariableDeclaration(node) && node.name.getText(tree) === "mcpToolDeps")
+			expression = node.initializer;
+		ts.forEachChild(node, visit);
+	};
+	visit(tree);
+	expect(expression).toBeTruthy();
+	// Execute the actual production dependency literal, not a reconstructed registration.
+	// Surrounding services are fixtures; SDK/server/tool/export/compute registration is real.
+	const { EditorDocumentHost } = await import("./editor-document-host"),
+		{ EventEmitter } = await import("node:events");
+	const evaluate = new Function(
+		"loudnessService",
+		"EditorDocumentHost",
+		"ipcMain",
+		"aiEditionDocuments",
+		"mcpSettings",
+		"agentCursorTelemetryReader",
+		"app",
+		"openVideoInHiddenWindow",
+		ts.transpileModule(`return (${expression!.getText(tree)});`, {
+			compilerOptions: { target: ts.ScriptTarget.ES2022 },
+		}).outputText,
+	);
+	const deps = evaluate(
+		f.compositor,
+		EditorDocumentHost,
+		new EventEmitter(),
+		f.documents,
+		{ getSettings: () => ({ allowEdits: allowed }) },
+		undefined,
+		{ getVersion: () => "0" },
+		() => undefined,
+	) as import("./openscreen-mcp-server").McpToolDeps;
+	await client.close();
+	await running.close();
+	running = await startMcpHttpServer({ port: 0, token: "disposable-export-token", deps });
+	client = await connect();
+	allowed = true;
+	const result = await call();
+	expect(result.isError).toBeFalsy();
+	expect(JSON.parse(text(result))).toMatchObject({ status: "materialized", frames: 45 });
+	expect(f.native).toHaveBeenCalledOnce();
+});
+it("HTTP returns actionable fixed tool-unavailable wording while retaining only authorized bounded artifact path", async () => {
+	const { RangeVideoToolUnavailableError } = await import("../lesson/rangeErrors");
+	allowed = true;
+	vi.mocked(validateRangeVideo).mockRejectedValueOnce(new RangeVideoToolUnavailableError());
+	const result = await call(),
+		value = JSON.parse(text(result));
+	expect(result.isError).toBe(true);
+	expect(value).toMatchObject({
+		code: "range-export-tool-unavailable",
+		message: expect.stringContaining("Reinstall or update OpenScreen"),
+	});
+	expect(value.artifactPath).toMatch(/lesson-range-/);
+	expect(text(result)).not.toContain("PRIVATE_SOURCE");
+	expect(await fs.readdir(value.artifactPath)).not.toContain("range-export.json");
+});

@@ -288,3 +288,19 @@ it("disables MP4 export while dirty independently of handler refusal and reenabl
 	act(() => useProjectStore.setState({ dirty: false }));
 	expect((exportButton() as HTMLButtonElement).disabled).toBe(false);
 });
+
+it("shows actionable tool-unavailable wording through the actual UI and registered export service", async () => {
+	const f = await fixture(),
+		video = await import("../../../../electron/lesson/encodedVideo"),
+		{ RangeVideoToolUnavailableError } = await import("../../../../electron/lesson/rangeErrors");
+	vi.mocked(video.validateRangeVideo).mockRejectedValueOnce(new RangeVideoToolUnavailableError());
+	fireEvent.click(exportButton());
+	await screen.findByText(
+		/The video verification tool is unavailable.*Reinstall or update OpenScreen/,
+	);
+	expect(screen.queryByText(/MP4 video checked and saved in:/)).toBeNull();
+	expect(f.native).toHaveBeenCalledOnce();
+	const dirs = (await fs.readdir(root)).filter((n) => n.startsWith("lesson-range-"));
+	expect(dirs).toHaveLength(1);
+	expect(await fs.readdir(path.join(root, dirs[0]))).not.toContain("range-export.json");
+});

@@ -1,3 +1,16 @@
+# Current review35 follow-up authority — 9 November 2026
+
+Complete only [M35-1 decoder resolution/errors and L35-1 guard closure](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
+from exactbbe56356, validate/build and prove actual non-root CLI/stdio export plus
+required real startup smoke, commit locally, then stop for coordinator exact-SHA
+actual Claude follow-up/fixes/private push. Originalreview35/evidence/user work,
+native bytes and main/private-main stay unchanged. No other worker, worker push,
+next packaging/player phase, main/upstream/publication/real-lesson/auth/config/paid
+API changes, checkout/reset/stash/discard, user-app termination or shared-cache
+purge. Old schedules and pause records are superseded; cutoffs remain revoked.
+
+## Prior checkpoint accounts
+
 # Current headless selected-step MP4 authority — 9 November 2026
 
 User autonomous roadmap continuation resumes from accepted/pushed8a5074f0 after

@@ -281,7 +281,9 @@ it.skipIf(process.platform !== "linux")(
 	"refuses missing tools, nonregular/oversized files and malformed bytes before decode",
 	async () => {
 		mocks.resolve.mockReturnValue(null);
-		await expect(validateRangeVideo(file, expected)).rejects.toThrow();
+		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
+			/^range-video-tool-unavailable$/,
+		);
 		mocks.resolve.mockReturnValue(executable);
 		await fs.writeFile(file, "invalid");
 		await expect(validateRangeVideo(file, expected)).rejects.toThrow();
@@ -412,7 +414,7 @@ it
 	async (mode) => {
 		const processes = child("success", mode);
 		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			/^range-video-tool-unavailable$/,
 		);
 		expect(mocks.spawn).toHaveBeenCalledTimes(1);
 		if (mode === "stdout" || mode === "stderr")
@@ -537,7 +539,7 @@ it.skipIf(process.platform !== "linux").each(["empty", "oversized", "directory"]
 		if (kind === "oversized") await fs.truncate(executable, 256 * 1024 * 1024 + 1);
 		if (kind === "directory") mocks.resolve.mockReturnValue(root);
 		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			/^range-video-tool-unavailable$/,
 		);
 		expect(mocks.spawn).not.toHaveBeenCalled();
 	},
@@ -573,7 +575,7 @@ it
 			return proc;
 		});
 		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			/^range-video-tool-unavailable$/,
 		);
 		expect(mocks.spawn).toHaveBeenCalledTimes(1);
 	},
@@ -620,7 +622,7 @@ it
 		});
 		child();
 		await expect(validateRangeVideo(file, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			/^range-video-tool-unavailable$/,
 		);
 		expect(mocks.spawn).not.toHaveBeenCalled();
 		if (kind === "oversized-before-read") expect(executableReads).not.toHaveBeenCalled();
@@ -652,7 +654,7 @@ it.skipIf(process.platform !== "linux")(
 		// Public validation also awaits closing its owned input descriptor.
 		await vi.waitFor(() => expect(outcome).toBe("rejected"), { timeout: 500, interval: 20 });
 		expect(reason).toBeInstanceOf(Error);
-		expect((reason as Error).message).toBe("range-video-validation-failed");
+		expect((reason as Error).message).toBe("range-video-tool-unavailable");
 		await result;
 	},
 );
@@ -688,7 +690,7 @@ it.skipIf(process.platform !== "linux").each(["stdout", "stderr"])(
 	async (pipe) => {
 		const processes = child("success", "hang");
 		const rejected = expect(validateRangeVideo(file, expected)).rejects.toThrow(
-			/^range-video-validation-failed$/,
+			/^range-video-tool-unavailable$/,
 		);
 		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1));
 		processes[0][pipe as "stdout" | "stderr"].emit("error", new Error("PRIVATE_PIPE_ERROR"));
