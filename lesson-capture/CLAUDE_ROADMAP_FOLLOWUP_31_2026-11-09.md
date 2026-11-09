@@ -1,5 +1,12 @@
 # Review31 source-grant/cancel test follow-up — 9 November 2026
 
+Coordinator disposition: actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md)
+acceptsbde9a618e1bc04ecd97a866b45037e935b3be6b2 with no new findings and closes
+L31-1/N31-2. Independent458focused/26files,0skip,test TS/lint pass; identified
+survivor rechecks now fail as expected. X12/X13 labels below are swapped, but both
+boundaries are tested. Original worker evidence is preserved, no production
+change or new full/build/native/Electron acceptance is inferred.
+
 Base: `edb74a00f8445d9889db1ec069fb87ebba1b9925`, accepted within scope by actual
 [review31](CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md), with no High/Medium findings.
 This narrow follow-up addresses L31-1 and N31-2 through production route/service/UI

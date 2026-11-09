@@ -1,4 +1,20 @@
-# Review31 bounded follow-up — 9 November 2026
+# Accepted selected-step MP4 checkpoint — 9 November 2026
+
+Actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md) accepts exact
+bde9a618e1bc04ecd97a866b45037e935b3be6b2 againstedb74a00 with no new findings.
+L31-1/N31-2 CLOSED. Independent458focused/26files,0skip,test TS/lint pass;
+review31 survivor rechecks now kill the identified grant/cancel/UI boundaries,
+leaving known equivalent guards. Production code unchanged by follow-up; no new
+full/build/Electron proof is inferred. Worker X12/X13 control labels are swapped,
+but both native-cancel boundaries are pinned. Preservation112/482/66 matches.
+
+Coordinator saves/pushes the accepted selected-step editor MP4 workflow, then
+continues CLI/MCP explicit confirmation/refresh/export parity. Prior full5902/441
+and real native/Electron proofs belong toedb74a00; dialog choice was stubbed.
+N31-3/N31-4/N29-3/N27-3 and physical/picker/audio/platform limits remain open.
+Autonomous private-feature workflow continues; main remainsfd2775e2.
+
+## Historical review31 follow-up account
 
 Actual [review31](CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md) accepts exact
 edb74a00f8445d9889db1ec069fb87ebba1b9925 within scope with no High/Medium.

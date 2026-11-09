@@ -5,7 +5,12 @@ following actual [review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md), which accep
 `27136d0f` with no new High/Medium/Low findings. One implementation writer;
 main/private-main remain `fd2775e2dbc540306b46085eb0301fa06a6a3aaa`. Original
 review reports, source/evidence and the external LMS workflow report are preserved.
-The implementation stops for coordinator exact-SHA Claude review/fixes/private push.
+Actual [review31](CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md) acceptsedb74a00
+with no High/Medium. [Review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md) accepts
+bde9a618e1bc04ecd97a866b45037e935b3be6b2 with no new findings and closes
+L31-1/N31-2. Independent458focused/26files pass,0skip,with identified source/
+cancel/UI guards pinned. Coordinator owns the accepted private checkpoint push;
+CLI/MCP confirmation/refresh/export parity remains next. Broader limits below persist.
 
 ## Delivered workflow
 
