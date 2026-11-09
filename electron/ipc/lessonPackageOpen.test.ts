@@ -8,6 +8,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { imageFixture } from "../../src/lib/lesson/fixtures.test-support";
 import { parseLesson } from "../../src/lib/lesson/schema";
+import { AI_EDITION_OPEN_PROJECT_CHANNEL } from "../../src/native/contracts";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { validateRangeVideo } from "../lesson/encodedVideo";
 import { createLessonPackage } from "../lesson/package";
@@ -17,12 +18,13 @@ import { registerLessonWorkflow } from "./lessonWorkflow";
 
 const host = vi.hoisted(() => ({
 	handle: vi.fn(),
+	on: vi.fn(),
 	open: vi.fn(),
 	save: vi.fn(),
 	getPath: vi.fn(),
 }));
 vi.mock("electron", () => ({
-	ipcMain: { handle: host.handle, on: vi.fn() },
+	ipcMain: { handle: host.handle, on: host.on },
 	dialog: { showOpenDialog: host.open, showSaveDialog: host.save },
 	app: { getPath: host.getPath },
 	BrowserWindow: { fromWebContents: () => null },
@@ -94,6 +96,7 @@ beforeEach(async () => {
 	directory = result.path;
 	await fs.rename(selected, selected + ".unavailable");
 	host.handle.mockClear();
+	host.on.mockClear();
 	host.getPath.mockReturnValue(root);
 	host.open.mockReset().mockResolvedValue({ canceled: false, filePaths: [directory] });
 	host.save
@@ -415,4 +418,81 @@ it.each([
 	);
 	expect(stages).toHaveLength(1);
 	expect((await fs.stat(path.join(root, stages[0]))).mode & 0o777).toBe(0o600);
+});
+
+/** Exercise the actual main production selection listener, including session replacement.
+ * This is not a second authority implementation or a direct select() substitute. */
+function selectThroughProduction(projectId: string | null) {
+	const registrations = host.on.mock.calls.filter(
+		([name]) => name === AI_EDITION_OPEN_PROJECT_CHANNEL,
+	);
+	expect(registrations).toHaveLength(1);
+	registrations[0][1](current.event, projectId);
+}
+async function packageBytes() {
+	const files = [
+		"lesson-package.json",
+		"package-receipt.json",
+		"lesson.openscreen-lesson.json",
+		"index.html",
+		"lesson.md",
+	];
+	const lesson = await parseLesson(
+		await fs.readFile(path.join(directory, "lesson.openscreen-lesson.json"), "utf8"),
+	);
+	for (const image of lesson.assets) files.push(`assets/${image.id}.jpg`);
+	return Promise.all(
+		files.map(async (name) => [name, await fs.readFile(path.join(directory, name))] as const),
+	);
+}
+it.each([
+	["same-project reselect", ["p"]],
+	["different project", ["other"]],
+	["different project then original project", ["other", "p"]],
+	["closed then reopened same project", [null, "p"]],
+] as const)("open-time capability refuses %s before any save picker, with fresh-open recovery", async (_kind, selections) => {
+	const authoredPath = path.join(root, "current-authored-work.json"),
+		authored = Buffer.from(
+			JSON.stringify({ ...newLesson("Unsaved authored work"), steps: [newStep("Keep this step")] }),
+		);
+	await fs.writeFile(authoredPath, authored);
+	const opened = await open(),
+		before = await packageBytes(),
+		rootNames = await fs.readdir(root);
+	for (const id of selections) selectThroughProduction(id);
+	expect(await copy(opened.token)).toEqual({ success: false, code: "lesson-package-invalid" });
+	expect(host.save).not.toHaveBeenCalled();
+	expect(await fs.readdir(root)).toEqual(rootNames);
+	expect(await packageBytes()).toEqual(before);
+	expect(await fs.readFile(authoredPath)).toEqual(authored);
+	// Returning to the original ID cannot resurrect a previous capability or session.
+	selectThroughProduction("p");
+	expect(await copy(opened.token)).toEqual({ success: false, code: "lesson-package-invalid" });
+	expect(host.save).not.toHaveBeenCalled();
+	const fresh = await open();
+	expect(fresh.token).not.toBe(opened.token);
+	expect(await copy(fresh.token)).toMatchObject({
+		success: true,
+		result: { status: "saved", path: path.join(root, "new.json") },
+	});
+	expect(host.save).toHaveBeenCalledTimes(1);
+	const saved = await parseLesson(await fs.readFile(path.join(root, "new.json"), "utf8"));
+	expect(saved.steps).toEqual(fresh.lesson.steps);
+	expect(saved.assets).toEqual(fresh.lesson.assets);
+	expect(await packageBytes()).toEqual(before);
+	expect(await fs.readFile(authoredPath)).toEqual(authored);
+});
+it("open-time capability refuses the live dirty provider before copy and recovers only after a fresh open", async () => {
+	const opened = await open(),
+		before = await packageBytes();
+	dirty = true;
+	expect(await copy(opened.token)).toEqual({ success: false, code: "lesson-package-invalid" });
+	expect(host.save).not.toHaveBeenCalled();
+	dirty = false;
+	selectThroughProduction("p");
+	expect(await copy(opened.token)).toMatchObject({ success: false });
+	expect(host.save).not.toHaveBeenCalled();
+	const fresh = await open();
+	expect(await copy(fresh.token)).toMatchObject({ success: true, result: { status: "saved" } });
+	expect(await packageBytes()).toEqual(before);
 });

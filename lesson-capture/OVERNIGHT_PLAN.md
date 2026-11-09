@@ -1,3 +1,17 @@
+# Current review39 narrow follow-up authority — 9 November 2026
+
+Complete only [L39-1 open-time capability tests and controls](CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
+from accepted8ae83766, validate and commit locally, then stop for coordinator actual
+exact-SHA Claude follow-up/fixes/private push. Production/format/API/native remain
+unchanged; no media-preserving reseal/player phase, other worker or worker push.
+Preserve every original report/evidence/user file, main/private-main and authority
+restrictions. Old pause records are superseded and time cutoffs remain revoked.
+No checkout/reset/stash/discard/main/upstream/Actions/publication/real-lesson/auth/
+paid-API changes, user-app termination or shared-cache purge. Prior accounts below
+are historical.
+
+## Prior checkpoint accounts
+
 # Current verified GUI package prerequisite authority — 9 November 2026
 
 Autonomous resumption from accepted/pushedb0463121 after review38 closesL37-1.

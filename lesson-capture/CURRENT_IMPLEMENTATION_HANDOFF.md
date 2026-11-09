@@ -1,3 +1,28 @@
+# Review39 session-capability follow-up — 9 November 2026
+
+Actual [review39](CLAUDE_ROADMAP_REVIEW_39_2026-11-09.md) accepts exact8ae83766
+with no High/Medium and LowL39-1 coverage gap. [The test-only follow-up](CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
+now pins same-ID reselect, different project/return and close/reopen before copy
+through the actual production project-selection listener, plus the live dirty
+provider after open. Stale tokens refuse before the save picker, cannot resurrect
+when the project returns, and leave package/authored bytes unchanged; fresh open
+and copy succeeds. Production/format/API/native behavior is unchanged.
+
+Final170focused/9files,0skips, bothTS and lint35baseline/docs37 pass. Six controls
+produce3single assertion kills,1paired R10+R16 kill and2honest redundant single
+survivors, with exact source restoration. The paired mutant still refuses after
+the picker via pinned authority; the new no-picker assertion pins the earlier
+boundary independently. Original review39 and prior proof/inventories/user work
+are preserved. No new full/build/Electron/startup/native acceptance run is claimed;
+parent6108/453 and reviewer39's full-app O8/startup proof retain their exact scope.
+
+N39 partial-file/capability-drop/nonspecific-error and redundant-check nits remain.
+Coordinator actual exact-SHA follow-up/fixes/private push is next, then separate
+media-preserving edit/reseal before player work. No worker push or next phase;
+main/private-mainfd2775e2 and addon stay unchanged.
+
+## Prior checkpoint accounts
+
 # Verified GUI package inspection/static-copy slice — 9 November 2026
 
 Actual [review38](CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts17bed4e6,

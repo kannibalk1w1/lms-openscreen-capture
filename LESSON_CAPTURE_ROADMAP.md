@@ -96,8 +96,9 @@ Actual [review38](lesson-capture/CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts
 pushed. [Portable v1 packaging](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)
 and CLI/MCP selected-MP4 parity are delivered within their bounded Linux scope.
 [Verified GUI inspection/static editable copies](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
-now implement the next prerequisite and await independent exact-SHA review/private
-push. Imported packages and unsaved current lessons remain unchanged. Video bindings
+are accepted within scope by actual review39 at8ae83766. The
+[narrow open-time capability test follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
+awaits independent exact-SHA review/private push. Imported packages and unsaved current lessons remain unchanged. Video bindings
 stay read-only; media-preserving editing/reseal is next before timed-player work.
 Full native-project/course portability, audio and physical/platform acceptance remain.
 Earlier accounts below retain their historical checkpoint context.
