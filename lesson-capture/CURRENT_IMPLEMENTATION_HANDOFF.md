@@ -1,4 +1,23 @@
-# Review29 bounded follow-up — 9 November 2026
+# Accepted native-render ownership checkpoint — 9 November 2026
+
+Actual [review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts exact
+27136d0f0766621c55a0ac497f58570c08ee165d against6821c776 with no new
+High/Medium/Low findings. T29-1/L29-1/N29-1/N29-2 CLOSED. Independent228focused/
+18files,0skip,both TS,Vite,lint pass;18own mutants yield17kills. Real Electron
+with the unchanged addon confirms still authority/live dirty state and GIF
+serialization. Preservation112/141/62entries matches, no broader physical proof.
+Worker full5858/439 remains its own run. N29-3 private-ID accounting and the
+unreproduced observation remain; nitN30-1 unpinned top-level dirty-provider wiring
+can be addressed with the next editor integration tests.
+
+Coordinator checkpoints/pushes this accepted prerequisite, then continues the
+selected-step MP4 editor workflow: native destination picker, pinned sources,
+shared owned render/cancellation/progress and actual video validation. CLI/MCP
+parity, packaging/player and platform/audio/physical acceptance remain separate.
+User authorizes autonomous continuation; main staysfd2775e2, existing evidence/
+source/private-feature constraints persist.
+
+## Historical review29 bounded follow-up account
 
 Actual [review29](CLAUDE_ROADMAP_REVIEW_29_2026-11-09.md) accepts6821c776 with no
 High/Medium. The sole writer implements the [required-authority/GIF follow-up](CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md):

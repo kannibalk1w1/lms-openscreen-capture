@@ -4,7 +4,12 @@ This prerequisite continues from accepted/pushed623fa85c119484577d3ad0bfcd9bc0f5
 following actual [review28](CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) of897ddceb.
 One implementation writer; no other worker or push is launched. The slice adds
 shared job ownership/serialization before selected-range MP4 editor integration.
-Coordinator exact-SHA Claude review/fixes/private checkpoint push remain required.
+Actual [review29](CLAUDE_ROADMAP_REVIEW_29_2026-11-09.md) accepts6821c776 and
+[review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts follow-up
+27136d0f0766621c55a0ac497f58570c08ee165d with no new High/Medium/Low, closing
+T29-1/L29-1/N29-1/N29-2. Independent228focused/18, both TS,Vite,lint and real
+Electron still/GIF probes pass;18mutants yield17kills. N29-3 and nitN30-1 remain
+documented; coordinator owns the private checkpoint push before editor MP4 work.
 Main/private-main remain fd2775e2dbc540306b46085eb0301fa06a6a3aaa.
 
 ## Inventory and boundary
