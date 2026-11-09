@@ -102,3 +102,50 @@ Full suite not run for this slice (run at the next milestone).
 - Not exercised: a real file picker, Windows or macOS (rename-over-open-file behaviour
   differs on Windows), network filesystems.
 - New strings are English in all 14 non-English catalogues.
+
+Slice 4 commit: `97ebcaa3`.
+
+### Slice 5 — create a portable package from the Lesson guide dialog
+
+**What changed for the author.** The Lesson guide has "Create a portable package from
+selected steps". It packages the lesson as it stands in the dialog, with the image and code
+settings already chosen there. With "Include exported step MP4s" ticked, a folder picker
+(multi-select, up to 4) takes the folders made by "Export this step's MP4"; then a second
+picker takes the destination. Until now this needed the CLI or MCP.
+
+**How**
+
+- `electron/lesson/package.ts`: `packageSelectedLesson` is the body of the existing
+  `createLessonPackage`, taking a validated lesson instead of a file path. CLI and MCP call
+  it through `createLessonPackage` exactly as before; the GUI calls it directly. One
+  projection, one media check (`selectedPackageMedia`), one writer (`publishLessonPackage`).
+- `electron/ipc/lessonPackageOpen.ts`: new `lesson:package-create` in the existing package
+  registration. It uses the same main-frame, registered-editor, current-project and
+  saved-project checks, the same one-operation-per-window state and the existing cancel
+  route. Folders come only from native dialogs; the request carries no path and nothing is
+  remembered afterwards. Each chosen folder's receipt must name a selected step, once. A bad
+  selection returns `lesson-package-video-selection-invalid` before the destination picker.
+  A failed creation does not revoke a separately opened package.
+- `LessonGuideDialog.tsx`: the checkbox, the button, a cancel button while it runs, and
+  refusals shown as alerts. 15 catalogues: five strings, English in all.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/ipc/lessonPackageOpen.test.ts` (15 new cases) and `LessonGuideDialog.test.tsx` (1 new) | 85 and 22 pass, 0 skipped |
+| Full suite, `npm run test -- --maxWorkers=4` (covers slices 4 and 5) | 6,206 tests / 457 files pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run i18n:check` | pass; 35 baseline; pass (1322 keys) |
+| `npx vite build`; required startup smoke, foreign cwd, hints cleared | pass; `success: true` |
+| Controls (`slice5/controls/`): unselected-step video; duplicate-step video; folder limit; failed create revokes opened package; session re-check after lesson validation | 4 killed; the last survived and is a redundant layer (the wrapper checks just before, and each picker checks after) |
+| Full production app under Xvfb with stubbed dialogs (`slice5/full-app-probe/`), using the real authored lesson, MP4 and receipt preserved in the reseal evidence (copied to scratch) | 4 of 4: a wrong video folder is refused and nothing is created; after **editing step text in the app** (revision past the receipt's) the package is created with the video, which is slice 2 working end to end; inputs byte-unchanged; fresh CLI `verify-package` returns `verified`, 45 samples / 45 decoded frames / 1.5 s |
+
+**Limits**
+
+- Linux only, like all packaging. Needs a selected, saved video project (existing authority).
+- Videos are found by choosing folders; the dialog does not remember where a step's MP4 was
+  exported. At most 4 videos and 32 steps (existing format limits).
+- Dialogs were stubbed in the app probe; no real picker was clicked. No audio is verified.
+- Harness note: my probe's Electron did not exit on `app.close()` because the new
+  close guard asked about the unsaved lesson and the harness had no dialog handler by then. I
+  stopped that one process by its recorded PID. Future probes must accept the dialog.

@@ -635,3 +635,63 @@ it("asks before opening another lesson over unsaved work and keeps the work when
 	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
 	await waitFor(() => expect(lessonOpen).toHaveBeenCalledTimes(2));
 });
+it("creates a package from the selected steps with the dialog's output settings and reports refusals as alerts", async () => {
+	const lessonPackageCreate = vi
+		.fn()
+		.mockResolvedValueOnce({
+			success: false,
+			code: "lesson-package-video-selection-invalid",
+		})
+		.mockResolvedValueOnce({
+			success: true,
+			result: {
+				status: "packaged",
+				path: "/chosen/lesson-package-1",
+				steps: 1,
+				images: 0,
+				videos: 1,
+			},
+		});
+	vi.stubGlobal("electronAPI", {
+		lessonPackageCreate,
+		lessonPackageCancel: vi.fn(async () => true),
+	});
+	show();
+	const create = () =>
+		screen.getByRole("button", {
+			name: "Create a portable package from selected steps",
+		}) as HTMLButtonElement;
+	expect(create().disabled).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByLabelText("Include step 2"));
+	fireEvent.click(
+		screen.getByLabelText("Include exported step MP4s (you choose their export folders next)"),
+	);
+	fireEvent.click(create());
+	expect(
+		(await screen.findByText(/Those folders cannot be used for videos/)).getAttribute("role"),
+	).toBe("alert");
+	const sent = lessonPackageCreate.mock.calls[0][0];
+	expect(Object.keys(sent).sort()).toEqual([
+		"imagePolicy",
+		"includeCode",
+		"includeVideos",
+		"lesson",
+		"operationId",
+		"stepIds",
+	]);
+	expect(sent).toMatchObject({
+		includeCode: true,
+		imagePolicy: "include-external-provenance",
+		includeVideos: true,
+	});
+	expect(sent.stepIds).toEqual([sent.lesson.steps[0].id]);
+	fireEvent.click(create());
+	await screen.findByText(
+		"Package checked and saved: /chosen/lesson-package-1 (1 steps, 0 images, 1 videos). Review it before sharing.",
+	);
+	expect(screen.queryByText(/Those folders cannot be used for videos/)).toBeNull();
+	act(() => useProjectStore.setState({ dirty: true }));
+	expect(create().disabled).toBe(true);
+});

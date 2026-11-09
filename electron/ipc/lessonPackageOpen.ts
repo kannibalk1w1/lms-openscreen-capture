@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import {
 	BrowserWindow,
 	dialog,
@@ -8,8 +9,9 @@ import {
 } from "electron";
 import { z } from "zod";
 import type { PackageOpenCode } from "../../src/lib/lesson/packageOpen";
-import { LessonPackageError } from "../lesson/package";
-import { digest } from "../lesson/packageIO";
+import { validateLesson } from "../../src/lib/lesson/schema";
+import { LessonPackageError, packageSelectedLesson } from "../lesson/package";
+import { digest, pinMetadata } from "../lesson/packageIO";
 import {
 	type InspectedPackage,
 	openSelectedLessonPackage,
@@ -20,6 +22,16 @@ import { resealLessonPackage } from "../lesson/packageReseal";
 const idSchema = z.string().uuid();
 const resealSchema = z
 	.object({ operationId: idSchema, token: idSchema, lesson: z.unknown() })
+	.strict();
+const createSchema = z
+	.object({
+		operationId: idSchema,
+		lesson: z.unknown(),
+		stepIds: z.array(idSchema).min(1).max(32),
+		includeCode: z.boolean(),
+		imagePolicy: z.enum(["exclude", "include-external-provenance"]),
+		includeVideos: z.boolean(),
+	})
 	.strict();
 const copySchema = z.object({ operationId: idSchema, token: idSchema }).strict();
 /** One bounded inspection capability per registered current editor; never a file-protocol grant. */
@@ -57,6 +69,8 @@ export function registerLessonPackageOpenHandlers(
 		action: (state: State, authority: { assertCurrent(): void; signal: AbortSignal }) => Promise<T>,
 		/** Reseal only: the presented token, whose own capability may survive a recoverable failure. */
 		retainToken?: string,
+		/** Creation from the authored lesson never uses, so never revokes, an opened package. */
+		independent = false,
 	) => {
 		let state: State | undefined;
 		let operation: State["active"];
@@ -95,13 +109,15 @@ export function registerLessonPackageOpenHandlers(
 					/* Keep edits in the renderer; no replacement identity or authority is captured. */
 				}
 			}
-			if (state && capability !== "retained") state.opened = undefined;
+			if (state && capability !== "retained" && !independent) state.opened = undefined;
 			let code: PackageOpenCode =
 				error instanceof LessonPackageError ? error.code : "lesson-package-invalid";
 			if (error instanceof Error && error.message === "package-edit-unsupported")
 				code = "lesson-package-edit-unsupported";
 			if (error instanceof Error && error.message === "package-destination-invalid")
 				code = "lesson-package-destination-invalid";
+			if (error instanceof Error && error.message === "package-video-selection-invalid")
+				code = "lesson-package-video-selection-invalid";
 			if (error instanceof Error && error.message === "package-video-copy-unsupported")
 				code = "lesson-package-video-copy-unsupported";
 			if (error && typeof error === "object" && "code" in error && error.code === "EEXIST")
@@ -216,6 +232,81 @@ export function registerLessonPackageOpenHandlers(
 				);
 			},
 			request.data.token,
+		);
+	});
+	// The author's current lesson: explicit native selections only, the shared writer, no stored grant.
+	ipcMain.handle("lesson:package-create", (event, input: unknown) => {
+		const request = createSchema.safeParse(input);
+		if (!request.success) return { success: false, code: "lesson-package-invalid" };
+		return run(
+			event,
+			request.data.operationId,
+			async (_state, authority) => {
+				const lesson = await validateLesson(request.data.lesson);
+				authority.assertCurrent();
+				const parent = BrowserWindow.fromWebContents(event.sender);
+				const pick = async (title: string, many: boolean) => {
+					const options = {
+						title,
+						properties: (many ? ["openDirectory", "multiSelections"] : ["openDirectory"]) as Array<
+							"openDirectory" | "multiSelections"
+						>,
+					};
+					const picked = parent
+						? await dialog.showOpenDialog(parent, options)
+						: await dialog.showOpenDialog(options);
+					authority.assertCurrent();
+					return picked.canceled || !picked.filePaths.length ? null : picked.filePaths;
+				};
+				const media: Array<{ stepId: string; receiptPath: string; mediaPath: string }> = [];
+				if (request.data.includeVideos) {
+					const folders = await pick(
+						"Choose the exported step MP4 folders to include (up to 4)",
+						true,
+					);
+					if (!folders) return { status: "cancelled" as const };
+					try {
+						if (folders.length > 4) throw new Error("too-many");
+						for (const folder of folders) {
+							const receiptPath = path.join(folder, "range-export.json"),
+								receipt = z
+									.object({ target: z.object({ stepId: idSchema }) })
+									.parse(JSON.parse(pinMetadata(receiptPath, 65536).bytes.toString("utf8"))),
+								stepId = receipt.target.stepId;
+							if (!request.data.stepIds.includes(stepId) || media.some((m) => m.stepId === stepId))
+								throw new Error("unmatched");
+							media.push({ stepId, receiptPath, mediaPath: path.join(folder, "range.mp4") });
+						}
+					} catch {
+						throw new Error("package-video-selection-invalid");
+					}
+				}
+				const destination = await pick(
+					"Choose an existing folder for the new lesson package",
+					false,
+				);
+				if (!destination) return { status: "cancelled" as const };
+				const result = await packageSelectedLesson(
+					lesson,
+					{
+						stepIds: request.data.stepIds,
+						includeCode: request.data.includeCode,
+						imagePolicy: request.data.imagePolicy,
+						media,
+						outputDirectory: destination[0],
+					},
+					authority,
+				);
+				return {
+					status: result.status,
+					path: result.path,
+					steps: result.steps,
+					images: result.images,
+					videos: result.videos,
+				};
+			},
+			undefined,
+			true,
 		);
 	});
 	ipcMain.handle("lesson:package-cancel", (event, input: unknown) => {

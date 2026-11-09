@@ -292,6 +292,12 @@
 		"scope": "Build editable, application-neutral steps and export an offline HTML/Markdown guide. No application integration is required.",
 		"unsaved": "This lesson is separate from the video project. Save an editable copy before leaving this project; saving never replaces an existing file.",
 		"lessonTitle": "Lesson title",
+		"packageCreate": {
+			"action": "Create a portable package from selected steps",
+			"videos": "Include exported step MP4s (you choose their export folders next)",
+			"scope": "Creates a new checked package folder from the selected steps, using the image and code settings above. Linux only. Save the video project first. To include videos, tick the box and choose the folders made by “Export this step’s MP4” for selected steps (up to 4); each video must still match its step’s confirmed range. Your lesson, project and exported files are not changed.",
+			"created": "Package checked and saved: {{path}} ({{steps}} steps, {{images}} images, {{videos}} videos). Review it before sharing."
+		},
 		"saveCurrent": "Save changes to the opened file",
 		"savedCurrent": "Saved to the same file: {{path}}",
 		"dirtyFile": "Unsaved lesson changes. Last saved file: {{path}}",
@@ -486,6 +492,7 @@
 				"lesson-package-video-copy-unsupported": "Editable copying with video bindings is not supported yet. The package remains read-only.",
 				"destination-exists": "That file already exists. Choose a new filename; existing files are never replaced.",
 				"lesson-package-destination-invalid": "That folder cannot be used. Choose an existing folder outside the package you opened. Your package is unchanged.",
+				"lesson-package-video-selection-invalid": "Those folders cannot be used for videos. Choose up to 4 folders made by “Export this step’s MP4”, one per selected step. Nothing was created.",
 				"lesson-package-edit-unsupported": "This draft changes unsupported package fields. Keep all original step IDs, images, video bindings and inclusion settings, then edit only the supported text and order."
 			},
 			"edit": "Edit supported text and order as a new draft",

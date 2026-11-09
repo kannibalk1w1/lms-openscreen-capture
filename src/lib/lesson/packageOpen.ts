@@ -8,6 +8,7 @@ export type PackageOpenCode =
 	| "lesson-package-video-copy-unsupported"
 	| "destination-exists"
 	| "lesson-package-destination-invalid"
+	| "lesson-package-video-selection-invalid"
 	| "lesson-package-edit-unsupported";
 export type PackageOpenResult<T> =
 	| { success: true; result: T }
@@ -47,4 +48,20 @@ export interface LessonPackageOpenApi {
 	>;
 	lessonPackageCancel?: (operationId: string) => Promise<boolean>;
 	lessonPackageRelease?: (token: string) => Promise<boolean>;
+}
+/** Separate from inspection: the editor's own lesson, with folders chosen in native dialogs only. */
+export interface LessonPackageCreateApi {
+	lessonPackageCreate?: (input: {
+		operationId: string;
+		lesson: LessonManifest;
+		stepIds: string[];
+		includeCode: boolean;
+		imagePolicy: "exclude" | "include-external-provenance";
+		includeVideos: boolean;
+	}) => Promise<
+		PackageOpenResult<
+			| { status: "packaged"; path: string; steps: number; images: number; videos: number }
+			| { status: "cancelled" }
+		>
+	>;
 }

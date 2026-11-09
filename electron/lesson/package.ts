@@ -18,6 +18,7 @@ import {
 } from "../../src/lib/lesson/schema";
 import { validateRangeVideo } from "./encodedVideo";
 import {
+	type CreateLessonPackageRequest,
 	createLessonPackageSchema,
 	PACKAGE_MAX_BYTES,
 	type PortablePackageManifest,
@@ -266,6 +267,28 @@ export async function inspectLessonPackage(input: unknown, authority: PackageAut
 export async function createLessonPackage(input: unknown, authority: PackageAuthority) {
 	const check = checkFor(authority);
 	const inputChecks: (() => void)[] = [];
+	try {
+		check();
+		const request = createLessonPackageSchema.parse(input);
+		pinDirectory(request.outputDirectory)();
+		const source = pinMetadata(request.manifestPath, MAX_LESSON_BYTES);
+		inputChecks.push(source.assertCurrent);
+		const lesson = await parseLesson(source.bytes.toString("utf8"));
+		check();
+		return await packageSelectedLesson(lesson, request, authority, inputChecks);
+	} catch (error) {
+		if (error instanceof LessonPackageError) throw error;
+		throw new LessonPackageError(failureCode(error, authority));
+	}
+}
+/** One projection and media path for a saved lesson file (CLI/MCP) and a validated in-memory lesson (editor). */
+export async function packageSelectedLesson(
+	lesson: LessonManifest,
+	request: Omit<CreateLessonPackageRequest, "manifestPath">,
+	authority: PackageAuthority,
+	inputChecks: (() => void)[] = [],
+) {
+	const check = checkFor(authority);
 	let destination: (() => void) | undefined;
 	const assertInputs = () => {
 		authority.assertCurrent();
@@ -274,13 +297,8 @@ export async function createLessonPackage(input: unknown, authority: PackageAuth
 	};
 	try {
 		check();
-		const request = createLessonPackageSchema.parse(input);
 		destination = pinDirectory(request.outputDirectory);
 		destination();
-		const source = pinMetadata(request.manifestPath, MAX_LESSON_BYTES);
-		inputChecks.push(source.assertCurrent);
-		const lesson = await parseLesson(source.bytes.toString("utf8"));
-		check();
 		assertInputs();
 		const images = request.imagePolicy === "include-external-provenance",
 			includeCode = request.includeCode && lessonOutput(lesson).includeCode;

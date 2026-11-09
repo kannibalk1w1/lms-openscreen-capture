@@ -973,3 +973,179 @@ it("the open digest is exactly the validated package manifest, binding the whole
 		result.result.snapshotSha256,
 	);
 });
+
+// Editor package creation: the authored in-memory lesson, native selections only, the shared writer.
+async function authored() {
+	const fixtureRoot = path.join(root, "authored-fixture");
+	await fs.mkdir(fixtureRoot);
+	const f = await packageFixture(fixtureRoot),
+		destination = path.join(root, "created");
+	await fs.mkdir(destination);
+	const create = (change: Record<string, unknown> = {}, operationId = randomUUID()) =>
+		invoke("create", {
+			operationId,
+			lesson: f.lesson,
+			stepIds: [f.step.id],
+			includeCode: true,
+			imagePolicy: "include-external-provenance",
+			includeVideos: true,
+			...change,
+		});
+	const pickers = (...selections: Array<string[] | null>) => {
+		host.open.mockReset();
+		for (const selection of selections)
+			host.open.mockResolvedValueOnce(
+				selection ? { canceled: false, filePaths: selection } : { canceled: true, filePaths: [] },
+			);
+	};
+	return { ...f, destination, create, pickers };
+}
+it("creates a verified package from the authored lesson with a chosen exported video, changing no input", async () => {
+	const f = await authored(),
+		before = await Promise.all([
+			fs.readFile(f.request.manifestPath),
+			fs.readFile(f.request.media[0].receiptPath),
+			fs.readFile(f.request.media[0].mediaPath),
+		]);
+	f.pickers([f.rendered.path], [f.destination]);
+	const result = (await f.create()) as { success: boolean; result: { path: string } };
+	expect(result).toMatchObject({
+		success: true,
+		result: { status: "packaged", steps: 1, images: 1, videos: 1 },
+	});
+	expect(Object.keys(result.result).sort()).toEqual([
+		"images",
+		"path",
+		"status",
+		"steps",
+		"videos",
+	]);
+	expect(path.dirname(result.result.path)).toBe(f.destination);
+	expect(host.open.mock.calls.map((call) => call.at(-1).properties)).toEqual([
+		["openDirectory", "multiSelections"],
+		["openDirectory"],
+	]);
+	const inspected = await inspectLessonPackage(
+		{ directory: result.result.path },
+		{
+			assertCurrent() {
+				/* Explicit test authority. */
+			},
+		},
+	);
+	expect(inspected.manifest.videos.map((video) => video.stepId)).toEqual([f.step.id]);
+	expect(inspected.lesson.steps.map((step) => step.id)).toEqual([f.step.id]);
+	expect(JSON.stringify(inspected.lesson)).not.toMatch(/PRIVATE_EXCLUDED|PRIVATE_RAW|PRIVATE_PIN/);
+	expect(
+		await Promise.all([
+			fs.readFile(f.request.manifestPath),
+			fs.readFile(f.request.media[0].receiptPath),
+			fs.readFile(f.request.media[0].mediaPath),
+		]),
+	).toEqual(before);
+});
+it("creates a text and image package with one destination picker when videos are not requested", async () => {
+	const f = await authored();
+	f.pickers([f.destination]);
+	expect(await f.create({ includeVideos: false, imagePolicy: "exclude" })).toMatchObject({
+		success: true,
+		result: { status: "packaged", videos: 0, images: 0 },
+	});
+	expect(host.open).toHaveBeenCalledTimes(1);
+});
+it.each([
+	"foreign",
+	"subframe",
+	"dirty",
+	"reselect",
+])("refuses package creation for a %s caller before any picker", async (kind) => {
+	const f = await authored();
+	f.pickers([f.rendered.path], [f.destination]);
+	if (kind === "foreign") current = caller(false);
+	if (kind === "subframe")
+		current.event = { ...current.event, senderFrame: {} } as IpcMainInvokeEvent;
+	if (kind === "dirty") dirty = true;
+	if (kind === "reselect") {
+		const pending = f.create();
+		selectThroughProduction("other");
+		expect(await pending).toMatchObject({ success: false });
+	} else expect(await f.create()).toMatchObject({ success: false });
+	if (kind !== "reselect") expect(host.open).not.toHaveBeenCalled();
+	expect(await fs.readdir(f.destination)).toEqual([]);
+});
+it.each([
+	"not-an-export",
+	"unselected-step",
+	"same-step-twice",
+	"five-folders",
+])("refuses a %s video selection before the destination picker and creates nothing", async (kind) => {
+	const f = await authored(),
+		copy = path.join(root, "export-copy");
+	await fs.cp(f.rendered.path, copy, { recursive: true });
+	// Five well-formed receipts for five selected steps: only the folder limit refuses these.
+	const five = await Promise.all(
+		[0, 1, 2, 3, 4].map(async (index) => {
+			const folder = path.join(root, `export-${index}`),
+				stepId = randomUUID();
+			await fs.mkdir(folder);
+			await fs.writeFile(
+				path.join(folder, "range-export.json"),
+				JSON.stringify({ target: { stepId } }),
+			);
+			return { folder, stepId };
+		}),
+	);
+	const selection =
+		kind === "not-an-export"
+			? [root]
+			: kind === "same-step-twice"
+				? [f.rendered.path, copy]
+				: kind === "five-folders"
+					? five.map((item) => item.folder)
+					: [f.rendered.path];
+	f.pickers(selection, [f.destination]);
+	expect(
+		await f.create(
+			kind === "unselected-step"
+				? { stepIds: [f.lesson.steps[1].id] }
+				: kind === "five-folders"
+					? { stepIds: five.map((item) => item.stepId) }
+					: {},
+		),
+	).toEqual({ success: false, code: "lesson-package-video-selection-invalid" });
+	expect(host.open).toHaveBeenCalledTimes(1);
+	expect(await fs.readdir(f.destination)).toEqual([]);
+});
+it("cancelling either picker creates nothing, and a changed range refuses the stale video", async () => {
+	const f = await authored();
+	f.pickers(null);
+	expect(await f.create()).toEqual({ success: true, result: { status: "cancelled" } });
+	f.pickers([f.rendered.path], null);
+	expect(await f.create()).toEqual({ success: true, result: { status: "cancelled" } });
+	f.pickers([f.rendered.path], [f.destination]);
+	const moved = {
+		...f.lesson,
+		steps: f.lesson.steps.map((step, index) =>
+			index === 0
+				? { ...step, mediaSelection: { ...step.mediaSelection, documentSha256: "cd".repeat(32) } }
+				: step,
+		),
+	};
+	expect(await f.create({ lesson: moved })).toEqual({
+		success: false,
+		code: "lesson-package-invalid",
+	});
+	expect(await fs.readdir(f.destination)).toEqual([]);
+});
+it("a failed creation never revokes a separately opened package capability", async () => {
+	const f = await authored();
+	host.open.mockReset().mockResolvedValue({ canceled: false, filePaths: [directory] });
+	const opened = await open();
+	f.pickers([root], [f.destination]);
+	expect(await f.create()).toMatchObject({ success: false });
+	host.open.mockReset().mockResolvedValue({ canceled: false, filePaths: [f.destination] });
+	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toMatchObject({
+		success: true,
+		result: { status: "packaged" },
+	});
+});

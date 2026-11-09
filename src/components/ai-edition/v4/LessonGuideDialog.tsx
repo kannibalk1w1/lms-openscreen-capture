@@ -28,6 +28,7 @@ import {
 	lessonMediaSelectionV2Schema,
 } from "@/lib/lesson/mediaSelection";
 import { lessonOutput } from "@/lib/lesson/output";
+import type { PackageOpenCode } from "@/lib/lesson/packageOpen";
 import {
 	type LessonRangeExportProgress,
 	lessonRangeExportProgressSchema,
@@ -150,6 +151,19 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		[stopExport],
 	);
 
+	const [packageVideos, setPackageVideos] = useState(false);
+	const [packageOperation, setPackageOperation] = useState<string | null>(null);
+	const [packageError, setPackageError] = useState<PackageOpenCode | null>(null);
+	const packageOperationRef = useRef<string | null>(null);
+	useEffect(
+		() => () => {
+			if (packageOperationRef.current)
+				void window.electronAPI
+					?.lessonPackageCancel?.(packageOperationRef.current)
+					.catch(() => undefined);
+		},
+		[],
+	);
 	const rangeOperation = useRef<{ id: string; cancelled: boolean } | null>(null);
 	const [confirmingRange, setConfirmingRange] = useState(false);
 	const [cancellingRange, setCancellingRange] = useState(false);
@@ -432,6 +446,68 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					>
 						{t("lesson.export")}
 					</button>
+					<label>
+						<input
+							type="checkbox"
+							checked={packageVideos}
+							onChange={(event) => setPackageVideos(event.target.checked)}
+						/>
+						{t("lesson.packageCreate.videos")}
+					</label>
+					<button
+						type="button"
+						disabled={
+							!active.length ||
+							active.length > 32 ||
+							hidden > 0 ||
+							projectDirty ||
+							!projectId ||
+							(output.includeImages &&
+								lesson.steps.some(
+									(step) => active.includes(step.id) && step.imageId && !step.imageAlt.trim(),
+								)) ||
+							!window.electronAPI?.lessonPackageCreate
+						}
+						onClick={() => {
+							setPackageError(null);
+							void run(async (current) => {
+								const operationId = crypto.randomUUID();
+								packageOperationRef.current = operationId;
+								setPackageOperation(operationId);
+								try {
+									const result = await window.electronAPI.lessonPackageCreate!({
+										operationId,
+										lesson,
+										stepIds: active,
+										includeCode: output.includeCode,
+										imagePolicy: output.includeImages ? "include-external-provenance" : "exclude",
+										includeVideos: packageVideos,
+									});
+									if (!current()) return;
+									if (!result.success) setPackageError(result.code);
+									else if (result.result.status === "packaged")
+										setNotice(
+											t("lesson.packageCreate.created", {
+												path: result.result.path,
+												steps: result.result.steps,
+												images: result.result.images,
+												videos: result.result.videos,
+											}),
+										);
+									else setNotice(t("lesson.package.cancelled"));
+								} finally {
+									if (packageOperationRef.current === operationId)
+										packageOperationRef.current = null;
+									setPackageOperation(null);
+								}
+							});
+						}}
+					>
+						{t("lesson.packageCreate.action")}
+					</button>
+					<p>
+						<small>{t("lesson.packageCreate.scope")}</small>
+					</p>
 					{lesson.steps.map((step, index) => {
 						if (!visible.has(step.id)) return null;
 						const image = lesson.assets.find((image) => image.id === step.imageId);
@@ -892,7 +968,20 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							? t("lesson.busy")
 							: ""}
 				</p>
+				{packageOperation && (
+					<button
+						type="button"
+						onClick={() =>
+							void window.electronAPI
+								?.lessonPackageCancel?.(packageOperation)
+								.catch(() => undefined)
+						}
+					>
+						{t("lesson.package.cancel")}
+					</button>
+				)}
 				{error && <p role="alert">{t(`lesson.errors.${error}`)}</p>}
+				{packageError && <p role="alert">{t(`lesson.package.errors.${packageError}`)}</p>}
 				<p role="status" style={{ overflowWrap: "anywhere" }}>
 					{notice}
 				</p>
