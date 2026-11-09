@@ -6,6 +6,7 @@ import {
 	addLessonStepsFileSchema,
 	createLessonFileSchema,
 	exportLessonFileSchema,
+	moveLessonStepFileSchema,
 	queryLessonFileSchema,
 	removeLessonStepFileSchema,
 	updateLessonStepFileSchema,
@@ -152,5 +153,25 @@ export async function removeLessonStepFile(input: unknown) {
 		lessonId: next.id,
 		revision: next.revision,
 		totalSteps: next.steps.length,
+	};
+}
+/** Order only: step IDs, text, media bindings and review status are untouched. */
+export async function moveLessonStepFile(input: unknown) {
+	const request = moveLessonStepFileSchema.parse(input);
+	const lesson = await readLessonFile(request.manifestPath);
+	const from = lesson.steps.findIndex((step) => step.id === request.stepId);
+	if (from < 0 || request.position > lesson.steps.length)
+		throw new Error("Unknown step or position");
+	const steps = [...lesson.steps],
+		[moved] = steps.splice(from, 1);
+	steps.splice(request.position - 1, 0, moved);
+	const next = await validateLesson(reviseLesson(lesson, { steps }));
+	await writeNewLesson(request.outputPath, next);
+	return {
+		status: "saved" as const,
+		path: request.outputPath,
+		lessonId: next.id,
+		revision: next.revision,
+		order: next.steps.map((step, index) => ({ number: index + 1, id: step.id, title: step.title })),
 	};
 }

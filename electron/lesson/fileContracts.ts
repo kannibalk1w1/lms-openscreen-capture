@@ -73,6 +73,16 @@ export const updateLessonStepFileSchema = z
 export const removeLessonStepFileSchema = z
 	.object({ manifestPath: absolutePath, outputPath: absolutePath, stepId: z.string().uuid() })
 	.strict();
+/** Moves one step to a 1-based position; guide numbering follows the new order. Saves a new copy. */
+export const moveLessonStepFileSchema = z
+	.object({
+		manifestPath: absolutePath,
+		outputPath: absolutePath,
+		stepId: z.string().uuid(),
+		position: z.number().int().min(1).max(200),
+	})
+	.strict();
+export type MoveLessonStepFileRequest = z.infer<typeof moveLessonStepFileSchema>;
 export type UpdateLessonStepFileRequest = z.infer<typeof updateLessonStepFileSchema>;
 export type RemoveLessonStepFileRequest = z.infer<typeof removeLessonStepFileSchema>;
 export type CreateLessonFileRequest = z.infer<typeof createLessonFileSchema>;

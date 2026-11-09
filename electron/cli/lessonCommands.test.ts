@@ -604,3 +604,41 @@ it("illustrate reports a fixed reason such as a trimmed time and otherwise the g
 	expect(said).not.toContain(root);
 	expect(await fs.readdir(root)).not.toContain("out.json");
 });
+it("moves a step from the command line and through nothing else", async () => {
+	const steps = [newStep("A"), newStep("B")];
+	await fs.writeFile(path.join(root, "a.json"), JSON.stringify({ ...newLesson(), steps }));
+	const chunks: string[] = [];
+	const command = parseCliArgs(
+		[
+			"electron",
+			"app",
+			"lesson",
+			"move-step",
+			"a.json",
+			"--step",
+			steps[1].id,
+			"--to",
+			"1",
+			"--out",
+			"b.json",
+			"--json",
+		],
+		2,
+		root,
+	);
+	if (command?.kind !== "lesson") throw new Error(JSON.stringify(command));
+	expect(await runLessonCommand(command, (value) => chunks.push(value))).toBe(0);
+	expect(
+		JSON.parse(chunks.join("")).result.order.map((step: { title: string }) => step.title),
+	).toEqual(["B", "A"]);
+	for (const args of [
+		["--step", steps[1].id, "--to", "first", "--out", "c.json"],
+		["--step", steps[1].id, "--out", "c.json"],
+		["--step", steps[1].id, "--to", "1"],
+		["--to", "1", "--out", "c.json"],
+		["--step", steps[1].id, "--to", "1", "--out", "c.json", "--title", "T"],
+	])
+		expect(
+			parseCliArgs(["electron", "app", "lesson", "move-step", "a.json", ...args], 2, root)?.kind,
+		).toBe("error");
+});

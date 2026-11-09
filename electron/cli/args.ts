@@ -32,6 +32,8 @@ import {
 	type CreateLessonFileRequest,
 	createLessonFileSchema,
 	exportLessonFileSchema,
+	type MoveLessonStepFileRequest,
+	moveLessonStepFileSchema,
 	type RemoveLessonStepFileRequest,
 	removeLessonStepFileSchema,
 	type UpdateLessonStepFileRequest,
@@ -54,6 +56,7 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "new"; request: CreateLessonFileRequest }
 	| { action: "add-step"; request: AddLessonStepsFileRequest }
 	| { action: "illustrate"; request: IllustrateLessonStepFileRequest }
+	| { action: "move-step"; request: MoveLessonStepFileRequest }
 	| { action: "edit-step"; request: UpdateLessonStepFileRequest }
 	| { action: "remove-step"; request: RemoveLessonStepFileRequest }
 	| { action: "query"; query: LessonQuery }
@@ -150,6 +153,8 @@ Usage:
                      --out <new-lesson.json> [--json]
                             Attach one composed frame of the saved project to a step and save a new copy;
                             every source file the project plays must be named; the step becomes draft
+  openscreen lesson move-step <lesson.json> --step <UUID> --to <position> --out <new-lesson.json> [--json]
+                            Move one step to a 1-based position and save a new copy; nothing else changes
   openscreen lesson remove-step <lesson.json> --step <UUID> --out <new-lesson.json> [--json]
                             Remove one step and save a new copy; the selected file is unchanged
   openscreen lesson query <lesson.json> [--title <text>] [--status <all|draft|reviewed>]
@@ -680,6 +685,36 @@ function parseLessonCommand(args: string[], cwd: string): CliCommand {
 		if (!parsed.success)
 			throw new Error(
 				"lesson illustrate requires --project, --project-id, --step, --at <seconds>, --alt <description>, 1–8 --source files and --out <new-lesson.json>",
+			);
+		return { kind: "lesson", action, manifestPath, request: parsed.data, json };
+	}
+	if (action === "move-step") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const values: Record<string, string> = {};
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (!["--step", "--to", "--out"].includes(flag) || flag in values)
+				throw new Error("Unexpected lesson option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		const manifestPath = resolvePath(file, cwd),
+			to = values["--to"];
+		const parsed = moveLessonStepFileSchema.safeParse({
+			manifestPath,
+			outputPath: values["--out"] === undefined ? undefined : resolvePath(values["--out"], cwd),
+			stepId: values["--step"],
+			position: to !== undefined && /^\d{1,3}$/.test(to) ? Number(to) : undefined,
+		});
+		if (!parsed.success)
+			throw new Error(
+				"lesson move-step requires --step <UUID>, --to <position 1–200> and --out <new-lesson.json>",
 			);
 		return { kind: "lesson", action, manifestPath, request: parsed.data, json };
 	}

@@ -4,6 +4,7 @@ import {
 	addLessonStepsFile,
 	createLessonFile,
 	exportLessonFile,
+	moveLessonStepFile,
 	queryLessonFile,
 	removeLessonStepFile,
 	updateLessonStepFile,
@@ -12,6 +13,7 @@ import {
 	addLessonStepsFileSchema,
 	createLessonFileSchema,
 	exportLessonFileSchema,
+	moveLessonStepFileSchema,
 	queryLessonFileSchema,
 	removeLessonStepFileSchema,
 	updateLessonStepFileSchema,
@@ -225,6 +227,13 @@ export function registerLessonTools(
 				"Remove one step (and any illustration no other step uses) from an explicitly selected editable lesson file and save the result as a NEW file at an explicit absolute outputPath. The selected file is unchanged and no file is replaced. Requires MCP edits.",
 			inputSchema: removeLessonStepFileSchema,
 			run: removeLessonStepFile,
+		},
+		{
+			name: "moveLessonStep",
+			description:
+				"Move one step to a 1-based position in an explicitly selected editable lesson file and save the result as a NEW file at an explicit absolute outputPath. Only the order changes; step IDs, text, media bindings and review status are kept. The selected file is unchanged and no file is replaced. Requires MCP edits.",
+			inputSchema: moveLessonStepFileSchema,
+			run: moveLessonStepFile,
 		},
 	] as const)
 		server.registerTool(

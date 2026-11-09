@@ -7,6 +7,7 @@ import { imageFixture } from "../../src/lib/lesson/fixtures.test-support";
 import { type LessonManifest, parseLesson } from "../../src/lib/lesson/schema";
 import {
 	exportLessonFile,
+	moveLessonStepFile,
 	queryLessonFile,
 	removeLessonStepFile,
 	updateLessonStepFile,
@@ -308,5 +309,50 @@ it("edits and removes a step into new files, demoting changed teaching text but 
 		"d.json",
 		"selected.json",
 	]);
+	expect(await fs.readFile(source, "utf8")).toBe(raw);
+});
+it("moves a step to a position in a new file, changing only the order", async () => {
+	const steps = ["A", "B", "C"].map((title) => ({
+			...newStep(title),
+			status: "reviewed" as const,
+			instructions: `Text ${title}`,
+		})),
+		source = path.join(root, "selected.json"),
+		raw = JSON.stringify({ ...newLesson("L"), steps });
+	await fs.writeFile(source, raw);
+	const moved = await moveLessonStepFile({
+		manifestPath: source,
+		outputPath: path.join(root, "moved.json"),
+		stepId: steps[2].id,
+		position: 1,
+	});
+	expect(moved.order.map((step) => step.title)).toEqual(["C", "A", "B"]);
+	const saved = await parseLesson(await fs.readFile(moved.path, "utf8"));
+	expect(saved.revision).toBe(1);
+	expect([...saved.steps].sort((a, b) => a.title.localeCompare(b.title))).toEqual(
+		(await parseLesson(raw)).steps,
+	);
+	for (const request of [
+		{ stepId: steps[0].id, position: 4 },
+		{ stepId: steps[0].id, position: 0 },
+		{ stepId: crypto.randomUUID(), position: 1 },
+		{ stepId: steps[0].id, position: 1.5 },
+	])
+		await expect(
+			moveLessonStepFile({
+				manifestPath: source,
+				outputPath: path.join(root, "x.json"),
+				...request,
+			}),
+		).rejects.toThrow();
+	await expect(
+		moveLessonStepFile({
+			manifestPath: source,
+			outputPath: moved.path,
+			stepId: steps[0].id,
+			position: 2,
+		}),
+	).rejects.toThrow();
+	expect((await fs.readdir(root)).sort()).toEqual(["moved.json", "selected.json"]);
 	expect(await fs.readFile(source, "utf8")).toBe(raw);
 });

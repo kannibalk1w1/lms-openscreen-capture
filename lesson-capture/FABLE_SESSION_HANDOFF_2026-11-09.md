@@ -420,3 +420,22 @@ continuation; I do not have the exact error text. No usage information is expose
 - Updating `LESSON_CAPTURE_COMMANDS.md` for the new commands.
 - GIF and standalone PNG step outputs, and the 1280 px cap, which touch accepted render and
   package contracts and so should be designed with a reviewer.
+
+### Slice 12 — headless step reordering and a command reference (after the summary above)
+
+**What changed.** CLI `openscreen lesson move-step <lesson.json> --step <UUID> --to <position>
+--out <new-lesson.json>` and MCP `moveLessonStep` move one step to a 1-based position in a
+new lesson copy. Only the order changes. `LESSON_CAPTURE_COMMANDS.md` gains an appended
+section listing every headless authoring command and tool added in this session; its earlier
+text is untouched. `technical-documentation/architecture/mcp-server.md` names the new tool.
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/lesson/fileCommands.test.ts electron/cli electron/mcp` (3 new cases) | 318 tests pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run docs:check`; `npx vite build`; required startup smoke | pass; 35 baseline; OK; pass; `success: true` |
+| Real production CLI under Xvfb (`slice12/cli-move-step.jsonl`) on the slice 6 lesson | the second step is first in the new file |
+
+No mutation controls and no full-suite run for this slice (last full run: slice 11, 6,255 /
+458). With this slice the "could continue without outside input" list above loses headless
+reordering and the command reference; an MCP illustration tool and the output-format work
+remain.

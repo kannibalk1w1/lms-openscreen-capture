@@ -3,6 +3,7 @@ import {
 	addLessonStepsFile,
 	createLessonFile,
 	exportLessonFile,
+	moveLessonStepFile,
 	queryLessonFile,
 	removeLessonStepFile,
 	updateLessonStepFile,
@@ -129,22 +130,24 @@ export async function runLessonCommand(
 					})
 				: command.action === "new"
 					? await createLessonFile(command.request)
-					: command.action === "edit-step"
-						? await updateLessonStepFile(command.request)
-						: command.action === "remove-step"
-							? await removeLessonStepFile(command.request)
-							: command.action === "add-step"
-								? await addLessonStepsFile(command.request)
-								: command.action === "query"
-									? await queryLessonFile({
-											manifestPath: command.manifestPath,
-											query: command.query,
-										})
-									: await exportLessonFile({
-											manifestPath: command.manifestPath,
-											outputDirectory: command.outputDirectory,
-											stepIds: command.stepIds,
-										});
+					: command.action === "move-step"
+						? await moveLessonStepFile(command.request)
+						: command.action === "edit-step"
+							? await updateLessonStepFile(command.request)
+							: command.action === "remove-step"
+								? await removeLessonStepFile(command.request)
+								: command.action === "add-step"
+									? await addLessonStepsFile(command.request)
+									: command.action === "query"
+										? await queryLessonFile({
+												manifestPath: command.manifestPath,
+												query: command.query,
+											})
+										: await exportLessonFile({
+												manifestPath: command.manifestPath,
+												outputDirectory: command.outputDirectory,
+												stepIds: command.stepIds,
+											});
 		out(
 			JSON.stringify(
 				command.json ? { event: "done", result } : result,

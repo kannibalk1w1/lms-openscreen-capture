@@ -341,6 +341,7 @@ describe("the MCP tool surface", () => {
 			"addLessonSteps",
 			"updateLessonStep",
 			"removeLessonStep",
+			"moveLessonStep",
 		]);
 		for (const tool of tools.slice(1, 1 + OPENSCREEN_TOOL_NAMES.length)) {
 			expect(tool.description).toBe(TOOL_DESCRIPTIONS[tool.name]);

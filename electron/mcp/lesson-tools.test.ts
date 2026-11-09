@@ -43,6 +43,7 @@ it("registers only selected-file query/export tools and no recovery channel", as
 		"addLessonSteps",
 		"updateLessonStep",
 		"removeLessonStep",
+		"moveLessonStep",
 	]);
 	tools.splice(0, 4);
 	expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
@@ -253,4 +254,25 @@ it("updates and removes a step through MCP only with edits enabled, into new fil
 	).toMatchObject({ status: "saved", totalSteps: 1 });
 	expect(await fs.readFile(source, "utf8")).toBe(raw);
 	expect((await fs.readdir(root)).sort()).toEqual(["removed.json", "source.json", "updated.json"]);
+});
+it("moves a step through MCP only with edits enabled, into a new file", async () => {
+	const steps = [newStep("A"), newStep("B")],
+		source = path.join(root, "source.json"),
+		args = {
+			manifestPath: source,
+			outputPath: path.join(root, "moved.json"),
+			stepId: steps[1].id,
+			position: 1,
+		};
+	await fs.writeFile(source, JSON.stringify({ ...newLesson(), steps }));
+	allowed = false;
+	expect(text(await client.callTool({ name: "moveLessonStep", arguments: args }))).toContain(
+		"consent_required",
+	);
+	allowed = true;
+	const moved = JSON.parse(
+		text(await client.callTool({ name: "moveLessonStep", arguments: args })),
+	);
+	expect(moved.order.map((step: { id: string }) => step.id)).toEqual([steps[1].id, steps[0].id]);
+	expect((await fs.readdir(root)).sort()).toEqual(["moved.json", "source.json"]);
 });
