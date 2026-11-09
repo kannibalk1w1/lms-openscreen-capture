@@ -5,6 +5,12 @@ import { lessonOutputSchema } from "./output";
 export const MAX_LESSON_BYTES = 16 * 1024 * 1024;
 const id = z.string().uuid();
 const title = z.string().min(1).max(300);
+/** Author-entered LMS destination: one printable line, never interpreted or checked here. */
+export const lmsReferenceSchema = z
+	.string()
+	.min(1)
+	.max(200)
+	.refine((value) => !/\p{Cc}/u.test(value));
 export const lessonEvidenceSchema = z
 	.object({
 		kind: z.enum(["recording-flag", "typing-section", "authored"]),
@@ -52,6 +58,7 @@ export const lessonStepSchema = z
 		mediaSelection: lessonMediaSelectionSchema.optional(),
 		imageId: id.optional(),
 		imageAlt: z.string().max(1000).default(""),
+		slideRef: lmsReferenceSchema.optional(),
 		code: z
 			.object({ language: z.string().max(40), text: z.string().max(40000) })
 			.strict()
@@ -73,6 +80,7 @@ export const lessonManifestSchema = z
 			.strict()
 			.optional(),
 		title,
+		lessonRef: lmsReferenceSchema.optional(),
 		output: lessonOutputSchema.optional(),
 		steps: z.array(lessonStepSchema).max(200),
 		assets: z.array(lessonImageSchema).max(40),

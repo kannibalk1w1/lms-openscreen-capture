@@ -14,6 +14,7 @@ import {
 	buildLessonSceneDescription,
 	lessonRenderFingerprint,
 } from "../../src/lib/lesson/frameSource";
+import { LESSON_MAPPING_FILE, lessonMappingBytes } from "../../src/lib/lesson/mapping";
 import { lessonRangeRequestSchema } from "../../src/lib/lesson/mediaSelection";
 import {
 	decodeImage,
@@ -131,6 +132,8 @@ export class LessonService {
 				new TextEncoder().encode(JSON.stringify(output.lesson, null, 2) + "\n"),
 			],
 		]);
+		// Always present, so LMS preparation can rely on one step-to-file listing per guide folder.
+		files.set(LESSON_MAPPING_FILE, lessonMappingBytes(output.lesson));
 		for (const image of output.lesson.assets)
 			files.set(`assets/${image.id}.jpg`, decodeImage(image));
 		if (output.lesson.assets.length)

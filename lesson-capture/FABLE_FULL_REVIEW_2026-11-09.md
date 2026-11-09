@@ -434,3 +434,69 @@ change) and a real CLI packaging run with an actual rendered MP4. The unit fixtu
 mocked video validator.
 
 **Next:** slice 3 (H2, LMS references and mapping file).
+
+### Slice 3 — LMS lesson and slide references with a mapping file (H2)
+
+Parent: `cd444252`. Evidence: `../openscreen-evaluation/fable-review-2026-11-09T2130Z/slice3/`.
+
+**What a teacher or agent can now do.** Type an optional "LMS lesson reference" for the
+lesson and an optional "LMS slide reference" for each step in the Lesson guide dialog (or set
+`lessonRef` and `slideRef` in the lesson JSON). Every guide export then contains
+`lesson-mapping.json`, which lists each exported step with its number, stable ID, title,
+review status, slide reference if any, guide anchor, image file and alt text if any, video
+file if any, and whether it has code. The HTML and Markdown guides show the references too.
+
+**Changed**
+
+- `src/lib/lesson/schema.ts`: optional `lessonRef` on the lesson and `slideRef` on a step.
+  Each is one line of 1 to 200 characters with no control characters.
+- `src/lib/lesson/mapping.ts` (new): builds the mapping from an already projected lesson.
+  It records what the author typed and which files exist. It infers nothing and checks
+  nothing against an LMS, and says so in its `meaning` field.
+- `src/lib/lesson/export.ts`: guides show "LMS lesson" and "LMS slide" lines only when a
+  reference exists, HTML-escaped. Guides for lessons without references are byte-identical
+  to before.
+- `electron/lesson/service.ts`: the guide export always writes `lesson-mapping.json` and
+  lists it in the checksum report.
+- `electron/lesson/package.ts`: a package includes `lesson-mapping.json`, with video paths,
+  **only when** the lesson has a reference. Packages without references keep the original v1
+  inventory, so existing packages and the retained v1 fixture verify unchanged. The file is
+  part of the checked inventory.
+- `LessonGuideDialog.tsx`: the two inputs. Editing a slide reference keeps a step's reviewed
+  status, because a destination label is not teaching content.
+- 15 catalogues: three strings, English text in all.
+
+**Decisions and limits**
+
+- A build older than this commit rejects a lesson file or package that contains a reference,
+  because its schema is strict. Files without references are unaffected in both directions.
+- References are free text. There is no LMS lookup, no slide picker and no insertion into
+  LMS upload files; the spec defers that.
+- The package re-edit panel keeps references fixed; they are not editable there yet.
+- `lesson query` output does not show references yet.
+- A selected-step MP4 exported on its own (outside a package) is not listed in a guide
+  export's mapping, because the guide export does not know about it.
+
+**Validation**
+
+| Check | Result |
+| --- | --- |
+| Focused lesson-area Vitest (`src/lib/lesson`, `electron/lesson`, `electron/mcp`, `electron/cli`, `src/components/ai-edition/v4`, two IPC files) | 1,174 tests / 73 files pass, 0 skipped |
+| Full suite once, `npm run test -- --maxWorkers=4` | 6,181 tests / 455 files pass, 0 skipped |
+| Both `tsc` configurations; `npm run lint` (35 baseline); `npm run i18n:check` (15 locales, 1309 keys); `npx vite build` | pass |
+| Required real startup smoke, foreign cwd, hints cleared | `success: true` |
+| Real production CLI, pinned Electron build under Xvfb: `lesson export`, `lesson package` (text only), `lesson verify-package` on a hand-written lesson with references | exported with the mapping shown in `cli-export-lesson-mapping.json`; packaged with `lesson-mapping.json`; `verified` |
+| Real production CLI `verify-package` on a copy of the pre-existing video package from the reseal evidence | `verified` (old inventory still accepted) |
+| 2 controls: always add the mapping to packages; never add it | 2 killed (the first by the retained v1 fixture test) |
+
+Not exercised: the two new inputs in the real app (jsdom test only), a package with both a
+video and references through the real CLI (unit fixture with the mocked validator only), any
+other platform.
+
+### State after the three slices, and what is next
+
+The remaining plan items, in order: M1 (save to the same lesson file, dirty marker, close
+confirmation); GUI package creation; headless lesson authoring commands (M6); a Windows run
+and capability gates (H1); decoupling the package capability from project state (M2); GIF and
+PNG step outputs and the 1280 px cap; and the manual pilot on real hardware. None of these is
+started.

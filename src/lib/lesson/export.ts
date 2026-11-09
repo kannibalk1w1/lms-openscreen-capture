@@ -81,7 +81,7 @@ export async function renderProjectedLessonGuide(input: LessonManifest) {
 				index + 1 < selected.steps.length
 					? `<a href="#${anchor(index + 1)}">Next step (${index + 2})</a>`
 					: "";
-			return `<section aria-labelledby="${anchor(index)}"><h2 id="${anchor(index)}" tabindex="-1">${step.title.trim() ? `${index + 1}. ${html(step.title)}` : `<span lang="en" dir="ltr">Step ${index + 1}</span>`}</h2><p class="status" lang="en" dir="ltr">${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}</p><p>${html(step.instructions.replace(/\r\n?/g, "\n")).replace(/\n/g, "<br>")}</p>${image ? `<figure><img src="data:image/jpeg;base64,${image.base64}" alt="${html(step.imageAlt)}" width="${image.width}" height="${image.height}"><figcaption aria-hidden="true">${html(step.imageAlt)}</figcaption></figure>` : ""}${step.code ? `<pre dir="ltr"><code>${html(step.code.text)}</code></pre>` : ""}<nav class="step-navigation" aria-label="Step ${index + 1} navigation" lang="en" dir="ltr"><a href="#lesson-steps">Back to steps</a>${previous}${next}</nav></section>`;
+			return `<section aria-labelledby="${anchor(index)}"><h2 id="${anchor(index)}" tabindex="-1">${step.title.trim() ? `${index + 1}. ${html(step.title)}` : `<span lang="en" dir="ltr">Step ${index + 1}</span>`}</h2><p class="status" lang="en" dir="ltr">${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}</p>${step.slideRef ? `<p class="status"><span lang="en" dir="ltr">LMS slide: </span>${html(step.slideRef)}</p>` : ""}<p>${html(step.instructions.replace(/\r\n?/g, "\n")).replace(/\n/g, "<br>")}</p>${image ? `<figure><img src="data:image/jpeg;base64,${image.base64}" alt="${html(step.imageAlt)}" width="${image.width}" height="${image.height}"><figcaption aria-hidden="true">${html(step.imageAlt)}</figcaption></figure>` : ""}${step.code ? `<pre dir="ltr"><code>${html(step.code.text)}</code></pre>` : ""}<nav class="step-navigation" aria-label="Step ${index + 1} navigation" lang="en" dir="ltr"><a href="#lesson-steps">Back to steps</a>${previous}${next}</nav></section>`;
 		})
 		.join("\n");
 	const outputHtml = `<!doctype html><html lang="${html(output.language)}" dir="${output.direction}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>${html(selected.title)}</title><style>
@@ -93,15 +93,16 @@ a{color:inherit}nav a,.skip-link{display:inline-block;box-sizing:border-box;min-
 .contents ol{padding-inline-start:1.75em}.contents a{display:block}.step-navigation{display:flex;flex-wrap:wrap;gap:8px 16px}
 a:focus-visible,h2:focus-visible{outline:3px solid currentColor;outline-offset:4px}h2{scroll-margin-block-start:24px}
 @page{margin:16mm}@media print{body{max-width:none;padding:0;margin:0;color:#000;background:#fff}nav,.skip-link{display:none!important}h1,h2{break-after:avoid}figure{break-inside:avoid}section,pre{break-inside:auto}section{margin:24px 0}.status,figcaption{color:#000}}
-</style></head><body><header><h1>${html(selected.title)}</h1><a class="skip-link" href="#${anchor(0)}" lang="en" dir="ltr">Skip to first step</a></header>${contents}<main>${sections}</main></body></html>`;
+</style></head><body><header><h1>${html(selected.title)}</h1>${selected.lessonRef ? `<p class="status"><span lang="en" dir="ltr">LMS lesson: </span>${html(selected.lessonRef)}</p>` : ""}<a class="skip-link" href="#${anchor(0)}" lang="en" dir="ltr">Skip to first step</a></header>${contents}<main>${sections}</main></body></html>`;
 	const markdown =
 		[
 			`# ${md(selected.title.replace(/[\r\n]/g, " "))}`,
 			`Derived lesson revision ${selected.revision}; source revision ${selected.derivedFrom?.revision ?? selected.revision}. Draft steps require review.`,
+			...(selected.lessonRef ? [`LMS lesson: ${md(selected.lessonRef)}`] : []),
 			...selected.steps.map((step, index) => {
 				const image = selected.assets.find((asset) => asset.id === step.imageId);
 				const code = step.code ? `\n\n<pre>${html(step.code.text)}</pre>` : "";
-				return `## ${index + 1}. ${md(step.title.replace(/[\r\n]/g, " "))}\n\n${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}\n\n${instructionsMarkdown(step.instructions)}${image ? `\n\n![${md(step.imageAlt.replace(/[\r\n]/g, " "))}](assets/${image.id}.jpg)` : ""}${code}`;
+				return `## ${index + 1}. ${md(step.title.replace(/[\r\n]/g, " "))}\n\n${step.status === "draft" ? "Draft — review required" : "Source step reviewed"}${step.slideRef ? `\n\nLMS slide: ${md(step.slideRef)}` : ""}\n\n${instructionsMarkdown(step.instructions)}${image ? `\n\n![${md(step.imageAlt.replace(/[\r\n]/g, " "))}](assets/${image.id}.jpg)` : ""}${code}`;
 			}),
 		].join("\n\n") + "\n";
 	return { lesson: selected, html: outputHtml, markdown };

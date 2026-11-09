@@ -84,6 +84,7 @@ it("allows minimal HTTP query with permission and gates export before filesystem
 	expect((await fs.readdir(result.path)).sort()).toEqual([
 		"export-report.json",
 		"index.html",
+		"lesson-mapping.json",
 		"lesson.md",
 		"lesson.openscreen-lesson.json",
 	]);

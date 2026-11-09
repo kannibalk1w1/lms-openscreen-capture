@@ -590,3 +590,42 @@ it("packages a video after later lesson text edits, while a changed pin still re
 	);
 	expect((await fs.readdir(f.outputDirectory)).length).toBe(1);
 });
+it("carries authored LMS references into a verified mapping file with the video path, and adds none without references", async () => {
+	const f = await packageFixture(root);
+	const plain = await createLessonPackage(f.request, authority);
+	expect(await fs.readdir(plain.path)).not.toContain("lesson-mapping.json");
+	const referenced = {
+		...f.lesson,
+		lessonRef: "RPG Course 1 / Lesson 1",
+		steps: f.lesson.steps.map((step, index) =>
+			index === 0
+				? { ...step, slideRef: "slide 12" }
+				: { ...step, slideRef: "PRIVATE_EXCLUDED_SLIDE" },
+		),
+	};
+	await fs.writeFile(f.request.manifestPath, JSON.stringify(referenced));
+	const packaged = await createLessonPackage(f.request, authority),
+		file = path.join(packaged.path, "lesson-mapping.json"),
+		mapping = JSON.parse(await fs.readFile(file, "utf8")),
+		opened = await inspectLessonPackage({ directory: packaged.path }, authority);
+	expect(mapping).toMatchObject({
+		lessonId: opened.lesson.id,
+		lessonRef: "RPG Course 1 / Lesson 1",
+		steps: [
+			{
+				number: 1,
+				stepId: f.step.id,
+				slideRef: "slide 12",
+				video: { path: `media/${f.step.id.toLowerCase()}.mp4`, frames: 45, durationSec: 1.5 },
+			},
+		],
+	});
+	expect(JSON.stringify(mapping)).not.toContain("PRIVATE_EXCLUDED_SLIDE");
+	expect(opened.manifest.files.map((entry) => entry.path)).toContain("lesson-mapping.json");
+	expect(opened.lesson.steps[0].slideRef).toBe("slide 12");
+	// The mapping is part of the checked inventory: an edited destination no longer verifies.
+	await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace("slide 12", "slide 13"));
+	await expect(
+		inspectLessonPackage({ directory: packaged.path }, authority),
+	).rejects.toHaveProperty("code", "lesson-package-invalid");
+});

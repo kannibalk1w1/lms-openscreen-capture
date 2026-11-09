@@ -29,7 +29,7 @@ export function newStep(title = "New step"): LessonStep {
 }
 export function reviseLesson(
 	lesson: LessonManifest,
-	change: Partial<Pick<LessonManifest, "title" | "steps" | "assets" | "output">>,
+	change: Partial<Pick<LessonManifest, "title" | "lessonRef" | "steps" | "assets" | "output">>,
 ): LessonManifest {
 	return lessonManifestSchema.parse({ ...lesson, ...change, revision: lesson.revision + 1 });
 }

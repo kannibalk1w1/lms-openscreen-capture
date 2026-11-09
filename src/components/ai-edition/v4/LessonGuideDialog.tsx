@@ -232,6 +232,19 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							onCommit={(title) => author(() => reviseLesson(lesson, { title }))}
 						/>
 					</label>
+					<label>
+						{t("lesson.lessonRef")}
+						<input
+							maxLength={200}
+							value={lesson.lessonRef ?? ""}
+							onChange={(event) =>
+								author(() => reviseLesson(lesson, { lessonRef: event.target.value || undefined }))
+							}
+						/>
+					</label>
+					<p>
+						<small>{t("lesson.refScope")}</small>
+					</p>
 					<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 						<button
 							type="button"
@@ -392,6 +405,20 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									<LessonTitleInput
 										value={step.title}
 										onCommit={(title) => update(step.id, { title })}
+									/>
+								</label>
+								<label>
+									{t("lesson.slideRef")}
+									<input
+										maxLength={200}
+										value={step.slideRef ?? ""}
+										onChange={(event) =>
+											// A destination label is not teaching content: keep the review status.
+											update(step.id, {
+												slideRef: event.target.value || undefined,
+												status: step.status,
+											})
+										}
 									/>
 								</label>
 								<label>

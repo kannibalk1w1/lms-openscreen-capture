@@ -3,6 +3,11 @@ import { writeFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { projectLesson, renderProjectedLessonGuide } from "../../src/lib/lesson/export";
+import {
+	hasLmsReferences,
+	LESSON_MAPPING_FILE,
+	lessonMappingBytes,
+} from "../../src/lib/lesson/mapping";
 import { lessonOutput } from "../../src/lib/lesson/output";
 import {
 	decodeImage,
@@ -93,6 +98,9 @@ async function portableGuideV1Files(
 		["lesson.md", Buffer.from(markdown)],
 		["lesson.openscreen-lesson.json", Buffer.from(JSON.stringify(lesson, null, 2) + "\n")],
 	]);
+	// Only with authored LMS references: packages without them keep the original v1 inventory.
+	if (hasLmsReferences(lesson))
+		files.set(LESSON_MAPPING_FILE, Buffer.from(lessonMappingBytes(lesson, videos)));
 	for (const image of lesson.assets) {
 		const relative = `assets/${image.id}.jpg`;
 		if (files.has(relative)) throw new Error("package-path-collision");

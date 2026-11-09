@@ -491,3 +491,51 @@ it.each([
 	expect(range.keptSpans[0].startSec).toBe(startSec);
 	expect(range.keptSpans.at(-1)?.endSec).toBe(endSec);
 });
+it("writes the step-to-slide mapping into every guide folder and its checksum inventory", async () => {
+	const root = await directory(),
+		f = fixture(),
+		image = await imageFixture(),
+		step = { ...newStep("Included"), slideRef: "L1-S04", imageId: image.id, imageAlt: "Example" },
+		other = { ...newStep("Omitted"), slideRef: "PRIVATE_OMITTED_SLIDE" };
+	const lesson = {
+		...newLesson(),
+		lessonRef: "Course 1 / Lesson 1",
+		steps: [step, other],
+		assets: [image],
+	};
+	const result = await f.service.exportGuide(lesson, [step.id], async () => root);
+	if (result.status !== "exported") throw new Error("export");
+	const bytes = await fs.readFile(path.join(result.path, "lesson-mapping.json")),
+		mapping = JSON.parse(bytes.toString("utf8")),
+		report = JSON.parse(await fs.readFile(path.join(result.path, "export-report.json"), "utf8"));
+	expect(mapping).toMatchObject({
+		format: "openscreen-lesson-mapping",
+		lessonRef: "Course 1 / Lesson 1",
+		steps: [
+			{
+				number: 1,
+				stepId: step.id,
+				slideRef: "L1-S04",
+				image: { path: `assets/${image.id}.jpg`, alt: "Example" },
+			},
+		],
+	});
+	expect(mapping.steps).toHaveLength(1);
+	expect(bytes.toString("utf8")).not.toContain("PRIVATE_OMITTED_SLIDE");
+	expect(
+		report.files.find((item: { path: string }) => item.path === "lesson-mapping.json"),
+	).toEqual({
+		path: "lesson-mapping.json",
+		bytes: bytes.length,
+		sha256: await sha256(bytes),
+	});
+	// A lesson with no references still gets the listing, with no invented destinations.
+	const bare = { ...newLesson(), steps: [newStep("Only")] };
+	const plain = await f.service.exportGuide(bare, [bare.steps[0].id], async () => root);
+	if (plain.status !== "exported") throw new Error("export");
+	const listing = JSON.parse(
+		await fs.readFile(path.join(plain.path, "lesson-mapping.json"), "utf8"),
+	);
+	expect(listing.lessonRef).toBeUndefined();
+	expect(listing.steps[0].slideRef).toBeUndefined();
+});

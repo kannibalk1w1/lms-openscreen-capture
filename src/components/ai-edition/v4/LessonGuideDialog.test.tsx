@@ -522,3 +522,35 @@ it("closing the guide asks before discarding an unsaved package draft", async ()
 	fireEvent.click(screen.getByRole("button", { name: /^Close$/ }));
 	expect(onClose).toHaveBeenCalledTimes(1);
 });
+it("records optional LMS references without demoting a reviewed step, and clears them when emptied", async () => {
+	const lessonExport = vi.fn<NonNullable<LessonApi["lessonExport"]>>(async () => ({
+		success: true as const,
+		result: { status: "exported" as const, path: "/new/guide", steps: 1, images: 0 },
+	}));
+	vi.stubGlobal("electronAPI", { lessonExport });
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByLabelText("I have reviewed this step"));
+	fireEvent.change(screen.getByLabelText("LMS lesson reference (optional)"), {
+		target: { value: "RPG Course 1 / Lesson 1" },
+	});
+	fireEvent.change(screen.getByLabelText("LMS slide reference (optional)"), {
+		target: { value: "slide 12" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Export selected offline guide" }));
+	await waitFor(() => expect(lessonExport).toHaveBeenCalledTimes(1));
+	expect(lessonExport.mock.calls[0][0]).toMatchObject({
+		lessonRef: "RPG Course 1 / Lesson 1",
+		steps: [{ slideRef: "slide 12", status: "reviewed" }],
+	});
+	fireEvent.change(screen.getByLabelText("LMS slide reference (optional)"), {
+		target: { value: "" },
+	});
+	fireEvent.change(screen.getByLabelText("LMS lesson reference (optional)"), {
+		target: { value: "" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Export selected offline guide" }));
+	await waitFor(() => expect(lessonExport).toHaveBeenCalledTimes(2));
+	expect(lessonExport.mock.calls[1][0].lessonRef).toBeUndefined();
+	expect(lessonExport.mock.calls[1][0].steps[0].slideRef).toBeUndefined();
+});
