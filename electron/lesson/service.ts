@@ -110,12 +110,12 @@ export class LessonService {
 		if (!target) return { status: "cancelled" as const };
 		// New paths only: never replace a user's lesson, project or existing export.
 		await fs.writeFile(target, JSON.stringify(lesson, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-		return { status: "saved" as const, path: target };
+		return { status: "saved" as const, path: target, lesson };
 	}
 	async openEditable(pickPath: () => Promise<string | null>) {
 		const target = await pickPath();
 		if (!target) return { status: "cancelled" as const };
-		return { status: "opened" as const, lesson: await readLessonFile(target) };
+		return { status: "opened" as const, path: target, lesson: await readLessonFile(target) };
 	}
 	async exportGuide(input: unknown, ids: unknown, pickDirectory: () => Promise<string | null>) {
 		const selection = z.array(z.string().uuid()).min(1).max(200).parse(ids);

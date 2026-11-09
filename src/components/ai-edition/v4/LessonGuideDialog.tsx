@@ -8,7 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { useScopedT } from "@/contexts/I18nContext";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
-import { type LessonErrorCode, LessonOperationError } from "@/lib/lesson/api";
+import {
+	type LessonErrorCode,
+	type LessonFileHandle,
+	LessonOperationError,
+} from "@/lib/lesson/api";
 import {
 	attachLessonIllustration,
 	attachLessonMediaSelection,
@@ -35,6 +39,7 @@ import {
 	validateLesson,
 	validateLessonImage,
 } from "@/lib/lesson/schema";
+import { setLessonUnsavedWork } from "@/lib/lesson/unsavedWork";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
 import { LessonPackagePanel } from "./LessonPackagePanel";
@@ -52,6 +57,18 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		if (!packageDraft || window.confirm(t("lesson.package.discardConfirm"))) onClose();
 	};
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
+	// The lesson object last opened from or saved to a file; any later edit is unsaved work.
+	const [baseline, setBaseline] = useState<LessonManifest | null>(lesson);
+	const [file, setFile] = useState<LessonFileHandle | null>(null);
+	const lessonDirty = lesson !== baseline;
+	useEffect(() => {
+		setLessonUnsavedWork("lesson", lessonDirty);
+		return () => setLessonUnsavedWork("lesson", false);
+	}, [lessonDirty]);
+	useEffect(() => {
+		setLessonUnsavedWork("package", packageDraft);
+		return () => setLessonUnsavedWork("package", false);
+	}, [packageDraft]);
 	const [query, setQueryValue] = useState(emptyLessonQuery);
 	const [pinned, setPinned] = useState<string[]>([]);
 	const [editNotice, setEditNotice] = useState("");
@@ -274,7 +291,8 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						<button
 							type="button"
 							disabled={!window.electronAPI?.lessonOpen}
-							onClick={() =>
+							onClick={() => {
+								if (lessonDirty && !window.confirm(t("lesson.replaceConfirm"))) return;
 								void run(async (current) => {
 									const result = await window.electronAPI.lessonOpen!();
 									if (!current()) return;
@@ -283,10 +301,12 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										const valid = await validateLesson(result.result.lesson);
 										if (!current()) return;
 										replaceLesson(valid);
+										setBaseline(valid);
+										setFile(result.result.file ?? null);
 										setNotice(t("lesson.opened"));
 									}
-								})
-							}
+								});
+							}}
 						>
 							{t("lesson.open")}
 						</button>
@@ -298,19 +318,59 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									const result = await window.electronAPI.lessonSave!(lesson);
 									if (!current()) return;
 									if (!result.success) throw new LessonOperationError(result.code);
-									if (result.result.status === "saved")
+									if (result.result.status === "saved") {
+										// Later edits made while saving stay marked as unsaved.
+										setBaseline(lesson);
+										setFile(result.result.file ?? null);
 										setNotice(t("lesson.saved", { path: result.result.path }));
+									}
 								})
 							}
 						>
 							{t("lesson.save")}
 						</button>
+						<button
+							type="button"
+							disabled={!file || !lessonDirty || !window.electronAPI?.lessonSaveCurrent}
+							onClick={() =>
+								void run(async (current) => {
+									if (!file) return;
+									const result = await window.electronAPI.lessonSaveCurrent!({
+										token: file.token,
+										lesson,
+									});
+									if (!current()) return;
+									if (!result.success) {
+										// The old file is untouched and this permission is spent; the work stays here.
+										setFile(null);
+										throw new LessonOperationError(result.code);
+									}
+									setBaseline(lesson);
+									setFile(result.result.file);
+									setNotice(t("lesson.savedCurrent", { path: result.result.path }));
+								})
+							}
+						>
+							{t("lesson.saveCurrent")}
+						</button>
 					</div>
+					<p role="status">
+						{lessonDirty
+							? file
+								? t("lesson.dirtyFile", { path: file.path })
+								: t("lesson.dirtyNoFile")
+							: file
+								? t("lesson.cleanFile", { path: file.path })
+								: ""}
+					</p>
 					<LocalLessonDraftControls
 						key={lesson.id}
 						lesson={lesson}
 						onRestore={(valid) => {
 							replaceLesson(valid);
+							// A restored copy is not a file on disk: unsaved until explicitly saved.
+							setBaseline(null);
+							setFile(null);
 							setNotice(t("lesson.drafts.restored"));
 						}}
 					/>

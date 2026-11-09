@@ -554,3 +554,84 @@ it("records optional LMS references without demoting a reviewed step, and clears
 	expect(lessonExport.mock.calls[1][0].lessonRef).toBeUndefined();
 	expect(lessonExport.mock.calls[1][0].steps[0].slideRef).toBeUndefined();
 });
+const fileLesson = () => ({ ...newLesson("From file"), steps: [newStep("Opened step")] });
+it("marks unsaved lesson work, tells main, and saves edits back to the opened file by its permission only", async () => {
+	const opened = fileLesson(),
+		handle = { token: crypto.randomUUID(), path: "/chosen/lesson.json" };
+	const lessonOpen = vi.fn<NonNullable<LessonApi["lessonOpen"]>>(async () => ({
+		success: true as const,
+		result: { status: "opened" as const, lesson: opened, file: handle },
+	}));
+	const lessonSaveCurrent = vi.fn<NonNullable<LessonApi["lessonSaveCurrent"]>>(async () => ({
+		success: true as const,
+		result: { status: "saved" as const, path: handle.path, file: handle },
+	}));
+	const setLessonUnsavedWork = vi.fn();
+	vi.stubGlobal("electronAPI", { lessonOpen, lessonSaveCurrent, setLessonUnsavedWork });
+	show();
+	const sameFile = () =>
+		screen.getByRole("button", { name: "Save changes to the opened file" }) as HTMLButtonElement;
+	expect(sameFile().disabled).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await screen.findByText("All lesson changes are saved in: /chosen/lesson.json");
+	expect(sameFile().disabled).toBe(true);
+	fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Edited text" } });
+	await screen.findByText("Unsaved lesson changes. Last saved file: /chosen/lesson.json");
+	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(true);
+	fireEvent.click(sameFile());
+	await screen.findByText("Saved to the same file: /chosen/lesson.json");
+	expect(lessonSaveCurrent).toHaveBeenCalledTimes(1);
+	const sent = lessonSaveCurrent.mock.calls[0][0];
+	expect(Object.keys(sent).sort()).toEqual(["lesson", "token"]);
+	expect(sent.token).toBe(handle.token);
+	expect(sent.lesson.steps[0].instructions).toBe("Edited text");
+	await screen.findByText("All lesson changes are saved in: /chosen/lesson.json");
+	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(false);
+});
+it("a refused same-file save keeps every edit, stays marked unsaved and falls back to saving a new copy", async () => {
+	const handle = { token: crypto.randomUUID(), path: "/chosen/lesson.json" };
+	vi.stubGlobal("electronAPI", {
+		lessonOpen: vi.fn(async () => ({
+			success: true as const,
+			result: { status: "opened" as const, lesson: fileLesson(), file: handle },
+		})),
+		lessonSaveCurrent: vi.fn(async () => ({
+			success: false as const,
+			code: "lesson-file-changed" as const,
+		})),
+	});
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await screen.findByText("All lesson changes are saved in: /chosen/lesson.json");
+	fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Must survive" } });
+	fireEvent.click(screen.getByRole("button", { name: "Save changes to the opened file" }));
+	await screen.findByText(/so it was not replaced. Your work is still here/);
+	expect((screen.getByLabelText("Instructions") as HTMLTextAreaElement).value).toBe("Must survive");
+	await screen.findByText("Unsaved lesson changes. This lesson has not been saved to a file.");
+	expect(
+		(screen.getByRole("button", { name: "Save changes to the opened file" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
+});
+it("asks before opening another lesson over unsaved work and keeps the work when declined", async () => {
+	const lessonOpen = vi.fn<NonNullable<LessonApi["lessonOpen"]>>(async () => ({
+		success: true as const,
+		result: { status: "opened" as const, lesson: fileLesson() },
+	}));
+	vi.stubGlobal("electronAPI", { lessonOpen });
+	const confirm = vi.fn(() => false);
+	vi.stubGlobal("confirm", confirm);
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await screen.findByDisplayValue("Opened step");
+	expect(confirm).not.toHaveBeenCalled();
+	fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Unsaved" } });
+	await screen.findByText("Unsaved lesson changes. This lesson has not been saved to a file.");
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	expect(confirm).toHaveBeenCalledTimes(1);
+	expect(lessonOpen).toHaveBeenCalledTimes(1);
+	expect((screen.getByLabelText("Instructions") as HTMLTextAreaElement).value).toBe("Unsaved");
+	confirm.mockReturnValue(true);
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await waitFor(() => expect(lessonOpen).toHaveBeenCalledTimes(2));
+});

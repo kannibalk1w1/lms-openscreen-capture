@@ -267,6 +267,8 @@ interface Window {
 		lessonPlanRange?: import("../src/lib/lesson/api").LessonApi["lessonPlanRange"];
 		lessonFrame?: import("../src/lib/lesson/api").LessonApi["lessonFrame"];
 		lessonSave?: import("../src/lib/lesson/api").LessonApi["lessonSave"];
+		lessonSaveCurrent?: import("../src/lib/lesson/api").LessonApi["lessonSaveCurrent"];
+		setLessonUnsavedWork?: (unsaved: boolean) => void;
 		lessonPackageOpen?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageOpen"];
 		lessonPackageCopy?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageCopy"];
 		lessonPackageReseal?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageReseal"];

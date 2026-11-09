@@ -19,6 +19,8 @@ export type LessonErrorCode =
 	| "range-export-cancelled"
 	| "range-export-source-unavailable"
 	| "destination-exists"
+	| "lesson-file-changed"
+	| "lesson-file-unavailable"
 	| "local-draft-limit"
 	| "local-draft-unavailable";
 export class LessonOperationError extends Error {
@@ -29,6 +31,11 @@ export class LessonOperationError extends Error {
 export type LessonResult<T> =
 	| { success: true; result: T }
 	| { success: false; code: LessonErrorCode };
+/** Opaque permission for one explicitly chosen file, plus its path for display only. */
+export interface LessonFileHandle {
+	token: string;
+	path: string;
+}
 export interface LessonApi {
 	lessonConfirmRange?: (input: {
 		operationId: string;
@@ -46,9 +53,21 @@ export interface LessonApi {
 	}) => Promise<LessonResult<LessonImage>>;
 	lessonSave?: (
 		input: LessonManifest,
-	) => Promise<LessonResult<{ status: "saved"; path: string } | { status: "cancelled" }>>;
+	) => Promise<
+		LessonResult<
+			{ status: "saved"; path: string; file?: LessonFileHandle } | { status: "cancelled" }
+		>
+	>;
+	/** Update the file main last opened or saved for this window; the renderer names no path. */
+	lessonSaveCurrent?: (input: {
+		token: string;
+		lesson: LessonManifest;
+	}) => Promise<LessonResult<{ status: "saved"; path: string; file: LessonFileHandle }>>;
 	lessonOpen?: () => Promise<
-		LessonResult<{ status: "opened"; lesson: LessonManifest } | { status: "cancelled" }>
+		LessonResult<
+			| { status: "opened"; lesson: LessonManifest; file?: LessonFileHandle }
+			| { status: "cancelled" }
+		>
 	>;
 	lessonExport?: (
 		input: LessonManifest,

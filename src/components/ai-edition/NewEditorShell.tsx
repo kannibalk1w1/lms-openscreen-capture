@@ -60,6 +60,7 @@ import {
 	totalVirtualDuration,
 } from "@/lib/ai-edition/timeline/virtual-preview";
 import { firstTimelineBusyView } from "@/lib/ai-edition/transcription/status";
+import { hasLessonUnsavedWork } from "@/lib/lesson/unsavedWork";
 import { isTextEditingTarget, matchesShortcut } from "@/lib/shortcuts";
 import type { TypingReviewTarget } from "@/lib/typing/review";
 import { nativeBridgeClient } from "@/native";
@@ -378,12 +379,15 @@ export function NewEditorShell() {
 
 	const promptUnsaved = useCallback(
 		(action: "close" | "new" | "open" | "record"): Promise<UnsavedChoice> => {
+			// Lesson-guide work is separate from the project and would be lost by any of these actions.
+			if (hasLessonUnsavedWork() && !window.confirm(tTimeline("lesson.leaveConfirm")))
+				return Promise.resolve("cancel");
 			if (!dirty) return Promise.resolve("discard");
 			return new Promise<UnsavedChoice>((resolve) => {
 				setUnsavedPrompt({ action, resolve });
 			});
 		},
-		[dirty],
+		[dirty, tTimeline],
 	);
 
 	const primaryAssetPath =

@@ -1088,6 +1088,13 @@ let isCloseConfirmInFlight = false;
 ipcMain.on("set-has-unsaved-changes", (_, hasChanges: boolean) => {
 	editorHasUnsavedChanges = hasChanges;
 });
+// Separate from project dirtiness: unsaved lesson-guide work asks before closing, but must never
+// change the saved-project authority that lesson media operations check.
+let lessonHasUnsavedWork = false;
+ipcMain.on("set-lesson-unsaved-work", (event, unsaved: unknown) => {
+	if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents)
+		lessonHasUnsavedWork = unsaved === true;
+});
 
 // Quit requested from the editor's in-app File menu. Mirrors the native
 // menu's role:"quit" so the unsaved-changes close flow still runs.
@@ -1119,9 +1126,15 @@ function createEditorWindowWrapper() {
 	}
 	mainWindow = createEditorWindow();
 	editorHasUnsavedChanges = false;
+	lessonHasUnsavedWork = false;
 
 	mainWindow.on("close", (event) => {
-		if (isForceClosing || !editorHasUnsavedChanges || isCloseConfirmInFlight) return;
+		if (
+			isForceClosing ||
+			(!editorHasUnsavedChanges && !lessonHasUnsavedWork) ||
+			isCloseConfirmInFlight
+		)
+			return;
 
 		event.preventDefault();
 		isCloseConfirmInFlight = true;
