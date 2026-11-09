@@ -3,8 +3,12 @@
 This coherent prerequisite resumes the roadmap from `7b6f4a73f6e3c700d968114ba3f891f8c1ed2a07`
 on `lesson-capture/input-boundaries`. Source identity is already delivered and
 accepted through actual review26 at d017e4b8 within bounded Linux content-equality
-observations. This slice is locally implemented; coordinator exact-SHA review and
-private feature push remain pending. Main stays fd2775e2dbc540306b46085eb0301fa06a6a3aaa.
+observations. Actual [review27](CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts
+1dad5a7c and [review28](CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts follow-up
+897ddcebabd16c1c572f0d99c3274afb5ac5677d with no new High/Medium/Low findings.
+The follow-up closes the downgrade/guard/wiring/wording findings; hash navigation
+retains its tested fail-closed limitation. Coordinator owns the private checkpoint
+push. Main stays fd2775e2dbc540306b46085eb0301fa06a6a3aaa.
 
 ## Delivered workflow
 

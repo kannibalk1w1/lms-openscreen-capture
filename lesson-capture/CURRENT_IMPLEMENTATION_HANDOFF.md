@@ -1,4 +1,21 @@
-# Review27 follow-up — 9 November 2026
+# Accepted editor authoring checkpoint — 9 November 2026
+
+Actual [review28](CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts exact
+897ddcebabd16c1c572f0d99c3274afb5ac5677d against1dad5a7c with no new
+High/Medium/Low findings. L27-1/T27-1 and N27-1/N27-2 are closed; N27-3 remains
+the documented/tested fail-closed navigation limit. Independent146focused/12files,
+both TS, Vite, lint/i18n pass;24own mutants yield21kills and3known survivors.
+Real production Electron IPC re-probe repeats prior results; no GUI-click/native-
+picker/physical/other-platform acceptance is inferred. Preservation inventories
+match. Full5829/436 belongs to worker897ddceb, not a fresh reviewer run.
+
+User authorizes autonomous roadmap continuation with interruptions only when
+input is required. Coordinator checkpoints/pushes accepted work, then dispatches
+the next shared native-render ownership prerequisite. One implementation writer,
+exact-SHA Claude review, private feature only; main staysfd2775e2. No paid API,
+auth changes, real lesson edits, publication or evidence overwrite is authorized.
+
+## Historical review27 follow-up account
 
 Actual [review27](CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts1dad5a7c with no
 High/Medium. The sole writer implements the requested bounded

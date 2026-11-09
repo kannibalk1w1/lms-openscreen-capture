@@ -1,5 +1,12 @@
 # Review27 bounded follow-up — 9 November 2026
 
+Coordinator disposition: actual [review28](CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md)
+accepts897ddcebabd16c1c572f0d99c3274afb5ac5677d with no new High/Medium/Low.
+L27-1/T27-1/N27-1/N27-2 closed; N27-3 remains documented/tested fail-closed.
+Independent146focused/12files, both TS, Vite, lint/i18n and real Electron IPC
+re-probe pass;24mutants yield21kills and3known survivors. Original worker
+account below is preserved; no GUI-click/native-picker/physical acceptance added.
+
 Actual [review27](CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts exact
 1dad5a7ccf62032d0e628806524cae77400a8e32 with no High/Medium. Its original report
 is preserved verbatim and included in this checkpoint. This follow-up addresses
