@@ -1,4 +1,4 @@
-import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
+import { LessonOperationError, rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
 import {
 	addLessonStepsFile,
 	createLessonFile,
@@ -8,6 +8,7 @@ import {
 	updateLessonStepFile,
 } from "../lesson/fileCommands";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
+import { illustrateLessonStepFile, type LessonFrameRenderer } from "../lesson/fileIllustrate";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import {
@@ -26,6 +27,7 @@ export async function runLessonCommand(
 		signal?: AbortSignal;
 		lifecycle?: LessonFileLifecycle;
 		render?: LessonFileRangeRenderer;
+		renderFrames?: LessonFrameRenderer;
 	} = {},
 ): Promise<number> {
 	try {
@@ -42,6 +44,34 @@ export async function runLessonCommand(
 				command.action === "package"
 					? await createLessonPackage(command.request, authority)
 					: await verifyLessonPackage({ directory: command.directory }, authority);
+			out(
+				JSON.stringify(
+					command.json ? { event: "done", result } : result,
+					null,
+					command.json ? undefined : 2,
+				) + "\n",
+			);
+			return 0;
+		}
+		if (command.action === "illustrate") {
+			let frames = options.renderFrames;
+			if (!frames) {
+				const { CompositorViewService } = await import(
+					"../native-bridge/services/compositorViewService"
+				);
+				const service = new CompositorViewService();
+				frames = (...args) => service.renderFrames(...args);
+			}
+			const result = await illustrateLessonStepFile(
+				command.request,
+				{
+					signal: options.signal,
+					assertCurrent: () => {
+						/* Explicit launch and file arguments supply CLI authority; no editor state is claimed. */
+					},
+				},
+				frames,
+			);
 			out(
 				JSON.stringify(
 					command.json ? { event: "done", result } : result,
@@ -128,7 +158,10 @@ export async function runLessonCommand(
 		const error =
 			failure instanceof LessonPackageError || failure instanceof LessonFileRangeError
 				? failure.code
-				: "lesson-file-operation-failed";
+				: // Fixed codes only, such as a trimmed time; still no paths, payloads or raw errors.
+					command.action === "illustrate" && failure instanceof LessonOperationError
+					? failure.code
+					: "lesson-file-operation-failed";
 		out(
 			(command.json
 				? JSON.stringify({

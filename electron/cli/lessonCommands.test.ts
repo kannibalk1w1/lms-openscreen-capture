@@ -409,3 +409,198 @@ it.each([
 ])("refuses the incomplete or contradictory step command %j", (...args) => {
 	expect(parseCliArgs(["electron", "app", "lesson", ...args], 2, root)?.kind).toBe("error");
 });
+it.each([
+	[],
+	[
+		"--project",
+		"p.openscreen",
+		"--project-id",
+		"p",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--at",
+		"1",
+		"--alt",
+		"A",
+		"--out",
+		"b.json",
+	],
+	[
+		"--project",
+		"p.openscreen",
+		"--project-id",
+		"p",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--at",
+		"soon",
+		"--alt",
+		"A",
+		"--source",
+		"/s.mp4",
+		"--out",
+		"b.json",
+	],
+	[
+		"--project",
+		"p.openscreen",
+		"--project-id",
+		"p",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--at",
+		"1",
+		"--source",
+		"/s.mp4",
+		"--out",
+		"b.json",
+	],
+	[
+		"--project",
+		"p.openscreen",
+		"--project-id",
+		"p",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--at",
+		"1",
+		"--alt",
+		"A",
+		"--source",
+		"/s.mp4",
+	],
+	[
+		"--project",
+		"p.openscreen",
+		"--project-id",
+		"p",
+		"--step",
+		"00000000-0000-4000-8000-000000000000",
+		"--at",
+		"1",
+		"--at",
+		"2",
+		"--alt",
+		"A",
+		"--source",
+		"/s.mp4",
+		"--out",
+		"b.json",
+	],
+])("refuses the incomplete illustrate command %j, and parses a complete one", (...args) => {
+	expect(
+		parseCliArgs(["electron", "app", "lesson", "illustrate", "a.json", ...args], 2, root)?.kind,
+	).toBe("error");
+	const complete = parseCliArgs(
+		[
+			"electron",
+			"app",
+			"lesson",
+			"illustrate",
+			"a.json",
+			"--project",
+			"p.openscreen",
+			"--project-id",
+			"p",
+			"--step",
+			"00000000-0000-4000-8000-000000000000",
+			"--at",
+			"2.5",
+			"--alt",
+			"Described",
+			"--source",
+			"/s.mp4",
+			"--out",
+			"b.json",
+		],
+		2,
+		root,
+	);
+	expect(complete).toMatchObject({
+		kind: "lesson",
+		action: "illustrate",
+		request: {
+			manifestPath: path.join(root, "a.json"),
+			projectPath: path.join(root, "p.openscreen"),
+			rulerSec: 2.5,
+			sourcePaths: ["/s.mp4"],
+			outputPath: path.join(root, "b.json"),
+		},
+	});
+});
+it("illustrate reports a fixed reason such as a trimmed time and otherwise the generic failure", async () => {
+	const step = newStep("Shown");
+	const lessonPath = path.join(root, "lesson.json"),
+		projectPath = path.join(root, "project.openscreen"),
+		source = path.join(root, "source.mp4");
+	await fs.writeFile(lessonPath, JSON.stringify({ ...newLesson(), steps: [step] }));
+	await fs.writeFile(source, "PRIVATE_VIDEO_BYTES");
+	const { createEmptyDocument } = await import("../../src/lib/ai-edition/schema");
+	const doc = createEmptyDocument({ projectId: "p", title: "PRIVATE_PROJECT_TITLE" });
+	doc.assets = [{ id: "a", kind: "video", label: "S", originalPath: source, cameraTrack: null }];
+	doc.timeline.clips = [
+		{
+			id: "c",
+			assetId: "a",
+			sourceStartSec: 0,
+			sourceEndSec: 5,
+			timelineStartSec: 0,
+			timelineEndSec: 5,
+			origin: "user",
+			wordRefs: [],
+			reason: "fixture",
+		},
+	];
+	await fs.writeFile(projectPath, JSON.stringify(doc));
+	const run = async (at: string, sourcePath: string) => {
+		const chunks: string[] = [];
+		const command = parseCliArgs(
+			[
+				"electron",
+				"app",
+				"lesson",
+				"illustrate",
+				"lesson.json",
+				"--project",
+				"project.openscreen",
+				"--project-id",
+				"p",
+				"--step",
+				step.id,
+				"--at",
+				at,
+				"--alt",
+				"Described",
+				"--source",
+				sourcePath,
+				"--out",
+				"out.json",
+				"--json",
+			],
+			2,
+			root,
+		);
+		if (command?.kind !== "lesson") throw new Error(JSON.stringify(command));
+		const renderFrames = vi.fn(async () => null);
+		const code = await runLessonCommand(command, (value) => chunks.push(value), { renderFrames });
+		return { code, text: chunks.join(""), renderFrames };
+	};
+	const trimmed = await run("9", source);
+	expect(trimmed.code).toBe(1);
+	expect(JSON.parse(trimmed.text)).toEqual({ event: "error", message: "frame-unavailable" });
+	expect(trimmed.renderFrames).not.toHaveBeenCalled();
+	const ungranted = await run("2", lessonPath);
+	expect(JSON.parse(ungranted.text)).toEqual({
+		event: "error",
+		message: "lesson-file-operation-failed",
+	});
+	const noFrame = await run("2", source);
+	expect(JSON.parse(noFrame.text)).toEqual({
+		event: "error",
+		message: "lesson-file-operation-failed",
+	});
+	const said = trimmed.text + ungranted.text + noFrame.text;
+	expect(said).not.toMatch(/PRIVATE|source\.mp4/);
+	expect(said).not.toContain(root);
+	expect(await fs.readdir(root)).not.toContain("out.json");
+});

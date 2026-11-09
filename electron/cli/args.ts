@@ -38,6 +38,10 @@ import {
 	updateLessonStepFileSchema,
 } from "../lesson/fileContracts";
 import {
+	type IllustrateLessonStepFileRequest,
+	illustrateLessonStepFileSchema,
+} from "../lesson/fileIllustrate";
+import {
 	type ConfirmLessonFileRangeRequest,
 	confirmLessonFileRangeSchema,
 } from "../lesson/fileRangeContracts";
@@ -49,6 +53,7 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "export-range"; request: ExportLessonRangeFileRequest }
 	| { action: "new"; request: CreateLessonFileRequest }
 	| { action: "add-step"; request: AddLessonStepsFileRequest }
+	| { action: "illustrate"; request: IllustrateLessonStepFileRequest }
 	| { action: "edit-step"; request: UpdateLessonStepFileRequest }
 	| { action: "remove-step"; request: RemoveLessonStepFileRequest }
 	| { action: "query"; query: LessonQuery }
@@ -140,6 +145,11 @@ Usage:
                      [--slide-ref <label> | --clear-slide-ref] [--code-language <name> --code-text <text> | --clear-code]
                      --out <new-lesson.json> [--json]
                             Change one step's text and save a new copy; changed teaching text becomes draft
+  openscreen lesson illustrate <lesson.json> --project <saved.openscreen> --project-id <ID> --step <UUID>
+                     --at <ruler-seconds> --alt <image description> --source <absolute-file> [--source ...]
+                     --out <new-lesson.json> [--json]
+                            Attach one composed frame of the saved project to a step and save a new copy;
+                            every source file the project plays must be named; the step becomes draft
   openscreen lesson remove-step <lesson.json> --step <UUID> --out <new-lesson.json> [--json]
                             Remove one step and save a new copy; the selected file is unchanged
   openscreen lesson query <lesson.json> [--title <text>] [--status <all|draft|reviewed>]
@@ -635,6 +645,44 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
 
+	if (action === "illustrate") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const single = ["--project", "--project-id", "--step", "--at", "--alt", "--out"];
+		const values: Record<string, string> = {};
+		const sourcePaths: string[] = [];
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (flag !== "--source" && (!single.includes(flag) || flag in values))
+				throw new Error("Unexpected lesson option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			if (flag === "--source") sourcePaths.push(resolvePath(value, cwd));
+			else values[flag] = value;
+		}
+		const manifestPath = resolvePath(file, cwd);
+		const at = values["--at"];
+		const parsed = illustrateLessonStepFileSchema.safeParse({
+			manifestPath,
+			projectPath:
+				values["--project"] === undefined ? undefined : resolvePath(values["--project"], cwd),
+			projectId: values["--project-id"],
+			stepId: values["--step"],
+			rulerSec: at !== undefined && /^\d+(\.\d+)?$/.test(at) ? Number(at) : undefined,
+			imageAlt: values["--alt"],
+			sourcePaths,
+			outputPath: values["--out"] === undefined ? undefined : resolvePath(values["--out"], cwd),
+		});
+		if (!parsed.success)
+			throw new Error(
+				"lesson illustrate requires --project, --project-id, --step, --at <seconds>, --alt <description>, 1–8 --source files and --out <new-lesson.json>",
+			);
+		return { kind: "lesson", action, manifestPath, request: parsed.data, json };
+	}
 	if (action === "edit-step" || action === "remove-step") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
 		const valued =

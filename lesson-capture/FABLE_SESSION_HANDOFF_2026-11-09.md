@@ -312,3 +312,50 @@ The writer still does not delete anything.
 | 2 controls (`slice10/`): the writer naming the folder after scope loss; the path allowed on every route | 1 killed; 1 survived, because the static-copy route never produces such a path, so the route condition is a second layer only |
 
 Not driven in the real app: I did not force a late failure there. Full suite not rerun.
+
+Slice 10 commit: `ddc38561`.
+
+### Slice 11 — headless step illustration from a saved project frame (CLI)
+
+**What changed.** `openscreen lesson illustrate <lesson.json> --project <saved.openscreen>
+--project-id <ID> --step <UUID> --at <ruler-seconds> --alt <description> --source <file>
+[--source ...] --out <new-lesson.json>` attaches one composed frame of a saved project to a
+step, the headless form of the editor's "Illustrate from current saved playhead". With slices
+6 and 7 an agent can now build an illustrated lesson and export its guide without the GUI.
+
+**How.** `electron/lesson/fileIllustrate.ts` reuses the existing pieces: the pinned
+lesson-and-project reader used by `confirm-range` and `export-range`, `LessonService.captureFrame`
+(same trim, speed and fingerprint rules as the editor), and `attachLessonIllustration`. Rules:
+
+- Every source file the project's clips play must be named with `--source` and must not be
+  reached through a symlink; otherwise nothing is rendered.
+- A description is required. The step returns to `draft`, so a person still reviews the
+  pixels and the text. A second illustration replaces the first.
+- A new file only; the lesson and project files are re-checked after rendering and again
+  before writing.
+- Refusals print a fixed code. For this command only, the CLI passes through the fixed
+  lesson codes (for example `frame-unavailable` for a time inside a cut), so the caller can
+  tell why; paths and raw errors are still never printed.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/lesson/fileIllustrate.test.ts electron/cli/lessonCommands.test.ts` (11 + 8 new cases) | 42 tests pass, 0 skipped |
+| Full suite, `npm run test -- --maxWorkers=4` (covers slices 9, 10 and 11) | 6,255 tests / 458 files pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npx vite build`; required startup smoke | pass; 35 baseline; pass; `success: true` |
+| 4 controls (`slice11/`): any source accepted; symlinked source accepted; description not recorded; file re-check after rendering removed | 3 killed; the last survived because the second re-check before writing catches the same change |
+| Real production CLI under Xvfb with the real native compositor (`slice11/cli-illustrate.jsonl`), reading the preserved proof project and video without changing them | a time inside the project's cut returns `frame-unavailable`; a valid time saves a lesson with a 640×360 JPEG (`slice11/illustration-frame.jpg`); a request naming the wrong source is refused; both preserved inputs still match their hashes |
+| Real CLI `lesson export` of that illustrated lesson | guide folder with `assets/<id>.jpg`; `lesson-mapping.json` lists the image and its description |
+
+**Limits**
+
+- CLI only. There is no MCP tool for illustration yet; adding one needs the frame renderer
+  passed through both MCP bootstraps.
+- Linux software rendering under Xvfb with a synthetic proof clip. Not a recording of a real
+  application, and no other platform.
+- This command and the editor path cap the frame at 1280 px wide and 1 MiB.
+- An agent choosing a frame is not evidence that the frame shows the step; the step is draft
+  for that reason.
+- `LESSON_CAPTURE_COMMANDS.md` (the earlier command reference) does not describe the commands
+  added in slices 6, 7 and 11; the CLI help text and this handoff do.
