@@ -47,6 +47,10 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 	const document = useProjectStore((s) => s.document),
 		projectId = useProjectStore((s) => s.projectId);
 	const projectDirty = useProjectStore((s) => s.dirty);
+	const [packageDraft, setPackageDraft] = useState(false);
+	const requestClose = () => {
+		if (!packageDraft || window.confirm(t("lesson.package.discardConfirm"))) onClose();
+	};
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
 	const [query, setQueryValue] = useState(emptyLessonQuery);
 	const [pinned, setPinned] = useState<string[]>([]);
@@ -206,7 +210,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		<Dialog
 			open={open}
 			onOpenChange={(value) => {
-				if (!value && !busy) onClose();
+				if (!value && !busy) requestClose();
 			}}
 		>
 			<DialogContent style={{ maxWidth: 960, maxHeight: "90vh", overflowY: "auto" }}>
@@ -215,7 +219,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					<DialogDescription>{t("lesson.scope")}</DialogDescription>
 				</DialogHeader>
 				<p>{t("lesson.unsaved")}</p>
-				<LessonPackagePanel />
+				<LessonPackagePanel onDraftChange={setPackageDraft} />
 				<fieldset
 					className={styles.form}
 					disabled={busy}

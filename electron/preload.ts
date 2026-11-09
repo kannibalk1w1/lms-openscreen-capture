@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	lessonSave: (input: unknown) => ipcRenderer.invoke("lesson:save", input),
 	lessonPackageOpen: (id: string) => ipcRenderer.invoke("lesson:package-open", id),
 	lessonPackageCopy: (input: unknown) => ipcRenderer.invoke("lesson:package-copy", input),
+	lessonPackageReseal: (input: unknown) => ipcRenderer.invoke("lesson:package-reseal", input),
 	lessonPackageCancel: (id: string) => ipcRenderer.invoke("lesson:package-cancel", id),
 	lessonPackageRelease: (token: string) => ipcRenderer.invoke("lesson:package-release", token),
 	lessonOpen: () => ipcRenderer.invoke("lesson:open"),

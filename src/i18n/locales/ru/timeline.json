@@ -460,7 +460,7 @@
 			"saved": "New editable copy saved: {{path}}. Use Open editable lesson to edit it; your current lesson is unchanged.",
 			"noImages": "No images were included.",
 			"imageProvenance": "Images were explicitly included with external source identifiers and timing. Original source projects remain unavailable.",
-			"videosReadOnly": "This package contains rendered videos. Their bindings are preserved for inspection; editable copying and resealing with video are not supported yet. No video playback is provided here.",
+			"videosReadOnly": "Rendered videos can be retained when saving a new package. Standalone editable text/image copying still refuses videos. Playback and native video editing are not supported here; embedded audio is not verified.",
 			"video": "Included rendered video: {{frames}} frames, {{seconds}} seconds at 30 fps. Embedded audio is not verified.",
 			"copy": "Save a new editable text and image copy",
 			"copyScope": "Static packages only. The new file preserves all included text, code and embedded images with derived provenance. Open it explicitly to edit. The original package and its receipt stay unchanged; this copy is not a resealed package.",
@@ -472,8 +472,23 @@
 				"lesson-package-tool-unavailable": "The video checking tool is unavailable. Reinstall or update OpenScreen, or ask your administrator to check the configured FFmpeg tool, then retry.",
 				"lesson-package-busy": "Another package operation is still finishing. Wait, then retry.",
 				"lesson-package-video-copy-unsupported": "Editable copying with video bindings is not supported yet. The package remains read-only.",
-				"destination-exists": "That file already exists. Choose a new filename; existing files are never replaced."
-			}
+				"destination-exists": "That file already exists. Choose a new filename; existing files are never replaced.",
+				"lesson-package-edit-unsupported": "This draft changes unsupported package fields. Keep all original step IDs, images, video bindings and inclusion settings, then edit only the supported text and order."
+			},
+			"edit": "Edit supported text and order as a new draft",
+			"draft": "New package draft — review required",
+			"editing": "Draft changes are not saved. Retained videos and images may no longer match edited text; review before sharing. Save or discard before opening another package. Switching video projects discards this package draft.",
+			"stepTitle": "Package step title",
+			"instructions": "Package step instructions",
+			"code": "Included code text",
+			"imageAlt": "Included image description",
+			"up": "Move package step up",
+			"down": "Move package step down",
+			"reseal": "Save a new package with retained media",
+			"resealed": "New package checked and saved: {{path}}. The source package is unchanged. Review edited text against the retained media before sharing. Open that new folder explicitly to continue editing.",
+			"discardDraft": "Discard package draft",
+			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
+			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged."
 		}
 	}
 }

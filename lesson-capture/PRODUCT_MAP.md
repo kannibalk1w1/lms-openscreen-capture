@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; narrow session-capability tests awaiting exact-SHA follow-up). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; session-capability tests accepted by review40; media-preserving GUI reseal awaiting exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -29,7 +29,8 @@ raw evidence/history and full course/player semantics remain outside this scope;
 Review38 accepts the privacy follow-up and coordinator checkpointb0463121 is pushed.
 [Verified GUI inspection/static new-copy](VERIFIED_PACKAGE_OPEN_2026-11-09.md) is now
 accepted within scope by review39; its [narrow capability-test follow-up](CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
-awaits exact-SHA review/private push before video-preserving edit/reseal.
+is accepted by review40 and pushed at5d73f835. [Supported GUI edits/new-package reseal](PACKAGE_RESEAL_2026-11-09.md)
+now retain all MP4/JPEG bindings and policy, pending exact-SHA review; player work remains later.
 
 [Review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts36d30d24 within its derived
 package scope. [L37-1 test follow-up](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md) pins
@@ -298,10 +299,10 @@ Bounded Linux authored source content identity is accepted through review26;
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
-accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; narrow session-capability tests awaiting exact-SHA follow-up/push;
+accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; session-capability tests accepted by review40; media-preserving GUI reseal awaiting exact-SHA review/push;
 [Verified GUI inspection/static editable copies](VERIFIED_PACKAGE_OPEN_2026-11-09.md)
-retain the imported package and existing authored work. Video-preserving edit/reseal,
-full editor/course packaging and timed output acceptance remain.
+retain the imported package and existing authored work. [Bounded media-preserving edit/reseal](PACKAGE_RESEAL_2026-11-09.md) is implemented
+pending review; full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.

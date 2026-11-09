@@ -15,7 +15,12 @@ import {
 	saveStaticPackageCopy,
 } from "../lesson/packageOpen";
 
+import { resealLessonPackage } from "../lesson/packageReseal";
+
 const idSchema = z.string().uuid();
+const resealSchema = z
+	.object({ operationId: idSchema, token: idSchema, lesson: z.unknown() })
+	.strict();
 const copySchema = z.object({ operationId: idSchema, token: idSchema }).strict();
 /** One bounded inspection capability per registered current editor; never a file-protocol grant. */
 export function registerLessonPackageOpenHandlers(
@@ -74,6 +79,8 @@ export function registerLessonPackageOpenHandlers(
 			if (state) state.opened = undefined;
 			let code: PackageOpenCode =
 				error instanceof LessonPackageError ? error.code : "lesson-package-invalid";
+			if (error instanceof Error && error.message === "package-edit-unsupported")
+				code = "lesson-package-edit-unsupported";
 			if (error instanceof Error && error.message === "package-video-copy-unsupported")
 				code = "lesson-package-video-copy-unsupported";
 			if (error && typeof error === "object" && "code" in error && error.code === "EEXIST")
@@ -146,6 +153,40 @@ export function registerLessonPackageOpenHandlers(
 						? await dialog.showSaveDialog(parent, options)
 						: await dialog.showSaveDialog(options);
 					return selected.canceled ? null : (selected.filePath ?? null);
+				},
+			);
+		});
+	});
+	ipcMain.handle("lesson:package-reseal", (event, input: unknown) => {
+		const request = resealSchema.safeParse(input);
+		if (!request.success) return { success: false, code: "lesson-package-invalid" };
+		return run(event, request.data.operationId, async (state, authority) => {
+			const opened = state.opened;
+			if (!opened || opened.token !== request.data.token)
+				throw new LessonPackageError("lesson-package-invalid");
+			opened.assertCurrent();
+			return resealLessonPackage(
+				opened.directory,
+				opened.value,
+				request.data.lesson,
+				{
+					...authority,
+					assertCurrent: () => {
+						authority.assertCurrent();
+						opened.assertCurrent();
+						if (state.opened !== opened) throw new LessonPackageError("lesson-package-cancelled");
+					},
+				},
+				async () => {
+					const parent = BrowserWindow.fromWebContents(event.sender);
+					const options = {
+						title: "Choose an existing folder for a new edited lesson package",
+						properties: ["openDirectory"] as ["openDirectory"],
+					};
+					const selected = parent
+						? await dialog.showOpenDialog(parent, options)
+						: await dialog.showOpenDialog(options);
+					return selected.canceled ? null : (selected.filePaths[0] ?? null);
 				},
 			);
 		});

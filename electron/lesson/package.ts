@@ -257,10 +257,8 @@ export async function inspectLessonPackage(input: unknown, authority: PackageAut
 }
 export async function createLessonPackage(input: unknown, authority: PackageAuthority) {
 	const check = checkFor(authority);
-	let partial: string | undefined;
 	const inputChecks: (() => void)[] = [];
 	let destination: (() => void) | undefined;
-	let stageRoot: (() => void) | undefined;
 	const assertInputs = () => {
 		authority.assertCurrent();
 		destination?.();
@@ -318,17 +316,9 @@ export async function createLessonPackage(input: unknown, authority: PackageAuth
 			inputChecks.push(item.metadata.assertCurrent, item.binary.assertCurrent);
 			media.push(item);
 		}
-		const files = await portableGuideV1Files(
+		return await publishLessonPackage(
 			derived,
-			media.map((item) => item.portable),
-		);
-		check();
-		const manifest: PortablePackageManifest = {
-			format: "openscreen-portable-lesson",
-			guideContract: "openscreen-static-guide-portable-v1",
-			version: 1,
-			lessonId: derived.id,
-			scope: {
+			{
 				kind: "derived-static-lesson-and-rendered-video",
 				code: includeCode ? "included" : "excluded",
 				images: request.imagePolicy,
@@ -339,6 +329,48 @@ export async function createLessonPackage(input: unknown, authority: PackageAuth
 				nativeDependencies: "fonts-annotations-added-audio-branches-not-included",
 				mediaMeaning: "already-rendered-video; embedded-audio-unverified; not-native-editability",
 			},
+			media,
+			request.outputDirectory,
+			authority,
+			assertInputs,
+		);
+	} catch (error) {
+		if (error instanceof LessonPackageError) throw error;
+		throw new LessonPackageError(failureCode(error, authority));
+	}
+}
+/** Shared v1 writer for explicitly selected authored media and verified-package derivatives. */
+export async function publishLessonPackage(
+	derived: LessonManifest,
+	scope: PortablePackageManifest["scope"],
+	media: Array<{ portable: PortablePackageManifest["videos"][number]; binary: PinnedBinary }>,
+	outputDirectory: string,
+	authority: PackageAuthority,
+	assertSource: () => void,
+) {
+	const check = checkFor(authority);
+	let partial: string | undefined;
+	let stageRoot: (() => void) | undefined;
+	check();
+	assertSource();
+	const destination = pinDirectory(outputDirectory);
+	const assertInputs = () => {
+		authority.assertCurrent();
+		destination();
+		assertSource();
+	};
+	try {
+		const files = await portableGuideV1Files(
+			derived,
+			media.map((item) => item.portable),
+		);
+		check();
+		const manifest: PortablePackageManifest = {
+			format: "openscreen-portable-lesson",
+			guideContract: "openscreen-static-guide-portable-v1",
+			version: 1,
+			lessonId: derived.id,
+			scope,
 			files: [
 				...[...files].map(([relative, bytes]) => ({
 					path: relative,
@@ -354,7 +386,7 @@ export async function createLessonPackage(input: unknown, authority: PackageAuth
 		validateProjection(derived, manifest);
 		check();
 		assertInputs();
-		const created = path.join(request.outputDirectory, `lesson-package-${randomUUID()}`);
+		const created = path.join(outputDirectory, `lesson-package-${randomUUID()}`);
 		await fs.mkdir(created, { mode: 0o700 });
 		partial = created;
 		const root = pinDirectory(partial);
@@ -450,11 +482,12 @@ export async function createLessonPackage(input: unknown, authority: PackageAuth
 			stageRoot?.();
 			visible = partial;
 		} catch {
-			/* Replaced or revoked scope receives no output path. */
+			/* Revoked scope receives no path. */
 		}
 		throw new LessonPackageError(failureCode(error, authority), visible);
 	}
 }
+
 export async function verifyLessonPackage(input: unknown, authority: PackageAuthority) {
 	return (await inspectLessonPackage(input, authority)).summary;
 }

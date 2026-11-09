@@ -58,8 +58,9 @@ privacy follow-up are accepted through review38, pushed atb0463121. The current
 [verified GUI package inspection/static new-copy slice](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
 provides explicit directory selection, strict verification, safe read-only display
 and static editable copies without replacing current work. Video bindings remain
-read-only; media-preserving reseal and player dependencies are next after exact-SHA
-review/private push. Native source projects/full courses/audio/platform/physical
+read-only in the old static-copy action; the separate [media-preserving reseal slice](lesson-capture/PACKAGE_RESEAL_2026-11-09.md)
+now supports text/order/code/alt edits with fixed bindings and policy, pending exact-SHA
+review/private push before player dependencies. Native source projects/full courses/audio/platform/physical
 acceptance remain outside this scope.
 
 - [Narration captions](LESSON_CAPTURE.md): reuse local Whisper and transcript/caption
@@ -98,8 +99,9 @@ and CLI/MCP selected-MP4 parity are delivered within their bounded Linux scope.
 [Verified GUI inspection/static editable copies](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
 are accepted within scope by actual review39 at8ae83766. The
 [narrow open-time capability test follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
-awaits independent exact-SHA review/private push. Imported packages and unsaved current lessons remain unchanged. Video bindings
-stay read-only; media-preserving editing/reseal is next before timed-player work.
+is accepted by review40, pushed at5d73f835. [Media-preserving GUI reseal](lesson-capture/PACKAGE_RESEAL_2026-11-09.md)
+now adds supported drafts and new-package publication, awaiting exact-SHA review/private
+push. Imported packages and current authored lessons remain unchanged; player work is later.
 Full native-project/course portability, audio and physical/platform acceptance remain.
 Earlier accounts below retain their historical checkpoint context.
 

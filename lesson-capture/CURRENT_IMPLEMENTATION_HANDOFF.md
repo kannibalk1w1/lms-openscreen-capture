@@ -1,3 +1,31 @@
+# Media-preserving derived package reseal slice — 9 November 2026
+
+Actual [review40](CLAUDE_ROADMAP_REVIEW_40_2026-11-09.md) accepts93a84456 and
+closesL39-1; coordinator checkpoint5d73f835 is pushed. [The current reseal slice](PACKAGE_RESEAL_2026-11-09.md)
+adds explicit supported text/order/code/alt drafts and native-picker save to a NEW
+v1 package, retaining every stable MP4/JPEG binding and exact inclusion policy.
+Step/asset addition/deletion/IDs/reassignment/policy/old approval refuse; all new
+steps are draft. Current authored work, source package, media and receipts stay
+unchanged. One shared existing writer/validator serves original CLI/MCP creation
+and GUI reseal; no original source/project/range-receipt discovery or fake pins.
+
+Actual moved-input Electron IPC edit/reseal with stubbed dialogs, then fresh CLI
+and SDKstdio verify/query, preserve two reordered steps, JPEG and video with45samples/
+45decoded frames/1.5s; missing/corrupt/policy forgeries refuse, originals unchanged.
+Main/preload contracts are final; mandatory production CLI/MCP startup smoke passes.
+Focused206/10,0skip and7controls (6single/1paired assertion kills) pass with source
+restore. Final6149full/454files,0skips, root/testTS, Vite, lint35baseline/docs37/i18n15/1301
+and final mandatory startup pass; preservation details and honest diagnostics are linked.
+No GUI-click/native-picker/physical/audio/other-platform acceptance; English fallback
+translation status is explicit. Static copy still refuses videos; new action keeps
+media. CLI/MCP reseal commands are not delivered; shared service is reusable.
+
+Coordinator actual exact-SHA Claude review/fixes/private push is next, then bounded
+verified media access/player prerequisites or explicit headless reseal parity.
+No next phase/worker push; main/private-mainfd2775e2 and addon stay unchanged.
+
+## Prior checkpoint accounts
+
 # Accepted verified package opening checkpoint — 9 November 2026
 
 Actual [review40](CLAUDE_ROADMAP_REVIEW_40_2026-11-09.md) accepts exact

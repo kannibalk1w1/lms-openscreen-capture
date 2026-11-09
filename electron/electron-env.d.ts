@@ -269,6 +269,7 @@ interface Window {
 		lessonSave?: import("../src/lib/lesson/api").LessonApi["lessonSave"];
 		lessonPackageOpen?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageOpen"];
 		lessonPackageCopy?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageCopy"];
+		lessonPackageReseal?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageReseal"];
 		lessonPackageCancel?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageCancel"];
 		lessonPackageRelease?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageRelease"];
 		lessonOpen?: import("../src/lib/lesson/api").LessonApi["lessonOpen"];

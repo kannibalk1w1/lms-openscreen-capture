@@ -484,3 +484,41 @@ it("rejects a structurally valid range response that does not echo the requested
 	);
 	expect(screen.queryByText(/Stored reference:/)).toBeNull();
 });
+it("closing the guide asks before discarding an unsaved package draft", async () => {
+	const lesson = {
+		...newLesson("Portable draft source"),
+		steps: [newStep("Portable source step")],
+	};
+	vi.stubGlobal("electronAPI", {
+		lessonPackageOpen: vi.fn(async () => ({
+			success: true,
+			result: {
+				status: "opened",
+				token: crypto.randomUUID(),
+				lesson,
+				videos: [],
+				images: "exclude",
+			},
+		})),
+		lessonPackageReseal: vi.fn(),
+		lessonPackageRelease: vi.fn(async () => true),
+	});
+	const onClose = vi.fn(),
+		confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+	render(
+		<I18nProvider>
+			<LessonGuideDialog open onClose={onClose} />
+		</I18nProvider>,
+	);
+	fireEvent.click(screen.getByText("Open and check a package folder"));
+	await screen.findByText("Portable source step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.click(screen.getByRole("button", { name: /^Close$/ }));
+	expect(confirm).toHaveBeenCalledWith(
+		"Discard the unsaved package draft and close? The source package is unchanged.",
+	);
+	expect(onClose).not.toHaveBeenCalled();
+	confirm.mockReturnValue(true);
+	fireEvent.click(screen.getByRole("button", { name: /^Close$/ }));
+	expect(onClose).toHaveBeenCalledTimes(1);
+});

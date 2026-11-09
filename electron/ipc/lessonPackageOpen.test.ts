@@ -7,11 +7,12 @@ import type { IpcMainInvokeEvent } from "electron";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { imageFixture } from "../../src/lib/lesson/fixtures.test-support";
+import { beginPackageEdit } from "../../src/lib/lesson/packageEdit";
 import { parseLesson } from "../../src/lib/lesson/schema";
 import { AI_EDITION_OPEN_PROJECT_CHANNEL } from "../../src/native/contracts";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { validateRangeVideo } from "../lesson/encodedVideo";
-import { createLessonPackage } from "../lesson/package";
+import { createLessonPackage, inspectLessonPackage } from "../lesson/package";
 import { fakePackageVideo, packageFixture } from "../lesson/package.test-support";
 import { readSelectedFileSnapshot } from "../lesson/selectedFile";
 import { registerLessonWorkflow } from "./lessonWorkflow";
@@ -495,4 +496,333 @@ it("open-time capability refuses the live dirty provider before copy and recover
 	const fresh = await open();
 	expect(await copy(fresh.token)).toMatchObject({ success: true, result: { status: "saved" } });
 	expect(await packageBytes()).toEqual(before);
+});
+
+// Reseal uses the same capability, production registration and actual shared package writer.
+async function edited(
+	token: string,
+	lesson: Awaited<ReturnType<typeof open>>["lesson"],
+	operationId = randomUUID(),
+) {
+	return invoke("reseal", { token, operationId, lesson });
+}
+it("reseals changed text and order with every existing JPEG/video binding, without source projects or receipt forgery", async () => {
+	const f = await videoPackage();
+	// The existing fixture has one selected video step; add a second selected step in a new package.
+	const second = f.lesson.steps[1];
+	const originalManifest = await fs.readFile(f.request.manifestPath);
+	const withTwo = await createLessonPackage(
+		{
+			...f.request,
+			stepIds: [f.step.id, second.id],
+			includeCode: true,
+			imagePolicy: "include-external-provenance",
+		},
+		{
+			assertCurrent() {
+				/* Explicit fixture. */
+			},
+		},
+	);
+	directory = withTwo.path;
+	host.open.mockResolvedValue({ canceled: false, filePaths: [directory] });
+	const opened = await open(),
+		before = await packageBytes();
+	await fs.rename(f.authoring, f.authoring + ".unavailable");
+	const draft = beginPackageEdit(opened.lesson);
+	draft.title = "Corrected derived title";
+	draft.steps.reverse();
+	const videoStep = draft.steps.find((s) => s.id === f.step.id)!;
+	videoStep.instructions = "Corrected instructions requiring review";
+	videoStep.code!.text = "Updated code";
+	videoStep.imageAlt = "Corrected image description";
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	const response = (await edited(opened.token, draft)) as {
+		success: boolean;
+		result: { path: string };
+	};
+	expect(response.success).toBe(true);
+	const sealed = await inspectLessonPackage(
+		{ directory: response.result.path },
+		{
+			assertCurrent() {
+				/* Explicit output. */
+			},
+		},
+	);
+	expect(sealed.lesson.title).toBe(draft.title);
+	expect(sealed.lesson.steps.map((s) => s.id)).toEqual(draft.steps.map((s) => s.id));
+	expect(sealed.lesson.steps.every((s) => s.status === "draft")).toBe(true);
+	expect(sealed.lesson.derivedFrom).toMatchObject({
+		id: opened.lesson.id,
+		revision: opened.lesson.revision,
+	});
+	expect(sealed.lesson.assets).toEqual(opened.lesson.assets);
+	expect(sealed.manifest.scope).toEqual(
+		(
+			await inspectLessonPackage(
+				{ directory },
+				{
+					assertCurrent() {
+						/* Source. */
+					},
+				},
+			)
+		).manifest.scope,
+	);
+	expect(sealed.manifest.videos).toHaveLength(1);
+	expect(sealed.manifest.videos[0].stepId).toBe(f.step.id);
+	expect(
+		await fs.readFile(path.join(response.result.path, sealed.manifest.videos[0].path)),
+	).toEqual(await fs.readFile(path.join(directory, sealed.manifest.videos[0].path)));
+	expect(await packageBytes()).toEqual(before);
+	expect(await fs.readFile(path.join(f.authoring + ".unavailable", "lesson.json"))).toEqual(
+		originalManifest,
+	);
+});
+it.each([
+	"step-id",
+	"remove-step",
+	"add-step",
+	"pin",
+	"evidence",
+	"extensions",
+	"asset",
+	"policy",
+	"approval",
+	"new-code",
+])("reseal refuses unsupported %s without invoking destination picker", async (kind) => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson),
+		before = await packageBytes();
+	if (kind === "step-id") draft.steps[0].id = randomUUID();
+	if (kind === "remove-step") draft.steps = [];
+	if (kind === "add-step") draft.steps.push(newStep("Extra"));
+	if (kind === "pin")
+		(draft.steps[0] as Record<string, unknown>).mediaSelection = { unexpected: true };
+	if (kind === "evidence")
+		draft.steps[0].evidence = [{ kind: "authored", clock: "unmapped", provenance: "authored" }];
+	if (kind === "extensions") draft.extensions = { private: { journal: "PRIVATE_JOURNAL" } };
+	if (kind === "asset") draft.assets[0].source.projectId = "REPLACED_PRIVATE_SOURCE";
+	if (kind === "policy") draft.output!.includeImages = false;
+	if (kind === "approval") draft.steps[0].status = "reviewed";
+	if (kind === "new-code") {
+		draft.steps[0].code!.language = "new-language";
+	}
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({ success: false });
+	expect(host.open).not.toHaveBeenCalled();
+	expect(await packageBytes()).toEqual(before);
+});
+it("reseal picker cancel reads no source bytes and creates no outputs", async () => {
+	const opened = await open(),
+		before = await fs.readdir(root);
+	host.open.mockResolvedValue({ canceled: true });
+	await fs.rename(directory, directory + ".offline");
+	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toEqual({
+		success: true,
+		result: { status: "cancelled" },
+	});
+	expect((await fs.readdir(root)).filter((s) => !s.endsWith(".offline"))).toEqual(
+		before.filter((s) => s !== path.basename(directory)),
+	);
+});
+it.each([
+	"reselect",
+	"foreign",
+	"subframe",
+	"dirty",
+	"wrong-token",
+])("reseal refuses %s capability before picker", async (kind) => {
+	const opened = await open();
+	host.open.mockClear();
+	if (kind === "reselect") selectThroughProduction("p");
+	if (kind === "foreign") current = caller();
+	if (kind === "subframe")
+		current.event = { ...current.event, senderFrame: {} } as IpcMainInvokeEvent;
+	if (kind === "dirty") dirty = true;
+	expect(
+		await edited(
+			kind === "wrong-token" ? randomUUID() : opened.token,
+			beginPackageEdit(opened.lesson),
+		),
+	).toMatchObject({ success: false });
+	expect(host.open).not.toHaveBeenCalled();
+});
+it.each([
+	"session",
+	"release",
+	"cancel",
+	"asset",
+])("reseal refuses %s changes during destination picker before output", async (kind) => {
+	const opened = await open(),
+		id = randomUUID();
+	let settle!: (value: unknown) => void;
+	host.open.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve;
+			}),
+	);
+	const pending = edited(opened.token, beginPackageEdit(opened.lesson), id);
+	await vi.waitFor(() => expect(settle).toBeDefined());
+	if (kind === "session") selectThroughProduction("p");
+	if (kind === "release") await invoke("release", opened.token);
+	if (kind === "cancel") await invoke("cancel", id);
+	if (kind === "asset") await fs.appendFile(path.join(directory, "index.html"), "tampered");
+	const before = await fs.readdir(root);
+	settle({ canceled: false, filePaths: [root] });
+	expect(await pending).toMatchObject({ success: false });
+	expect(await fs.readdir(root)).toEqual(before);
+});
+it("reseal cancellation during actual decoder promise holds busy, prevents receipt and preserves private incomplete output", async () => {
+	const f = await videoPackage();
+	directory = f.directory;
+	const opened = await open();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	let settle!: () => void, entered!: () => void;
+	const decoding = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	// Input revalidation succeeds; hold the separate output verification decode.
+	vi.mocked(validateRangeVideo).mockImplementation(async (file, expected) => {
+		if (!file.startsWith(directory + path.sep)) {
+			entered();
+			await new Promise<void>((resolve) => {
+				settle = resolve;
+			});
+		}
+		return fakePackageVideo(file, expected);
+	});
+	const id = randomUUID(),
+		pending = edited(opened.token, beginPackageEdit(opened.lesson), id);
+	await decoding;
+	expect(await invoke("cancel", id)).toBe(true);
+	expect(await invoke("open", randomUUID())).toEqual({
+		success: false,
+		code: "lesson-package-busy",
+	});
+	settle();
+	expect(await pending).toMatchObject({ success: false, code: "lesson-package-cancelled" });
+	const outputs = (await fs.readdir(root)).filter(
+		(s) => s.startsWith("lesson-package-") && path.join(root, s) !== directory,
+	);
+	expect(outputs).toHaveLength(2); // Original static fixture plus the incomplete new derivative.
+	const incomplete = [];
+	for (const name of outputs) {
+		try {
+			await fs.access(path.join(root, name, "package-receipt.json"));
+		} catch {
+			incomplete.push(name);
+		}
+	}
+	expect(incomplete).toHaveLength(1);
+	expect(await fs.readdir(path.join(root, incomplete[0]))).toContain("lesson-package.json");
+});
+it.each([
+	"source-replace",
+	"project",
+	"crash",
+	"output-corrupt",
+])("reseal refuses %s during output decode without publishing a receipt", async (kind) => {
+	const f = await videoPackage();
+	directory = f.directory;
+	const opened = await open();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	let output: string | undefined;
+	vi.mocked(validateRangeVideo).mockImplementation(async (file, expected) => {
+		const result = await fakePackageVideo(file, expected);
+		if (!file.startsWith(directory + path.sep)) {
+			output = path.dirname(path.dirname(file));
+			if (kind === "project") selectThroughProduction("p");
+			if (kind === "crash") current.owner.emit("render-process-gone");
+			if (kind === "output-corrupt") await fs.appendFile(file, "tampered during decode");
+			if (kind === "source-replace") {
+				const named = path.join(directory, "lesson.openscreen-lesson.json"),
+					bytes = await fs.readFile(named);
+				await fs.rename(named, named + ".old");
+				await fs.writeFile(named, bytes);
+				await fs.unlink(named + ".old");
+			}
+		}
+		return result;
+	});
+	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toMatchObject({
+		success: false,
+	});
+	expect(output).toBeDefined();
+	await expect(fs.access(path.join(output!, "package-receipt.json"))).rejects.toThrow();
+});
+it("reseal rejects destination symlinks and the source package itself without modifying it", async () => {
+	const opened = await open(),
+		before = await packageBytes(),
+		alias = path.join(root, "alias");
+	await fs.symlink(root, alias);
+	host.open.mockResolvedValueOnce({ canceled: false, filePaths: [alias] });
+	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toMatchObject({
+		success: false,
+	});
+	host.open.mockResolvedValue({ canceled: false, filePaths: [directory] });
+	const fresh = await open();
+	host.open.mockResolvedValueOnce({ canceled: false, filePaths: [directory] });
+	expect(await edited(fresh.token, beginPackageEdit(fresh.lesson))).toMatchObject({
+		success: false,
+	});
+	expect(await packageBytes()).toEqual(before);
+});
+it.each([
+	"code",
+	"image",
+])("reseal cannot resurrect excluded %s from an imported draft", async (kind) => {
+	const included = await open();
+	const excluded = await createLessonPackage(
+		{
+			manifestPath: path.join(root, "selected.json.unavailable"),
+			stepIds: included.lesson.steps.map((s) => s.id),
+			includeCode: false,
+			imagePolicy: "exclude",
+			media: [],
+			outputDirectory: root,
+		},
+		{
+			assertCurrent() {
+				/* Explicit fixture. */
+			},
+		},
+	);
+	host.open.mockResolvedValue({ canceled: false, filePaths: [excluded.path] });
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	if (kind === "code") draft.steps[0].code = { language: "plain", text: "PRIVATE_EXCLUDED_CODE" };
+	else {
+		draft.assets = included.lesson.assets;
+		draft.steps[0].imageId = draft.assets[0].id;
+		draft.steps[0].imageAlt = "Resurrected";
+	}
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({ success: false });
+	expect(host.open).not.toHaveBeenCalled();
+});
+it("reseal refuses a decoder failure on copied output even when input inspection succeeds", async () => {
+	const f = await videoPackage();
+	directory = f.directory;
+	const opened = await open();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	vi.mocked(validateRangeVideo).mockImplementation(async (file, expected) => {
+		if (!file.startsWith(directory + path.sep)) throw new Error("INVALID_OUTPUT_DECODE");
+		return fakePackageVideo(file, expected);
+	});
+	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toMatchObject({
+		success: false,
+	});
+	const dirs = (await fs.readdir(root)).filter((n) => n.startsWith("lesson-package-"));
+	let incomplete = 0;
+	for (const name of dirs) {
+		try {
+			await fs.access(path.join(root, name, "package-receipt.json"));
+		} catch {
+			incomplete++;
+		}
+	}
+	expect(incomplete).toBe(1);
 });

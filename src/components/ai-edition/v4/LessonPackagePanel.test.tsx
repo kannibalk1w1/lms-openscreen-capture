@@ -43,6 +43,17 @@ beforeEach(() => {
 			success: true,
 			result: { status: "saved", path: "/explicit/new.json" },
 		})),
+		lessonPackageReseal: vi.fn<Required<LessonPackageOpenApi>["lessonPackageReseal"]>(async () => ({
+			success: true,
+			result: {
+				status: "packaged",
+				path: "/explicit/new-package",
+				lessonId: opened.lesson.id,
+				steps: 1,
+				images: 0,
+				videos: opened.videos.length,
+			},
+		})),
 		lessonPackageCancel: vi.fn(async () => true),
 		lessonPackageRelease: vi.fn(async () => true),
 	};
@@ -172,4 +183,119 @@ it("closing a checked snapshot releases its capability", async () => {
 	fireEvent.click(screen.getByText("Close package snapshot"));
 	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
 	expect(screen.queryByText("Package step")).toBeNull();
+});
+it("edits an existing lesson draft and submits stable video step bindings through the explicit new action", async () => {
+	opened.videos = [{ stepId: opened.lesson.steps[0].id, frames: 45, durationSec: 1.5 }];
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Corrected instructions" },
+	});
+	fireEvent.change(screen.getByLabelText("Included code text"), {
+		target: { value: "Corrected code" },
+	});
+	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
+		true,
+	);
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText(/New package checked and saved/);
+	const calls = vi.mocked(api.lessonPackageReseal).mock.calls;
+	expect(calls).toHaveLength(1);
+	expect(calls[0][0]).toMatchObject({
+		token: opened.token,
+		operationId: expect.any(String),
+		lesson: {
+			id: opened.lesson.id,
+			steps: [
+				{
+					id: opened.lesson.steps[0].id,
+					instructions: "Corrected instructions",
+					status: "draft",
+					code: { text: "Corrected code" },
+				},
+			],
+		},
+	});
+	expect(api.lessonPackageCopy).not.toHaveBeenCalled();
+	expect(opened.lesson.steps[0].instructions).toBe("<img src=x onerror=alert(1)>");
+});
+it("reseal freezes the submitted draft, cancels on project replacement and ignores late completion", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageReseal).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Submitted text" },
+	});
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Programmatic stale edit" },
+	});
+	expect(vi.mocked(api.lessonPackageReseal).mock.calls[0][0].lesson.steps[0].instructions).toBe(
+		"Submitted text",
+	);
+	act(() => useProjectStore.setState({ projectId: "replacement" }));
+	await act(async () => {
+		settle({
+			success: true,
+			result: {
+				status: "packaged",
+				path: "/must-not-attach",
+				steps: 1,
+				images: 0,
+				videos: 0,
+				lessonId: opened.lesson.id,
+			},
+		});
+	});
+	expect(api.lessonPackageCancel).toHaveBeenCalled();
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+	expect(screen.queryByText(/must-not-attach/)).toBeNull();
+	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
+});
+it("discarding a draft explicitly returns to the original snapshot without changing package data", async () => {
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Not saved" },
+	});
+	fireEvent.click(screen.getByText("Discard package draft"));
+	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
+	expect(api.lessonPackageReseal).not.toHaveBeenCalled();
+	expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeDefined();
+});
+it("cancelling reseal discards the unpublishable draft and allows a fresh open after settlement", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageReseal).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	fireEvent.click(screen.getByText("Cancel package operation"));
+	await act(async () => {
+		settle({ success: false, code: "lesson-package-cancelled" });
+	});
+	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
+	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
+		false,
+	);
+	clickOpen();
+	await screen.findByText("Package step");
 });

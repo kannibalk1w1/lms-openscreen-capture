@@ -1,3 +1,18 @@
+# Current media-preserving package reseal authority — 9 November 2026
+
+Autonomous resumption from accepted/pushed5d73f835 after review40 closesL39-1.
+Deliver [bounded supported draft edits and new derived package reseal](PACKAGE_RESEAL_2026-11-09.md),
+validate/build/real production startup and moved-input transport/decode proof, commit
+locally, then stop for coordinator actual exact-SHA Claude review/fixes/private push.
+No player, native-project import, policy/schema migration or broad source grant.
+Preserve original reports/evidence/user work, addon and main/private-main. No other
+workers, worker push, checkout/reset/stash/discard/main/upstream/release/Actions/
+publication/real-lesson/auth/config/paid-API changes, user-app termination or shared
+cache purge. Old pause records are superseded and time cutoffs revoked; older
+accounts below are historical.
+
+## Prior checkpoint accounts
+
 # Current review39 narrow follow-up authority — 9 November 2026
 
 Complete only [L39-1 open-time capability tests and controls](CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
