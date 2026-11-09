@@ -359,3 +359,64 @@ lesson-and-project reader used by `confirm-range` and `export-range`, `LessonSer
   for that reason.
 - `LESSON_CAPTURE_COMMANDS.md` (the earlier command reference) does not describe the commands
   added in slices 6, 7 and 11; the CLI help text and this handoff do.
+
+Slice 11 commit: `33acf24d`.
+
+## Current state (supersedes the "Unfinished and next" lists above)
+
+Branch `lesson-capture/input-boundaries`, all local, nothing pushed. Main and private main
+`fd2775e2`; private feature ref `5d73f835`; addon SHA256 `5d16ea98…09efca` unchanged. No
+existing report, evidence file or fixture was edited; preserved evidence was only read or
+copied to scratch. **None of the commits below is independently reviewed.**
+
+| SHA | Slice |
+| --- | --- |
+| `52008fac` | Full review report |
+| `26396851` | 1. Reseal recovery dead ends, wrong-token and busy replies, destination error |
+| `cd444252` | 2. Packaging survives lesson text edits after an MP4 export |
+| `4800f5ae` | 3. LMS lesson/slide references and `lesson-mapping.json` |
+| `97ebcaa3` | 4. Save to the opened lesson file; unsaved-work marker and guards |
+| `d9aba4c6` | 5. Create a package from the Lesson guide dialog |
+| `be758ca7` | 6. Headless `lesson new` / `add-step`; references in queries and package re-editing |
+| `d4d152e9` | 7. Headless `edit-step` / `remove-step` |
+| `5a2b0f14` | 8. Distinct step button names, heading order, plainer package wording |
+| `b8bb657c` | 9. Unsaved project edits pause package work instead of discarding its capability |
+| `ddc38561` | 10. Report unfinished package folders to the author |
+| `33acf24d` | 11. Headless `lesson illustrate` (CLI) |
+
+Documentation-only commits: `ebb2926c`, `5308811b`, and the one that adds this section.
+
+Last full suite: 6,255 tests / 458 files, 0 skipped, at slice 11. Last startup smoke: slice 11,
+`success: true`.
+
+**Evidence boundaries.** Unit and jsdom tests; mutation controls in `git archive` snapshots;
+the real production CLI under Xvfb; the full production app under Xvfb driven through the DOM
+with native dialogs stubbed. Nothing here is real-picker, physical-input, screen-reader,
+audio, Windows or macOS evidence, and no real lesson was recorded.
+
+**Limits encountered.** Two usage limits were hit, during slice 1 and during slice 8's test
+writing. In both cases the coordinator told me the limit had reset and authorised
+continuation; I do not have the exact error text. No usage information is exposed to me.
+
+### What needs outside input
+
+1. **Independent review** of slices 1 to 11, especially slice 2 (relaxes a guard review 37
+   accepted), slice 4 (a new main-held file grant and a change to the window-close flow in
+   `electron/main.ts`) and slice 5 (a new production IPC route).
+2. **Windows (H1).** Platform gates are untouched and no Windows support is claimed. Needs a
+   Windows machine. Slice 4's rename-over-existing-file should be checked there.
+3. **M2, wider form.** Whether package inspection and re-editing should stop depending on
+   the selected, saved project in main. I implemented only the renderer-side narrowing.
+4. **Autosave of lesson work.** A reload or crash still loses unsaved lesson edits. The
+   recovery store promises to write only on an explicit click, so automatic recovery copies
+   are a privacy decision for the owner.
+5. **A manual pilot on real hardware**, following the spec's Enemy sequence.
+6. **Translations.** Every string added in this session is English in all 14 other catalogues.
+
+### What could continue without outside input
+
+- An MCP tool for illustration (needs the frame renderer passed through both MCP bootstraps).
+- Headless step reordering.
+- Updating `LESSON_CAPTURE_COMMANDS.md` for the new commands.
+- GIF and standalone PNG step outputs, and the 1280 px cap, which touch accepted render and
+  package contracts and so should be designed with a reviewer.

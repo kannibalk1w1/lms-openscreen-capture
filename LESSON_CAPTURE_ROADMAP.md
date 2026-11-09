@@ -92,16 +92,20 @@ acceptance remain outside this scope.
 
 ## Active work and next concrete slices
 
-**Current status (9 November 2026, late).** [The Fable full review](lesson-capture/FABLE_FULL_REVIEW_2026-11-09.md)
-independently accepts the M41-1 fix at259534fe and the reseal slice beneath it. It then
-reorders the queue by what an author can newly do. Three local, unpushed slices follow
-it, none independently reviewed: reseal recovery follow-ups (26396851), packaging that
-survives later lesson text edits (cd444252), and optional LMS lesson/slide references with
-a `lesson-mapping.json` in every guide export. The review's findings H1 (the lesson media
-pipeline is Linux-only) and M1 (authored lessons are easy to lose) now lead the queue; the
-timed player and further package identity work are no longer next. See the
-[session handoff](lesson-capture/FABLE_SESSION_HANDOFF_2026-11-09.md). The paragraphs below
-are earlier checkpoint accounts.
+**Current status (9 November 2026, end of the Fable session).** [The Fable full review](lesson-capture/FABLE_FULL_REVIEW_2026-11-09.md)
+independently accepts the M41-1 fix at259534fe and the reseal slice beneath it, and reorders
+the queue by what an author can newly do. Eleven local, unpushed slices follow it; **none is
+independently reviewed**. On Linux an author can now: save changes back to the opened lesson
+file and is asked before unsaved lesson work is lost; record LMS lesson/slide references and
+get a `lesson-mapping.json` with every guide; create a portable package, with exported step
+videos, from the Lesson guide dialog; and package after later text edits. An agent can build
+an illustrated lesson headlessly (`lesson new`, `add-step`, `edit-step`, `remove-step`,
+`illustrate`, plus four MCP tools). Exact SHAs, commands, counts, proofs and limits are in the
+[session handoff](lesson-capture/FABLE_SESSION_HANDOFF_2026-11-09.md). Next, and needing
+outside input: an independent review of these slices; a Windows run (review finding H1, the
+lesson media pipeline is Linux-only); a decision on unbinding package tools from project
+state (M2); and a manual pilot on real hardware. The timed player and further package
+identity work are no longer next. The paragraphs below are earlier checkpoint accounts.
 
 Review41 found MediumM41-1 in9479172b: failed reseals discarded unsaved package
 drafts. [The correction](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md)
