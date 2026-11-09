@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up pending review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4 export implemented, pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -91,9 +91,11 @@ claims that every listed operation exists.
    is accepted by review32. Shared ownership and authority/GIF follow-up are
    accepted through review30 at27136d0f. [CLI/MCP explicit confirmation/refresh and new-copy persistence](HEADLESS_RANGE_CONFIRMATION_2026-11-09.md)
    is accepted within scope by review33 at00bdbc77; the [filesystem/startup test follow-up](CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md)
-   awaits review/push. Pushed035c8313 had a headless bootstrap regression, fixed
-   by00bdbc77 and missed byreviews31/32; headless selected-MP4 export
-   ownership/validation integration remains next. Timed Next/Previous/Replay/loop/speed, captions and local
+   is accepted by review34 and pushed at8a5074f0. Pushed035c8313 had a headless bootstrap regression, fixed
+   by00bdbc77 and missed byreviews31/32. [Headless selected-step MP4 export](HEADLESS_SELECTED_MP4_2026-11-09.md)
+   now integrates shared ownership/materialization/validation with real CLI/stdio
+   native proof, pending exact-SHA review. HTTP cancellation requires aborting its
+   active request; portable media packages remain next. Timed Next/Previous/Replay/loop/speed, captions and local
    learner progress remain later work.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
@@ -268,7 +270,7 @@ Bounded Linux authored source content identity is accepted through review26;
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
-accepted by review33, with filesystem/startup follow-up pending review/push;
+accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4 export implemented, pending exact-SHA review/push;
 headless selected-MP4 export parity,
 full editor/course packaging and timed output acceptance remain.
 

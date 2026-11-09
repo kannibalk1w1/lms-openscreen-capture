@@ -81,19 +81,22 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-Actual [review33](lesson-capture/CLAUDE_ROADMAP_REVIEW_33_2026-11-09.md) accepts
-00bdbc77's explicit CLI/MCP source confirmation/save prerequisite with no new
-High/Medium. It also confirms a pre-existing regression: edb74a00 made a provider
-required but omitted it in the headless consumer, so already-pushed035c8313 broke
-normal headless sources/record/export/captions/MCP startup; reviews31/32 missed it.
-00bdbc77 fixes that bootstrap, pending coordinator private push. The
-[L33-1 filesystem/startup follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md)
-adds independent canonical-path/inode tests and a committed real production
-CLI/MCP startup smoke required for future handler changes/reviews. It awaits exact-
-SHA follow-up review/fixes/push before native headless selected-MP4 ownership and
-materializer/validator transport parity. Existing editor MP4 and headless source
-confirmation scopes remain bounded; no headless MP4, portable course, timed player,
-audio/physical/other-platform readiness is claimed. Earlier labels are historical.
+Actual [review34](lesson-capture/CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts
+f9dcd8df and closesL33-1; confirmation/new-copy persistence plus the real startup
+smoke and bootstrap fix are pushed at8a5074f0. [Selected-step MP4 CLI/MCP export](lesson-capture/HEADLESS_SELECTED_MP4_2026-11-09.md)
+now reuses accepted materialization/validation and actual caller/native ownership,
+with explicit saved files/source grants/directory, unchanged originals and real
+CLI/stdio native proof. HTTP registration/native proof is bounded by a controlled
+permission-provider harness; stateless HTTP cancellation requires aborting the
+active request. Coordinator exact-SHA actual Claude review/fixes/private push is
+next, before selected-media portable packaging and accessible timed-player work.
+Linux video-only bounds and audio/physical/other-platform limits remain.
+
+Preserve the startup history: edb74a00 omitted a required provider in the headless
+consumer, breaking already-pushed035c8313; reviews31/32 missed it.00bdbc77 fixes
+it, and reviews33/34's real smoke detects both sides. Future handler/bootstrap
+changes and reviews run the committed real startup smoke; the parent was not
+generally functional. Earlier pending/pause/status labels below are historical.
 
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;
@@ -122,7 +125,8 @@ Its [bounded follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_25.md) tight
 same-project refresh and pins six guards. Actual
 [review26](lesson-capture/CLAUDE_POST_RESTART_REVIEW_26.md) acceptsd017e4b8
 with no findings and closesL26-3/T26-2/N26-5. Its accepted source-identity scope was backend-only;
-user-facing materialization and timed delivery are separate remaining work.
+user-facing materialization has since been integrated in editor and headless paths;
+timed delivery remains separate work.
 Earlier pause/pending notes below are historical snapshots.
 
 Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3

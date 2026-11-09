@@ -1,3 +1,7 @@
+import {
+	type ExportLessonRangeFileRequest,
+	exportLessonRangeFileSchema,
+} from "../lesson/fileExportContracts";
 // Pure argv parser for the OpenScreen CLI. No Electron imports so it can be
 // unit-tested under plain vitest.
 
@@ -26,6 +30,7 @@ import {
 
 export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
+	| { action: "export-range"; request: ExportLessonRangeFileRequest }
 	| { action: "query"; query: LessonQuery }
 	| { action: "export"; outputDirectory: string; stepIds: string[] }
 );
@@ -114,6 +119,9 @@ Usage:
                      --step <UUID> --start <seconds> --end <seconds> --source <absolute-file> [--source ...]
                      --intent <author-current|refresh-current> --out <new-lesson.json> [--json]
                             Explicit source grants and new editable copy; Linux supported subset, no MP4 export
+  openscreen lesson export-range <lesson.json> --project <current.openscreen> --project-id <ID>
+                     --step <UUID> --source <absolute-file> [--source ...] --out <existing-dir> [--json]
+                            Export exactly this included confirmed step to a new verified private MP4 folder
   openscreen mcp                                     Serve the agent tools over MCP on stdio
   openscreen help                                    Show this help
 
@@ -589,6 +597,54 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+
+	if (action === "export-range") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const request: Record<string, unknown> = {
+			manifestPath: resolvePath(file, cwd),
+			sourcePaths: [],
+		};
+		let json = false;
+		const fields: Record<string, string> = {
+			"--project": "projectPath",
+			"--project-id": "projectId",
+			"--step": "stepId",
+			"--source": "sourcePaths",
+			"--out": "outputDirectory",
+		};
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json") {
+				if (json) throw new Error("Duplicate option");
+				json = true;
+				continue;
+			}
+			const field = fields[flag];
+			if (!field) throw new Error("Unexpected range export option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			if (field === "sourcePaths") {
+				(request.sourcePaths as string[]).push(resolvePath(value, cwd));
+				continue;
+			}
+			if (field in request) throw new Error("Choose exactly one project, step and destination");
+			request[field] =
+				field === "projectPath" || field === "outputDirectory" ? resolvePath(value, cwd) : value;
+		}
+		request.includedStepIds = [request.stepId];
+		const parsed = exportLessonRangeFileSchema.safeParse(request);
+		if (!parsed.success)
+			throw new Error(
+				"Choose saved lesson/project, exactly one included step, explicit sources and an existing output directory",
+			);
+		return {
+			kind: "lesson",
+			action,
+			manifestPath: parsed.data.manifestPath,
+			request: parsed.data,
+			json,
+		};
+	}
 	if (action === "confirm-range") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
 		const request: Record<string, unknown> = {

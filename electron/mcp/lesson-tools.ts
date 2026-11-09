@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonFileSchema, queryLessonFileSchema } from "../lesson/fileContracts";
+import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
+import { exportLessonRangeFileSchema } from "../lesson/fileExportContracts";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
@@ -11,12 +13,83 @@ export function registerLessonTools(
 		transport,
 		editsAllowed,
 		lifecycle,
-	}: { transport: "http" | "stdio"; editsAllowed: () => boolean; lifecycle?: LessonFileLifecycle },
+		render,
+	}: {
+		transport: "http" | "stdio";
+		editsAllowed: () => boolean;
+		lifecycle?: LessonFileLifecycle;
+		render?: LessonFileRangeRenderer;
+	},
 ) {
 	const failure = (code: string) => ({
 		isError: true as const,
 		content: [{ type: "text" as const, text: code }],
 	});
+	server.registerTool(
+		"exportLessonRangeFile",
+		{
+			description:
+				"Export exactly the included pinned step from explicitly selected saved lesson/project files as a NEW private MP4 folder in explicit existing outputDirectory. Requires live MCP edits before filesystem inspection, explicit sourcePaths grants and includedStepIds:[stepId]. No implicit source confirmation, refresh, relink, legacy upgrade, discovery, full-project fallback or dialog. Linux bounded video-only subset; stored sample timing, full decode and hashes checked, audio flags false. Originals preserved; incomplete artifacts retained and disclosed only under current authority. Stdio SDK request cancel and connection close wait actual native/file settlement before ownership reuse. HTTP clients must abort/close the active HTTP request to cancel: stateless cancellation notifications alone do not address another request.",
+			inputSchema: exportLessonRangeFileSchema,
+			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+		},
+		async (args, extra) => {
+			if (!editsAllowed())
+				return failure("consent_required: Enable MCP edits to export a selected lesson range.");
+			if (!lifecycle || !render) return failure("range-export-unsupported");
+			const signal = AbortSignal.any([extra.signal, lifecycle.signal]),
+				assertCurrent = () => {
+					if (!editsAllowed()) throw new Error("consent_required");
+				};
+			try {
+				const pending = exportLessonRangeFile(
+					args,
+					{ owner: lifecycle.owner, signal, assertCurrent },
+					render,
+					(value) => {
+						if (extra._meta?.progressToken !== undefined)
+							void extra
+								.sendNotification({
+									method: "notifications/progress",
+									params: {
+										progressToken: extra._meta.progressToken,
+										progress:
+											value.frames ?? (value.phase === "validating" ? (value.totalFrames ?? 0) : 0),
+										...(value.totalFrames ? { total: value.totalFrames } : {}),
+										message: JSON.stringify(value),
+									},
+								})
+								.catch(() => undefined);
+					},
+				);
+				lifecycle.track(pending);
+				const result = await pending;
+				assertCurrent();
+				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+			} catch (error) {
+				if (!editsAllowed())
+					return failure("consent_required: Enable MCP edits to export a selected lesson range.");
+				return {
+					isError: true,
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify({
+								code:
+									error instanceof LessonFileRangeError
+										? error.code
+										: "lesson-file-operation-failed",
+								...(error instanceof LessonFileRangeError && error.artifactPath
+									? { artifactPath: error.artifactPath }
+									: {}),
+							}),
+						},
+					],
+				};
+			}
+		},
+	);
+
 	server.registerTool(
 		"confirmLessonRangeFile",
 		{

@@ -1,7 +1,11 @@
-import type { WebContents } from "electron";
 import { NativeRenderBusyError, NativeRenderInvalidatedError } from "./nativeRenderJobs";
 
-type ExportOwner = Pick<WebContents, "id" | "isDestroyed" | "once" | "removeListener">;
+/** A real window or transport lifetime, keyed by object identity, never a caller-supplied ID. */
+export interface ExportOwner {
+	isDestroyed(): boolean;
+	once(event: string, listener: () => void): unknown;
+	removeListener(event: string, listener: () => void): unknown;
+}
 
 export interface ExportJob<T> {
 	result: Promise<T>;

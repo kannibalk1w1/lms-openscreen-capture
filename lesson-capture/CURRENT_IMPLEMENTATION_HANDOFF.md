@@ -1,3 +1,35 @@
+# Selected-step MP4 CLI/MCP export — 9 November 2026
+
+Resumed from clean accepted/pushed8a5074f0 after actual review34 acceptsf9dcd8df,
+closingL33-1. The [headless selected-step MP4 slice](HEADLESS_SELECTED_MP4_2026-11-09.md)
+adds CLI lesson export-range and registered MCP exportLessonRangeFile using shared
+saved-file snapshots, accepted range export/materializer/validator and process-wide
+native compute ownership. Explicit files/project/one pinned included step/source
+grants/existing directory only; no implicit confirmation, refresh, relink, upgrade,
+discovery or full-project fallback. Original bytes/history stay unchanged.
+
+Actual production Electron CLI and SDK stdio each export45frames/1.5seconds with
+stored sample timing/full decode; SDK cancel, CLI SIGINT and stdio disconnect
+preserve three incomplete folders without receipts, then retry succeeds. Actual
+HTTP/native proof also passes with a controlled live permission provider, separate
+from GUI app/settings acceptance. Stateless HTTP cancellation requires aborting
+the active request; SDK cancel notification/timeout alone cannot address it.
+No GUI/picker/physical/audio/other-platform/player/package acceptance is claimed.
+
+Final5980/446,0skips (one full); focused195/12; bothTS/lint35baseline/docs37/
+i18n15/1265 pass. Vite and committed real startup smoke pass after final production
+build (61MCPtools, CLI registration/runner reached, expected missing-file error).
+Seven assertion-killed controls (six single/one paired), with a redundant top
+permission guard and the initial weaker shutdown test preserved honestly.
+Preservation112/860/72 matches; addon unchanged5d16ea98. Exact logs/proofs/limits
+are in ../openscreen-evaluation/headless-mp4-2026-11-09T1613Z/.
+Coordinator actual Claude exact-SHA review/fixes/private push is next, including
+committed real headless startup smoke, before selected-media portable package
+prerequisite and accessible timed player. Main/private-main stayfd2775e2; no worker
+push or next phase. Prior accepted checkpoint/status accounts below are historical.
+
+## Prior checkpoint accounts
+
 # Accepted headless confirmation checkpoint — 9 November 2026
 
 Actual [review34](CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts exact

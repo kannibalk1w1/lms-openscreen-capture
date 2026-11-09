@@ -71,11 +71,18 @@ export async function serveMcpOverStdio(options: {
 	const close = () => {
 		if (closed) return;
 		closed = true;
+		stdin.removeListener("end", close);
+		stdin.removeListener("close", close);
+		stdin.removeListener("error", close);
+		process.stdout.off("close", close);
+		process.stdout.off("error", close);
 		lessonLifecycle.abort();
 		void lessonLifecycle.drain().finally(() => options.onClose());
 	};
 	stdin.once("end", close);
 	stdin.once("close", close);
 	stdin.once("error", close);
+	process.stdout.once("close", close);
+	process.stdout.once("error", close);
 	await server.connect(new StdioServerTransport(stdin, process.stdout));
 }

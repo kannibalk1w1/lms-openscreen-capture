@@ -1,3 +1,4 @@
+import { createLessonFileLifecycle } from "../lesson/fileLifecycle";
 // Headless CLI mode: boots Electron without HUD/tray/menu, drives a hidden
 // renderer window (windowType=cli-export | cli-record) that reuses the app's
 // existing export and recording pipelines, and reports progress on stdio.
@@ -310,26 +311,32 @@ export function runCli(command: CliCommand): void {
 		.then(async () => {
 			milestone("app ready");
 			if (command.kind === "lesson") {
-				if (command.action !== "confirm-range") {
+				if (command.action !== "confirm-range" && command.action !== "export-range") {
 					const code = await runLessonCommand(command, writeStdout);
 					finished = true;
 					app.exit(code);
 					return;
 				}
-				const abort = new AbortController(),
-					cancel = () => abort.abort();
+				const lifecycle = createLessonFileLifecycle(),
+					abort = new AbortController(),
+					cancel = () => abort.abort(),
+					disconnect = () => {
+						abort.abort();
+						lifecycle.abort();
+					};
 				process.once("SIGINT", cancel);
 				process.once("SIGTERM", cancel);
-				process.stdout.once("close", cancel);
-				process.stdout.once("error", cancel);
+				process.stdout.once("close", disconnect);
+				process.stdout.once("error", disconnect);
 				let code: number;
 				try {
-					code = await runLessonCommand(command, writeStdout, { signal: abort.signal });
+					code = await runLessonCommand(command, writeStdout, { signal: abort.signal, lifecycle });
 				} finally {
 					process.off("SIGINT", cancel);
 					process.off("SIGTERM", cancel);
-					process.stdout.off("close", cancel);
-					process.stdout.off("error", cancel);
+					process.stdout.off("close", disconnect);
+					process.stdout.off("error", disconnect);
+					lifecycle.abort();
 				}
 				finished = true;
 				app.exit(code);

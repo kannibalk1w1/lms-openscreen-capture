@@ -146,3 +146,48 @@ it("runs the actual explicit-file command through shared confirmation, save/reop
 	expect(await runLessonCommand(command, (s) => chunks.push(s))).toBe(1);
 	expect(JSON.parse(chunks[1])).toMatchObject({ event: "error", message: "destination-exists" });
 });
+
+it("runs explicit selected MP4 through production CLI parser/command and actual validator rejection", async () => {
+	vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+	const { setup } = await import("../lesson/fileExport.test-support"),
+		f = await setup(root),
+		chunks: string[] = [];
+	const argv = [
+		"electron",
+		"app",
+		"lesson",
+		"export-range",
+		f.request.manifestPath,
+		"--project",
+		f.request.projectPath,
+		"--project-id",
+		"p",
+		"--step",
+		f.step.id,
+		"--source",
+		f.source,
+		"--out",
+		root,
+		"--json",
+	];
+	const command = parseCliArgs(argv, 2)!;
+	if (command.kind !== "lesson" || command.action !== "export-range")
+		throw new Error("missing command");
+	expect(command.request).toEqual(f.request);
+	// Fixture bytes deliberately fail the real decoder; native stats cannot certify them.
+	expect(
+		await runLessonCommand(command, (s) => chunks.push(s), {
+			lifecycle: f.lifecycle,
+			render: f.render,
+		}),
+	).toBe(1);
+	expect(f.native).toHaveBeenCalledOnce();
+	expect(JSON.parse(chunks.at(-1)!)).toMatchObject({
+		event: "error",
+		message: "range-export-incomplete",
+	});
+	expect(chunks.some((s) => JSON.parse(s).event === "lesson-progress")).toBe(true);
+	expect(chunks.join("")).not.toContain("PRIVATE_SOURCE");
+	expect(parseCliArgs([...argv, "--step", f.step.id], 2)).toMatchObject({ kind: "error" });
+	expect(parseCliArgs([...argv, "--out", root], 2)).toMatchObject({ kind: "error" });
+});

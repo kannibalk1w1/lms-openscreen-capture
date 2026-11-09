@@ -1,3 +1,20 @@
+# Current headless selected-step MP4 authority — 9 November 2026
+
+User autonomous roadmap continuation resumes from accepted/pushed8a5074f0 after
+actual review34. Deliver [selected-step MP4 CLI/MCP parity](HEADLESS_SELECTED_MP4_2026-11-09.md),
+validate/commit locally, then stop for coordinator exact-SHA actual Claude review/
+fixes/private push. No further packaging/player phase before that review.
+Explicit saved files/project/step/source/destination authority, existing native
+ownership and validator only; native unchanged. Preserve all original evidence,
+reports/user work, existing nits and the035c8313 startup regression history.
+No other workers, implementation-worker push, main/upstream/publication/real-lesson/
+auth/config/paid-API changes, new checkout/reset/stash/discard, user-app termination
+or shared-cache purge. Old schedules/pause records remain superseded history;
+cutoffs remain revoked. Future handler/bootstrap changes/reviews require real
+headless CLI/MCP startup smoke after changed production build.
+
+## Prior checkpoint accounts
+
 # Current review33 guard and startup follow-up — 9 November 2026
 
 Complete only [L33-1 tests and the real startup regression smoke](CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md),

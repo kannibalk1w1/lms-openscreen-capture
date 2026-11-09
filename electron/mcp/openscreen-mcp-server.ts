@@ -1,3 +1,4 @@
+import type { LessonFileRangeRenderer } from "../lesson/fileExport";
 import { createLessonFileLifecycle, type LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { registerLessonTools } from "./lesson-tools";
 // The OpenScreen MCP server: the in-app agent's tools, offered to any MCP client
@@ -167,6 +168,7 @@ export type McpTransport = "http" | "stdio";
 
 export interface McpToolDeps extends ImportMediaDeps {
 	lessonLifecycle?: LessonFileLifecycle;
+	startLessonRangeRender?: LessonFileRangeRenderer;
 	transport: McpTransport;
 	host: McpDocumentHost;
 	projects: McpProjectStore;
@@ -947,6 +949,7 @@ export function createOpenScreenMcpServer(
 		transport: deps.transport,
 		editsAllowed: () => deps.editsAllowed(),
 		lifecycle: deps.lessonLifecycle,
+		render: deps.startLessonRangeRender,
 	});
 	// The effect contract: too long for addEffect's description, and versioned with the contract.
 	server.registerResource(
@@ -1006,6 +1009,7 @@ export async function startMcpHttpServer(options: {
 	// This server obeys its own switch: never pass an override through.
 	const runTool = (name: string, args: unknown) => shared(name, args);
 	let boundPort = options.port;
+	const lessonLifetimes = new Set<ReturnType<typeof createLessonFileLifecycle>>();
 
 	const handle = async (req: IncomingMessage, res: ServerResponse) => {
 		const pathname = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
@@ -1023,6 +1027,7 @@ export async function startMcpHttpServer(options: {
 		// on every call, and what the media tools hold (the take, the exports) lives in
 		// `media`, built once, so there is nothing a session would need to remember.
 		const lessonLifecycle = createLessonFileLifecycle();
+		lessonLifetimes.add(lessonLifecycle);
 		const server = createOpenScreenMcpServer({ ...deps, lessonLifecycle }, runTool, options.media);
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: undefined,
@@ -1030,6 +1035,7 @@ export async function startMcpHttpServer(options: {
 		});
 		res.on("close", () => {
 			lessonLifecycle.abort();
+			void lessonLifecycle.drain().finally(() => lessonLifetimes.delete(lessonLifecycle));
 			void transport.close();
 			void server.close();
 		});
@@ -1055,10 +1061,15 @@ export async function startMcpHttpServer(options: {
 
 	return {
 		port: boundPort,
-		close: () =>
-			new Promise<void>((resolve) => {
-				httpServer.closeAllConnections();
-				httpServer.close(() => resolve());
-			}),
+		close: async () => {
+			for (const lifetime of lessonLifetimes) lifetime.abort();
+			await Promise.all([
+				new Promise<void>((resolve) => {
+					httpServer.closeAllConnections();
+					httpServer.close(() => resolve());
+				}),
+				...[...lessonLifetimes].map((lifetime) => lifetime.drain()),
+			]);
+		},
 	};
 }

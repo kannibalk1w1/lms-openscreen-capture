@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { linkSync, realpathSync, unlinkSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { documentSchema } from "../../src/lib/ai-edition/schema";
 import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
 import { attachLessonMediaSelection } from "../../src/lib/lesson/authoring";
 import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
@@ -10,7 +9,8 @@ import { MAX_LESSON_BYTES, parseLesson, validateLesson } from "../../src/lib/les
 import { confirmLessonFileRangeSchema } from "./fileRangeContracts";
 import { RangeAuthoringService } from "./rangeAuthoring";
 import { RangeMediaError } from "./rangeErrors";
-import { readSelectedFile, readSelectedFileSnapshot } from "./selectedFile";
+import { readSelectedFile } from "./selectedFile";
+import { openSelectedLessonContext } from "./selectedLessonContext";
 export class LessonFileRangeError extends LessonOperationError {
 	constructor(
 		code: LessonErrorCode,
@@ -45,37 +45,11 @@ export async function confirmLessonFileRange(
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 		}
 		check();
-		const lessonSnapshot = readSelectedFileSnapshot(request.manifestPath, MAX_LESSON_BYTES),
-			projectSnapshot = readSelectedFileSnapshot(request.projectPath, 16 * 1024 * 1024);
-		const lessonBytes = lessonSnapshot.bytes,
-			projectBytes = projectSnapshot.bytes;
-		const lesson = await parseLesson(lessonBytes.toString("utf8"));
-		check();
-		const document = documentSchema.parse(JSON.parse(projectBytes.toString("utf8")));
-		if (document.project.id !== request.projectId)
-			throw new LessonOperationError("project-changed");
-		const currentInputs = () => {
-			check();
-			const currentLesson = readSelectedFileSnapshot(request.manifestPath, MAX_LESSON_BYTES),
-				currentProject = readSelectedFileSnapshot(request.projectPath, 16 * 1024 * 1024);
-			if (
-				currentLesson.identity !== lessonSnapshot.identity ||
-				!currentLesson.bytes.equals(lessonBytes)
-			)
-				throw new LessonOperationError("range-target-changed");
-			if (
-				currentProject.identity !== projectSnapshot.identity ||
-				!currentProject.bytes.equals(projectBytes)
-			)
-				throw new LessonOperationError("project-changed");
-		};
+		const context = await openSelectedLessonContext(request, check);
+		const { lesson, document, assertCurrent: currentInputs } = context;
 		const step = lesson.steps.find((step) => step.id === request.stepId);
 		if (!step) throw new LessonOperationError("range-target-changed");
-		const service = new RangeAuthoringService(async (id) => {
-			currentInputs();
-			if (id !== request.projectId) throw new LessonOperationError("project-changed");
-			return document;
-		});
+		const service = new RangeAuthoringService(context.readDocument);
 		const owner = {},
 			operationId = randomUUID(),
 			cancel = () => service.cancelOwner(owner);

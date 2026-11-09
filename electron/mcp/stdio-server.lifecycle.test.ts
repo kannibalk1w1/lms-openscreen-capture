@@ -25,7 +25,10 @@ vi.mock("./app-channel", () => ({ routeToApp: () => vi.fn() }));
 vi.mock("../cli/stdin", () => ({ openStdin: () => mock.stdin }));
 vi.mock("@modelcontextprotocol/sdk/server/stdio.js", () => ({ StdioServerTransport: class {} }));
 afterEach(() => vi.clearAllMocks());
-it("production stdio closure aborts its own lifetime and waits for actual tracked work before exit", async () => {
+it.each([
+	"stdin",
+	"stdout",
+])("production %s closure aborts its own lifetime and waits for actual tracked work before exit", async (pipe) => {
 	const input = new PassThrough();
 	mock.stdin = input;
 	const onClose = vi.fn(),
@@ -67,8 +70,13 @@ it("production stdio closure aborts its own lifetime and waits for actual tracke
 			finish = resolve;
 		}),
 	);
-	input.emit("end");
-	input.emit("close");
+	if (pipe === "stdin") {
+		input.emit("end");
+		input.emit("close");
+	} else {
+		const listener = process.stdout.listeners("close").at(-1)!;
+		listener();
+	}
 	expect(own.signal.aborted).toBe(true);
 	expect(foreign.signal.aborted).toBe(false);
 	expect(onClose).not.toHaveBeenCalled();

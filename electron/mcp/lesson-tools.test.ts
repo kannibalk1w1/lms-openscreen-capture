@@ -33,10 +33,12 @@ function text(result: Awaited<ReturnType<Client["callTool"]>>) {
 it("registers only selected-file query/export tools and no recovery channel", async () => {
 	const tools = (await client.listTools()).tools;
 	expect(tools.map((tool) => tool.name)).toEqual([
+		"exportLessonRangeFile",
 		"confirmLessonRangeFile",
 		"queryLessonFile",
 		"exportLessonGuide",
 	]);
+	tools.shift();
 	tools.shift();
 	expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
 	expect(tools[1].annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
