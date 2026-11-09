@@ -1,5 +1,12 @@
 # Explicit CLI/MCP source confirmation prerequisite — 9 November 2026
 
+Coordinator disposition: actual [review33](CLAUDE_ROADMAP_REVIEW_33_2026-11-09.md)
+accepts00bdbc77 with no new High/Medium. [Review34](CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md)
+acceptsf9dcd8df01531f26322237bb01c449fbefb18f96 and closesL33-1. Independent
+289focused/16files, test TS/lint and real startup smoke pass; smoke also detects
+the prior pushed035c8313 startup regression fixed by00bdbc77. Original account
+below remains; headless selected-MP4 is still the next prerequisite, not delivered.
+
 Base: accepted/pushed `035c8313d05c41e68612b80717ff036731d3fafb`, following
 actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md), which accepts bde9a618
 with no new findings and closes L31-1/N31-2. One writer; no push or helper worker.

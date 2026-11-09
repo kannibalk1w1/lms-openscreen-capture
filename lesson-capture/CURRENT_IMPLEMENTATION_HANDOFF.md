@@ -1,3 +1,26 @@
+# Accepted headless confirmation checkpoint — 9 November 2026
+
+Actual [review34](CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts exact
+f9dcd8df01531f26322237bb01c449fbefb18f96 against00bdbc77; L33-1 CLOSED.
+Independent289focused/16files pass,0skip,test TS/lint clean. Own controls pin
+both output-parent guards independently, ancestor paths and same-byte project
+replacement; known equivalent guards remain. Real committed startup smoke
+detects the035c8313 dirty-provider regression and passes on00bdbc77 (MCP60tools,
+CLI registration/runner reached, expected missing-file failure/no output).
+The regression was introduced byedb74a00, missed byreviews31/32 and fixed by
+00bdbc77; no claim that the parent was functional. Preservation112/675/70 matches.
+Production unchanged by follow-up; prior full5941/444 belongs to00bdbc77.
+
+Coordinator saves/pushes the accepted confirmation/new-copy prerequisite, then
+continues headless selected-step MP4 export with actual caller/native ownership,
+materializer/full-decode and real transport proof. Full MP4 parity is not yet
+delivered. Future handler/registration changes and reviews run the committed real
+headless startup smoke per AGENTS. Smoke-reporting/fingerprint/legacy CLI trace
+nits remain documented, not material blockers. Main staysfd2775e2; autonomous
+private-feature/evidence/source constraints persist.
+
+## Historical follow-up account
+
 # Review33 guard/startup follow-up — 9 November 2026
 
 Actual [review33](CLAUDE_ROADMAP_REVIEW_33_2026-11-09.md) accepts exact00bdbc77
