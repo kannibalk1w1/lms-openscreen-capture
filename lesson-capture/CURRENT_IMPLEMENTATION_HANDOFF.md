@@ -1,3 +1,35 @@
+# Review33 guard/startup follow-up — 9 November 2026
+
+Actual [review33](CLAUDE_ROADMAP_REVIEW_33_2026-11-09.md) accepts exact00bdbc77
+within scope with no new High/Medium. It independently confirms that edb74a00
+introduced a missing-required-provider regression in the already-pushed035c8313:
+normal sources/record/export/captions/MCP bootstrap failed. Reviews31/32 missed
+it; file-only lesson commands did not prove general headless functionality.
+00bdbc77 fixes it with a fail-closed provider. Preserve this history explicitly.
+
+The sole writer delivers [L33-1 filesystem guard tests and durable real startup smoke](CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md):
+initial/late output-parent symlinks, input ancestor links, identical-byte project
+inode replacement during observation/publication and early existing-output refusal.
+Application/native behavior stays unchanged. The committed script and AGENTS rule
+require future handler/bootstrap changes AND reviews to run real MCP initialization
+and normal CLI registration/runner startup; mocked registration is insufficient.
+Current smoke passes on the original00bdbc77 build, with the CLI's deliberate
+missing-project validation failure distinguished from functional export acceptance.
+
+Final289focused/16,0skip; bothTS, lint35baseline/docs37/i18n15 pass;6assertion
+controls (1paired/5single) kill with sources restored; real startup smoke passes.
+Preservation112/675/70 and unchanged addon verified; exact evidence is linked; no full/build repeat for this test-only update. Prior5941/444
+and Vite are historical. Original review33/reports/proofs/initial logs/stale-inventory
+explanations and the user report remain. Existing metadata latency/error-specificity
+nits and N31-3/N31-4/N29-3/N27-3 remain unchanged.
+
+Coordinator exact-SHA actual Claude follow-up/fixes then private push of the
+accepted bootstrap fix is next, before headless selected-step MP4 native transport
+ownership/materializer/validator parity. No next phase or worker push here;
+main/private-main remainfd2775e2. Physical/audio/platform/player/package limits persist.
+
+## Historical confirmation prerequisite account
+
 # Explicit CLI/MCP confirmation prerequisite — 9 November 2026
 
 Resumed from accepted/pushed035c8313 after actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md)

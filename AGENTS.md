@@ -65,6 +65,33 @@ every edit is the main way an agent turns a 5-minute task into a 30-minute one, 
   CI is enough; say so rather than burning the wall-clock twice.
 - **Never** `npm run test:watch` — it does not terminate, and it will hang the session.
 
+### Required real headless startup regression check
+
+Any production change or review touching `registerIpcHandlers`, its consumers or
+CLI/MCP bootstrap must include a real `openscreen mcp` initialize/listTools and a
+normal headless CLI startup through production registration. Reconstructed handler
+mocks and file-only lesson commands do not cover this boundary. Build changed
+production code first, then on Linux run with pinned Node:
+
+```sh
+node scripts/smoke-headless-startup.cjs --evidence-dir /absolute/fresh/evidence-directory
+```
+
+The committed smoke uses `xvfb-run`, isolated profiles, the real Electron build and
+SDK stdio transport. Its CLI export request intentionally selects a nonexistent
+disposable project: registration and runner startup must succeed before the
+expected file-not-found failure. That is startup coverage, not export/capture/
+physical acceptance. It never enumerates devices, records or renders media.
+A test-only follow-up can use the original current build and records its hashes;
+no rebuild/full-suite repeat is required solely for this smoke. Retain logs and
+report a tooling block honestly if the real check cannot run.
+
+This rule follows the pushed035c8313 regression: edb74a00 made the dirty provider
+required while the headless consumer omitted it, breaking sources/record/export/
+captions/MCP startup. Reviews31/32 missed it;00bdbc77 fixes it and review33 confirms
+both the parent failure and the fix. Do not describe that parent as generally
+functional based only on editor or mocked-bootstrap checks.
+
 ### Layout and conventions
 
 - Unit tests live next to source as `*.test.ts` / `*.test.tsx` (Vitest). Config is

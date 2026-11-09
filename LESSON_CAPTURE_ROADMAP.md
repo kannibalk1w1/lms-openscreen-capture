@@ -81,18 +81,19 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-Actual [review32](lesson-capture/CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md) accepts
-bde9a618 with no new findings; L31-1/N31-2 CLOSED and checkpoint035c8313 is pushed.
-The accepted editor workflow exports included confirmed ranges with native picker,
-owned cancellation and Linux sample/decode/hash validation. The next coherent
-[CLI/MCP explicit-file confirmation prerequisite](lesson-capture/HEADLESS_RANGE_CONFIRMATION_2026-11-09.md)
-now implements explicit source grants, confirmation/same-project refresh and
-stale-safe new editable-copy publication plus connection cancellation. It awaits
-exact-SHA coordinator review/fixes/private push. CLI/MCP selected-step MP4 export
-is still next: real caller/job ownership, explicit directory authority, native
-settlement and actual validator/transport proof must be integrated first. No
-headless MP4 parity, portable course, timed player, audio/physical/other-platform
-readiness is claimed; earlier pending labels below are historical snapshots.
+Actual [review33](lesson-capture/CLAUDE_ROADMAP_REVIEW_33_2026-11-09.md) accepts
+00bdbc77's explicit CLI/MCP source confirmation/save prerequisite with no new
+High/Medium. It also confirms a pre-existing regression: edb74a00 made a provider
+required but omitted it in the headless consumer, so already-pushed035c8313 broke
+normal headless sources/record/export/captions/MCP startup; reviews31/32 missed it.
+00bdbc77 fixes that bootstrap, pending coordinator private push. The
+[L33-1 filesystem/startup follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md)
+adds independent canonical-path/inode tests and a committed real production
+CLI/MCP startup smoke required for future handler changes/reviews. It awaits exact-
+SHA follow-up review/fixes/push before native headless selected-MP4 ownership and
+materializer/validator transport parity. Existing editor MP4 and headless source
+confirmation scopes remain bounded; no headless MP4, portable course, timed player,
+audio/physical/other-platform readiness is claimed. Earlier labels are historical.
 
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;

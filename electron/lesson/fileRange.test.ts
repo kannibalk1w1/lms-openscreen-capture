@@ -1,3 +1,10 @@
+import { openSync, renameSync, symlinkSync } from "node:fs";
+
+vi.mock("node:fs", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:fs")>();
+	return { ...actual, openSync: vi.fn(actual.openSync) };
+});
+
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -12,6 +19,7 @@ let root: string;
 beforeEach(async () => {
 	vi.spyOn(process, "platform", "get").mockReturnValue("linux");
 	root = await fs.mkdtemp(path.join(os.tmpdir(), "file-range-"));
+	vi.mocked(openSync).mockClear();
 });
 afterEach(async () => {
 	vi.restoreAllMocks();
@@ -315,4 +323,163 @@ it("keeps a legacy reference intact until explicit same-project refresh into a n
 	expect(next.steps[0].mediaSelection.previousSelections).toHaveLength(1);
 	expect(next.steps[0].mediaSelection.previousSelections[0].version).toBe(1);
 	expect(await fs.readFile(f.manifestPath)).toEqual(old);
+});
+
+async function originals(f: Awaited<ReturnType<typeof fixture>>) {
+	return {
+		lesson: await fs.readFile(f.manifestPath),
+		project: await fs.readFile(f.projectPath),
+		source: await fs.readFile(f.source),
+	};
+}
+async function expectOriginals(
+	f: Awaited<ReturnType<typeof fixture>>,
+	before: Awaited<ReturnType<typeof originals>>,
+) {
+	expect(await fs.readFile(f.manifestPath)).toEqual(before.lesson);
+	expect(await fs.readFile(f.projectPath)).toEqual(before.project);
+	expect(await fs.readFile(f.source)).toEqual(before.source);
+}
+it("refuses an output-folder ancestor symlink before reading inputs/media, staging or disclosing paths", async () => {
+	const f = await fixture(root),
+		before = await originals(f),
+		alias = path.join(root, "alias");
+	await fs.symlink(root, alias, "dir");
+	const outputPath = path.join(alias, "new-copy.json"),
+		open = vi.spyOn(fs, "open"),
+		write = vi.spyOn(fs, "writeFile");
+	vi.mocked(openSync).mockClear();
+	const error = await confirmLessonFileRange({ ...f.request, outputPath }, authority).catch(
+		(e) => e,
+	);
+	expect(error.code).toBe("lesson-operation-failed");
+	expect(error.artifactPath).toBeUndefined();
+	expect(error.message).not.toContain(root);
+	expect(openSync).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+	expect(write).not.toHaveBeenCalled();
+	await expect(fs.stat(outputPath)).rejects.toHaveProperty("code", "ENOENT");
+	expect((await fs.readdir(root)).some((name) => name.endsWith(".partial"))).toBe(false);
+	await expectOriginals(f, before);
+});
+it("rechecks the output folder after staging when its name becomes a symlink", async () => {
+	const f = await fixture(root),
+		before = await originals(f),
+		destination = path.join(root, "destination"),
+		moved = path.join(root, "moved-destination");
+	await fs.mkdir(destination);
+	const outputPath = path.join(destination, "new-copy.json"),
+		write = fs.writeFile.bind(fs);
+	let staged = false,
+		checks = 0;
+	vi.spyOn(fs, "writeFile").mockImplementation(async (...args) => {
+		await write(...args);
+		staged = true;
+	});
+	const error = await confirmLessonFileRange(
+		{ ...f.request, outputPath },
+		{
+			assertCurrent: () => {
+				// Permission stays valid. Model an external folder rename at the final check,
+				// after staged bytes have already passed their canonical read and validation.
+				if (staged && ++checks === 2) {
+					renameSync(destination, moved);
+					symlinkSync(moved, destination, "dir");
+				}
+			},
+		},
+	).catch((e) => e);
+	expect(checks).toBeGreaterThanOrEqual(2);
+	expect(error.code).toBe("lesson-operation-failed");
+	expect(path.dirname(error.artifactPath)).toBe(destination);
+	expect(path.basename(error.artifactPath)).toMatch(/^\.lesson-confirm-.*\.partial$/);
+	expect(error.artifactPath).not.toContain("moved-destination");
+	expect((await fs.stat(error.artifactPath)).isFile()).toBe(true);
+	await expect(fs.stat(outputPath)).rejects.toHaveProperty("code", "ENOENT");
+	await expect(fs.stat(path.join(moved, "new-copy.json"))).rejects.toHaveProperty("code", "ENOENT");
+	await expectOriginals(f, before);
+});
+it.each([
+	"lesson",
+	"project",
+])("refuses a %s input ancestor symlink before opening that file or reading media", async (kind) => {
+	const f = await fixture(root),
+		before = await originals(f),
+		alias = path.join(root, "input-alias");
+	await fs.symlink(root, alias, "dir");
+	const target = path.join(alias, kind === "lesson" ? "lesson.json" : "project.openscreen"),
+		request = {
+			...f.request,
+			...(kind === "lesson" ? { manifestPath: target } : { projectPath: target }),
+		},
+		open = vi.spyOn(fs, "open");
+	vi.mocked(openSync).mockClear();
+	const error = await confirmLessonFileRange(request, authority).catch((e) => e);
+	expect(error.code).toBe("lesson-operation-failed");
+	expect(error.artifactPath).toBeUndefined();
+	expect(error.message).not.toContain(root);
+	expect(vi.mocked(openSync).mock.calls.some(([file]) => file === target)).toBe(false);
+	expect(open).not.toHaveBeenCalled();
+	await expect(fs.stat(f.request.outputPath)).rejects.toHaveProperty("code", "ENOENT");
+	await expectOriginals(f, before);
+});
+it.each([
+	"observation",
+	"publication",
+])("refuses same-byte project inode replacement during pending %s", async (phase) => {
+	const f = await fixture(root),
+		before = await originals(f),
+		oldStat = await fs.stat(f.projectPath),
+		oldPath = f.projectPath + ".old",
+		open = fs.open.bind(fs),
+		write = fs.writeFile.bind(fs);
+	let replaced = false;
+	const replace = async () => {
+		if (replaced) return;
+		replaced = true;
+		await fs.rename(f.projectPath, oldPath);
+		await write(f.projectPath, before.project);
+	};
+	if (phase === "observation")
+		vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+			const file = await open(...args);
+			if (args[0] === f.source) await replace();
+			return file;
+		});
+	else
+		vi.spyOn(fs, "writeFile").mockImplementation(async (...args) => {
+			await write(...args);
+			await replace();
+		});
+	const error = await confirmLessonFileRange(f.request, authority).catch((e) => e);
+	expect(replaced).toBe(true);
+	expect((await fs.stat(oldPath)).ino).toBe(oldStat.ino);
+	expect((await fs.stat(f.projectPath)).ino).not.toBe(oldStat.ino);
+	expect(error.code).toBe("project-changed");
+	await expect(fs.stat(f.request.outputPath)).rejects.toHaveProperty("code", "ENOENT");
+	if (phase === "observation") expect(error.artifactPath).toBeUndefined();
+	else {
+		expect(path.dirname(error.artifactPath)).toBe(root);
+		expect(path.basename(error.artifactPath)).toMatch(/^\.lesson-confirm-.*\.partial$/);
+		expect((await fs.stat(error.artifactPath)).isFile()).toBe(true);
+	}
+	expect(error.message).not.toContain(root);
+	expect(await fs.readFile(oldPath)).toEqual(before.project);
+	await expectOriginals(f, before);
+});
+it("refuses an existing destination before reading any selected input or media", async () => {
+	const f = await fixture(root),
+		before = await originals(f);
+	await fs.writeFile(f.request.outputPath, "EXISTING_OUTPUT");
+	const open = vi.spyOn(fs, "open"),
+		write = vi.spyOn(fs, "writeFile");
+	vi.mocked(openSync).mockClear();
+	const error = await confirmLessonFileRange(f.request, authority).catch((e) => e);
+	expect(error.code).toBe("destination-exists");
+	expect(error.artifactPath).toBeUndefined();
+	expect(openSync).not.toHaveBeenCalled();
+	expect(open).not.toHaveBeenCalled();
+	expect(write).not.toHaveBeenCalled();
+	expect(await fs.readFile(f.request.outputPath, "utf8")).toBe("EXISTING_OUTPUT");
+	await expectOriginals(f, before);
 });

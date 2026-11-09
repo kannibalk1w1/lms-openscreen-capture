@@ -1,3 +1,14 @@
+# Current review33 guard and startup follow-up — 9 November 2026
+
+Complete only [L33-1 tests and the real startup regression smoke](CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md),
+validate/commit locally and stop for coordinator actual Claude exact-SHA follow-up/
+fixes/private push. No headless MP4 phase yet. Pushed035c8313 had a headless startup
+regression introduced byedb74a00 and missed byreviews31/32;00bdbc77 fixes it and
+review33 verifies both sides. Preserve that history, original reports/evidence/user
+report and all authority limits. Future handler-touching changes/reviews require
+a real CLI/MCP startup smoke. No other workers, implementation-worker push or
+main/upstream/real-lesson/auth/config changes; old schedules remain revoked history.
+
 # Current headless confirmation prerequisite — 9 November 2026
 
 Autonomous dispatch resumes from accepted/pushed035c8313 after actual review32.

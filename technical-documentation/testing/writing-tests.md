@@ -117,3 +117,21 @@ npm run test                           # everything (~80s), once, before committ
 | A full export producing a real file | `tests/e2e/`, or the manual checklist |
 
 Automated suites do not exercise every hardware, permission, codec, signing, and packaged-app combination. Use the [manual end-to-end checklist](manual-e2e-checklist.md) for those release and platform checks.
+
+## Real headless registration smoke
+
+Changes and reviews touching `registerIpcHandlers`, its consumers or CLI/MCP
+bootstrap require the production runtime check, beyond reconstructed mocks:
+
+```sh
+node scripts/smoke-headless-startup.cjs --evidence-dir /absolute/fresh/evidence-directory
+```
+
+Run from the repo with pinned Node22.22.1 and an existing current production build
+(`npx vite build` after production changes), Electron dependencies and xvfb-run.
+The SDK subprocess must initialize/listTools, and a normal CLI export must reach
+production registration and its renderer before the expected missing-disposable-
+project failure. No devices or real media are accessed; this is startup coverage,
+not a working export/recording/physical claim. Retain build hashes and logs; a
+test-only change can reuse the original build. See [review33 follow-up](../../lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_33_2026-11-09.md)
+for the pushed startup regression missed by earlier editor/mocked checks.
