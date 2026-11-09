@@ -1,3 +1,23 @@
+# Accepted verified package opening checkpoint — 9 November 2026
+
+Actual [review40](CLAUDE_ROADMAP_REVIEW_40_2026-11-09.md) accepts exact
+93a84456f0bce70bcde666e45049cf66a176c369 against8ae83766 with no new findings;
+L39-1 CLOSED. Independent170focused/9files,0skip; all5production-registration
+cases refuse old capability before save picker after session/dirty changes,
+leave package/authored work untouched and permit fresh-open recovery. R10/R16
+alone are redundant; paired removal is killed by all5cases. Preservation
+1485/76,1873/78,125,267,2,112entries matches. No new full/build/Electron/native
+acceptance; prior full6108/453 and real IPC proofs belong to8ae83766.
+
+Coordinator checkpoints/pushes verified GUI inspection/static-only new-copy,
+then continues media-preserving edit/reseal as a separate package dependency.
+Video packages remain read-only and cannot be copied through static-only action;
+original packages/receipts unchanged. N39 partial/capability-drop/error nits,
+physical/picker/audio/platform limits persist. Autonomous feature-only workflow,
+mainfd2775e2 and evidence/source/user-report preservation constraints remain.
+
+## Historical package-open follow-up account
+
 # Review39 session-capability follow-up — 9 November 2026
 
 Actual [review39](CLAUDE_ROADMAP_REVIEW_39_2026-11-09.md) accepts exact8ae83766
