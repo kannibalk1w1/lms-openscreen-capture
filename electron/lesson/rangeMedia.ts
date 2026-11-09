@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AxcutDocument } from "../../src/lib/ai-edition/schema";
@@ -141,11 +142,18 @@ export async function materializeLessonRange(options: {
 	render: RangeMediaRenderer;
 	pickDirectory: () => Promise<string | null>;
 	signal?: AbortSignal;
+	assertCurrent?: () => void;
+	onPhase?: (phase: "checking-source" | "rendering" | "validating", totalFrames: number) => void;
+	target?: { lessonId: string; stepId: string; revision: number };
 }) {
+	const check = () => {
+		checkSourceCancellation(options.signal);
+		options.assertCurrent?.();
+	};
 	try {
 		const selection = lessonMediaSelectionSchema.parse(options.selection);
 		if (selection.version !== 2) throw new RangeMediaError("range-media-unattested");
-		checkSourceCancellation(options.signal);
+		check();
 		if (process.platform !== "linux") throw new RangeMediaError("range-media-unsupported");
 		const prepared = await prepareLessonRangeMedia(
 			await options.readDocument(selection.projectId),
@@ -153,22 +161,25 @@ export async function materializeLessonRange(options: {
 		);
 		const sourcesBeforePick = resolveRangeSources(prepared.derived, prepared.clips);
 		requireSourceCoverage(selection.identity, sourcesBeforePick);
+		check();
 		const parent = await options.pickDirectory();
-		checkSourceCancellation(options.signal);
+		check();
 		if (!parent) return { status: "cancelled" as const };
 		if (!path.isAbsolute(parent) || !(await fs.stat(parent)).isDirectory())
 			throw new RangeMediaError("range-media-unsupported");
+		options.onPhase?.("checking-source", prepared.expectedFrames);
 		const sources = resolveRangeSources(prepared.derived, prepared.clips);
 		requireSourceCoverage(selection.identity, sources);
 		const before = await observeRangeSources(sources, options.signal);
 		requireMatchingSourceContent(selection.identity.sources, before);
 		await prepareLessonRangeMedia(await options.readDocument(selection.projectId), selection);
-		checkSourceCancellation(options.signal);
+		check();
 		const directory = path.join(parent, `lesson-range-${randomUUID()}`);
 		await fs.mkdir(directory, { mode: 0o700 });
 		try {
-			checkSourceCancellation(options.signal);
+			check();
 			const file = path.join(directory, "range.mp4");
+			options.onPhase?.("rendering", prepared.expectedFrames);
 			const stats = await options.render(
 				prepared.clips,
 				file,
@@ -182,10 +193,13 @@ export async function materializeLessonRange(options: {
 				Math.abs(stats.videoDurationS - prepared.expectedFrames / 30) > 1e-6
 			)
 				throw new RangeMediaError("range-media-incomplete");
+			check();
+			options.onPhase?.("validating", prepared.expectedFrames);
 			const videoEvidence = await validateRangeVideo(file, {
 				...prepared.params,
 				frames: prepared.expectedFrames,
 			});
+			check();
 			await prepareLessonRangeMedia(await options.readDocument(selection.projectId), selection);
 			const after = await observeRangeSources(sources, options.signal);
 			requireMatchingSourceContent(before, after);
@@ -197,6 +211,7 @@ export async function materializeLessonRange(options: {
 			const receipt = {
 				format: "openscreen-lesson-range-media",
 				version: 1,
+				...(options.target ? { target: options.target } : {}),
 				selection: { ...selection, previousSelections: [] },
 				renderInputsSha256: await lessonRenderFingerprint(prepared.derived),
 				output: {
@@ -220,8 +235,10 @@ export async function materializeLessonRange(options: {
 					timingVerified: false,
 				},
 			};
-			checkSourceCancellation(options.signal);
-			await fs.writeFile(
+			check();
+			// Small bounded metadata publication is one JS turn after the final authority check.
+			// A later IPC cancellation is a completion-won race, not a stale receipt write.
+			writeFileSync(
 				path.join(directory, "range-export.json"),
 				JSON.stringify(receipt, null, 2) + "\n",
 				{ flag: "wx", mode: 0o600 },

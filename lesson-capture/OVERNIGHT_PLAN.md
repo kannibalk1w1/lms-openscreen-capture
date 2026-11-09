@@ -1,3 +1,14 @@
+# Current selected-step MP4 authorization — 9 November 2026
+
+The autonomous coordinator dispatch resumes from accepted/pushed `bc906e39` after
+actual review30 accepts `27136d0f` and closes T29-1/L29-1/N29-1/N29-2. Implement
+only the [bounded selected-step MP4 editor workflow](SELECTED_STEP_MP4_2026-11-09.md),
+validate/commit locally and stop for independent exact-SHA Claude review/fixes and
+coordinator private push. No additional workers or implementation-worker push;
+main/private-main stay `fd2775e2`, all source/evidence/real-lesson/auth restrictions
+persist. Earlier pause records and obsolete pending labels below are history;
+original overnight cutoffs remain revoked. CLI/MCP parity is next after acceptance.
+
 # Current review29 follow-up — 9 November 2026
 
 Finish only the [review29 authority/GIF follow-up](CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md)

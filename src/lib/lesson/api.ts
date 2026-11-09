@@ -11,6 +11,12 @@ export type LessonErrorCode =
 	| "range-source-changed"
 	| "range-source-cancelled"
 	| "render-busy"
+	| "range-export-unattested"
+	| "range-export-unsupported"
+	| "range-export-changed"
+	| "range-export-incomplete"
+	| "range-export-cancelled"
+	| "range-export-source-unavailable"
 	| "destination-exists"
 	| "local-draft-limit"
 	| "local-draft-unavailable";

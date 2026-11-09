@@ -60,6 +60,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	lessonDraftList: () => ipcRenderer.invoke("lesson:draft-list"),
 	lessonDraftRead: (id: string) => ipcRenderer.invoke("lesson:draft-read", id),
 	lessonDraftRemove: (id: string) => ipcRenderer.invoke("lesson:draft-remove", id),
+	lessonRangeExport: (input: unknown) => ipcRenderer.invoke("lesson:range-export", input),
+	lessonRangeExportCancel: (id: string) => ipcRenderer.invoke("lesson:range-export-cancel", id),
+	onLessonRangeExportProgress: (callback: (value: unknown) => void) => {
+		const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value);
+		ipcRenderer.on("lesson:range-export-progress", listener);
+		return () => ipcRenderer.removeListener("lesson:range-export-progress", listener);
+	},
 	lessonConfirmRange: (input: unknown) => ipcRenderer.invoke("lesson:confirm-range", input),
 	lessonCancelRange: (id: string) => ipcRenderer.invoke("lesson:cancel-range", id),
 	lessonPlanRange: (input: unknown) => ipcRenderer.invoke("lesson:plan-range", input),

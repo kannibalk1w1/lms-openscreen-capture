@@ -259,6 +259,9 @@ interface Window {
 		lessonDraftList?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftList"];
 		lessonDraftRead?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftRead"];
 		lessonDraftRemove?: import("../src/lib/lesson/drafts").LocalDraftApi["lessonDraftRemove"];
+		lessonRangeExport?: import("../src/lib/lesson/rangeExport").LessonRangeExportApi["lessonRangeExport"];
+		lessonRangeExportCancel?: import("../src/lib/lesson/rangeExport").LessonRangeExportApi["lessonRangeExportCancel"];
+		onLessonRangeExportProgress?: import("../src/lib/lesson/rangeExport").LessonRangeExportApi["onLessonRangeExportProgress"];
 		lessonConfirmRange?: import("../src/lib/lesson/api").LessonApi["lessonConfirmRange"];
 		lessonCancelRange?: import("../src/lib/lesson/api").LessonApi["lessonCancelRange"];
 		lessonPlanRange?: import("../src/lib/lesson/api").LessonApi["lessonPlanRange"];

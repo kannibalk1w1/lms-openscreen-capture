@@ -76,7 +76,6 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
-import { LessonService } from "../lesson/service";
 import {
 	DEFAULT_RECORDINGS_DIR,
 	getRecordingsDirInfo,
@@ -175,8 +174,7 @@ import {
 } from "../windows-update";
 import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
-import { registerEditorRangeAuthoring } from "./editorRangeAuthoring";
-import { registerEditorLessonHandlers } from "./lesson";
+import { registerLessonWorkflow } from "./lessonWorkflow";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
@@ -5072,14 +5070,6 @@ export function registerIpcHandlers(
 		return restore;
 	}
 
-	registerEditorLessonHandlers(
-		new LessonService(
-			(id) => aiEditionDocuments.getProject(id),
-			(...args) => loudnessService.renderFrames(...args),
-		),
-		() => editorHasUnsavedChanges?.() ?? false,
-	);
-
 	const mcpAppRecorder = createAppRecorder({
 		isRecording: () => appRecording,
 		editorHasUnsavedChanges: () => editorHasUnsavedChanges?.() ?? false,
@@ -5108,9 +5098,11 @@ export function registerIpcHandlers(
 	});
 	const mcpController = new McpController(mcpSettings, mcpToolDeps, mcpRunTool, mcpMedia);
 
-	registerEditorRangeAuthoring({
+	if (!editorHasUnsavedChanges) throw new Error("Editor dirty-state provider is required.");
+	registerLessonWorkflow({
 		documents: aiEditionDocuments,
-		editorHasUnsavedChanges: () => editorHasUnsavedChanges?.() ?? false,
+		compositor: loudnessService,
+		editorHasUnsavedChanges,
 		readableApprovedPath,
 	});
 

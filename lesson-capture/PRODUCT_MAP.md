@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up pending review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -36,7 +36,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | C Privacy-safe capture, storage and export | Partial | Default-off Linux button gates, scope suppression, source-bound receipts/recovery exclusions; full redaction/allowlists remain | Critical, phase 0; broad capture gate |
 | A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Manual steps, neutral flag/typing drafts, native stills, editable source, selected HTML/Markdown and bounded print proof; semantic generation remains | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
-| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references and explicit Linux source confirmation; selected MP4 UI and timed controls/progress remain | High, phase 3 |
+| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references and explicit Linux source confirmation; bounded selected-step MP4 export exists; timed player controls/progress remain | High, phase 3 |
 | E Accessible differentiated outputs | Partial | Unified lesson Standard/Large print/High contrast, language/direction and image/code exclusions; reviewed simplification/narration/slow profiles remain | High, phase 1 defaults + phase 3 delivery |
 | F Recording script/checklist | Planned | Notes and flags; no source-linked recording checklist established | Medium-high, phase 4; small earlier slice allowed |
 | G Quality review | Partial | Probes/health plus source review labels/findings and bounded title/status/source queries; unified media QC remains | High, preflight now; unified report phase 4 |
@@ -84,11 +84,13 @@ claims that every listed operation exists.
    review25 and review26 at d017e4b8; it is not immutable or authenticated history.
    [Editor confirmation](RANGE_AUTHORING_2026-11-09.md) now explicitly attaches
    current content or refreshes within the same project, with cancellation and
-   caller/source/stale-target guards; review27 accepts1dad5a7c with no High/Medium; the [bounded follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md) is accepted by actual review28 at897ddceb. Selected MP4
-   export remains backend-only: [shared native render-job ownership](NATIVE_RENDER_OWNERSHIP_2026-11-09.md) is accepted at6821c776 by review29; the [authority/GIF follow-up](CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md) awaits review before native picker,
-   progress/cancellation/status and actual materializer/validator integration are
-   next. CLI/MCP confirmation/export parity, timed Next/Previous/Replay/loop/speed,
-   captions and local progress remain unimplemented.
+   caller/source/stale-target guards; review27 accepts1dad5a7c with no High/Medium; the [bounded follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md) is accepted by actual review28 at897ddceb. The
+   [selected-step MP4 editor slice](SELECTED_STEP_MP4_2026-11-09.md) now integrates
+   native picker, owned progress/cancellation/status and actual validator, pending
+   exact-SHA coordinator review. Shared ownership and authority/GIF follow-up are
+   accepted through review30 at27136d0f. CLI/MCP confirmation/export parity is next
+   after acceptance. Timed Next/Previous/Replay/loop/speed, captions and local
+   learner progress remain later work.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
    Source clocks/claims stay distinguishable; imported references must be revalidated.
@@ -259,8 +261,10 @@ timing; review22 accepts slice24 runtime sample/decode proof at91b59b1d. Its
 guard/provenance and settlement follow-ups are accepted through review24.
 Bounded Linux authored source content identity is accepted through review26;
 [explicit editor confirmation](RANGE_AUTHORING_2026-11-09.md) is now implemented,
-accepted through review28 at897ddceb. Shared render ownership is accepted by review29; its authority/GIF follow-up is pending review; selected MP4 export UI/CLI/MCP, full editor/course packaging and
-timed output acceptance remain.
+accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
+review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
+implemented within its Linux subset, pending exact-SHA review; CLI/MCP parity,
+full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.

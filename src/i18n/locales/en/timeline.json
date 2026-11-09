@@ -330,7 +330,13 @@
 			"range-source-unavailable": "A source video is missing or has not been approved for this editor. Open or import it through the video project, save, then retry.",
 			"range-source-unsupported": "Source confirmation supports Linux video-only ranges from 1/30 second to 120 seconds, up to 32 kept spans and 8 source files (8 GiB total). Use a simple range without webcam, added audio, image backgrounds or image annotations; check that its source files are readable.",
 			"range-source-changed": "The source video or saved project changed during confirmation. Review the current video, save the project, then explicitly refresh the range and current source.",
-			"range-source-cancelled": "Source confirmation was cancelled. The lesson range was not changed."
+			"range-source-cancelled": "Source confirmation was cancelled. The lesson range was not changed.",
+			"range-export-unattested": "Confirm the current source for this included step before exporting its MP4. Older range references are kept until you explicitly refresh them.",
+			"range-export-unsupported": "This MP4 export supports Linux video-only ranges from 1/30 second to 120 seconds, up to 32 kept spans and 8 source files (8 GiB total). Remove unsupported webcam, added audio or image dependencies, save the project and explicitly refresh after reviewing the current source.",
+			"range-export-changed": "The saved project or source video differs from the confirmed range. Review the current video, save the project, then explicitly refresh the range and source before exporting.",
+			"range-export-incomplete": "The MP4 could not be verified. Any new unfinished files are kept for inspection; they are not a completed export. Check the source video and destination, then retry.",
+			"range-export-cancelled": "MP4 export stopped. No completed export was certified after cancellation.",
+			"range-export-source-unavailable": "A source video is missing or not approved for this editor. Open or import it through the video project, save, review and explicitly refresh the range before retrying."
 		},
 		"output": {
 			"title": "Guide output settings",
@@ -407,7 +413,7 @@
 		},
 		"range": {
 			"title": "Video range reference",
-			"scope": "Explicit range selection on the saved editor timeline. Attach a reference only, or explicitly confirm the current source contents. Cuts and speed affect the resulting video duration. MP4 export is not available here yet.",
+			"scope": "Explicit range selection on the saved editor timeline. Attach a reference only, or explicitly confirm the current source contents. Cuts and speed affect the resulting video duration. Export an included step’s confirmed range as an MP4 with a separate destination choice.",
 			"start": "Ruler start (seconds)",
 			"end": "Ruler end (seconds)",
 			"useStart": "Use playhead as range start",
@@ -424,7 +430,21 @@
 			"cancel": "Cancel source confirmation",
 			"cancelled": "Source confirmation cancelled; the lesson range was not changed.",
 			"working": "Reading selected source videos… This may take a while for large files.",
-			"cancelling": "Cancelling source confirmation… Waiting for the current file read to finish."
+			"cancelling": "Cancelling source confirmation… Waiting for the current file read to finish.",
+			"export": "Export this step’s MP4",
+			"exportScope": "Export only this included step’s confirmed range. Linux only; the supported video-only subset above applies. Video timing and decoded frames are checked; source audio and audio alignment are not verified. No full-project fallback or automatic source refresh.",
+			"exported": "MP4 video checked and saved in: {{path}}",
+			"exportIncomplete": "Unfinished export files kept in: {{path}}",
+			"exportCancelled": "MP4 export cancelled; existing lesson and source files are unchanged.",
+			"exportCancel": "Cancel MP4 export",
+			"exportCancelling": "Cancelling MP4 export… Waiting for current work to finish; some native work cannot stop immediately.",
+			"exportFrames": "{{frames}} of {{total}} frames rendered",
+			"exportPhases": {
+				"choosing-destination": "Choose a destination folder to continue. Cancelling the picker creates no export.",
+				"checking-source": "Checking the confirmed source videos…",
+				"rendering": "Rendering this step’s selected video…",
+				"validating": "Checking the exported video and source again…"
+			}
 		}
 	}
 }

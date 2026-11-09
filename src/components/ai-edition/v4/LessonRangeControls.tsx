@@ -9,11 +9,15 @@ export function LessonRangeControls({
 	onConfirm,
 	confirmAvailable,
 	onRemove,
+	onExport,
+	exportAvailable,
 }: {
 	selection?: LessonMediaSelection;
 	available: boolean;
 	onAttach: (startSec: number, endSec: number) => void;
 	onRemove: () => void;
+	onExport: () => void;
+	exportAvailable: boolean;
 	confirmAvailable: boolean;
 	onConfirm: (startSec: number, endSec: number) => void;
 }) {
@@ -90,6 +94,10 @@ export function LessonRangeControls({
 				{t(selection ? "lesson.range.refresh" : "lesson.range.confirm")}
 			</button>
 			<p>{t(selection?.version === 2 ? "lesson.range.confirmed" : "lesson.range.unconfirmed")}</p>
+			<p>{t("lesson.range.exportScope")}</p>
+			<button type="button" disabled={!exportAvailable} onClick={onExport}>
+				{t("lesson.range.export")}
+			</button>
 			{selection && (
 				<>
 					<p>

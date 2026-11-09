@@ -1,3 +1,34 @@
+# Selected-step MP4 editor slice — 9 November 2026
+
+Resumed from accepted/pushed `bc906e39`; actual [review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md)
+accepts `27136d0f` with no new High/Medium/Low, closing T29-1/L29-1/N29-1/N29-2.
+The sole writer delivers [selected-step MP4 export](SELECTED_STEP_MP4_2026-11-09.md)
+from Lesson guide: explicitly included v2 confirmed range, native destination
+picker before source media reads, shared owned cancellation/progress/lifecycle,
+actual Linux sample/decode/hash validation and honest incomplete artifacts.
+No automatic pin capture/refresh, legacy upgrade or full-project fallback.
+Main only holds the submitted lesson snapshot; UI target guards and cancellation
+complement current saved-project/session/source authority. Nit N30-1 now has actual
+main-binding and live production-registration controls. N29-3/N27-3 remain bounded
+usability limits; the old unreproduced observation remains unchanged.
+
+Final 5902 full tests/441 files and 453 focused/26 (44 new tests), zero skips;
+both TS, Vite, Biome (35 baseline warnings), docs (37 files) and i18n (15 catalogs)
+pass. Ten independent assertion controls killed; preservation of 112/189/64 entries
+and unchanged addon verified. Real Node/N-API and real Electron preload/registered
+IPC harness each produce 45 decoded frames/1.5s from cut/speed
+selection with unchanged source/project/lesson/addon. Destination dialogs are stubbed;
+no full-app GUI/native-picker/physical/Windows/macOS/audio acceptance. All15catalogs
+have keys; new non-English copy awaits human translation. Exact final checks,
+mutations, preservation and limits are in the linked report and unique evidence.
+Coordinator exact-SHA Claude review/fixes/private push is pending; implementation
+stops here. Next after acceptance: shared-service CLI/MCP confirmation/refresh/
+selected-export parity, with explicit transport authority and owned cancellation;
+physical picker/editor acceptance remains. No course package/timed player claim.
+Main/private-main stayfd2775e2; original evidence/user report and authority persist.
+
+## Historical checkpoint accounts
+
 # Accepted native-render ownership checkpoint — 9 November 2026
 
 Actual [review30](CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts exact

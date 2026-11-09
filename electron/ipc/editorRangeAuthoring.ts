@@ -3,6 +3,7 @@ import { AI_EDITION_OPEN_PROJECT_CHANNEL } from "../../src/native/contracts";
 import type { DocumentService } from "../ai-edition/document-service";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { RangeAuthoringService } from "../lesson/rangeAuthoring";
+import { renderOwnerJobs } from "./exportJobs";
 import { registerRangeAuthoringHandlers } from "./rangeAuthoring";
 
 /** Production registration shared by the main handlers and its focused integration tests.
@@ -28,7 +29,10 @@ export function registerEditorRangeAuthoring(options: {
 	ipcMain.on(AI_EDITION_OPEN_PROJECT_CHANNEL, (event, projectId: unknown) => {
 		const id =
 			typeof projectId === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(projectId) ? projectId : null;
-		if (event.senderFrame === event.sender.mainFrame) editorRangeSessions.select(event.sender, id);
+		if (event.senderFrame === event.sender.mainFrame) {
+			editorRangeSessions.select(event.sender, id);
+			renderOwnerJobs.invalidate(event.sender);
+		}
 		if (id === null && markedBy !== null && markedBy !== event.sender) return;
 		markedBy = id === null ? null : event.sender;
 		options.documents.markOpenInEditor(id);

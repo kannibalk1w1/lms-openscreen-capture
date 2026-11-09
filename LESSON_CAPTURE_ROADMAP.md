@@ -81,17 +81,16 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-Actual [review28](lesson-capture/CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts
-897ddceb with no new High/Medium/Low, closing the bounded authoring follow-ups.
-The accepted checkpoint623fa85c is pushed and reviewed; previous pending labels
-below remain history. [Shared native render ownership](lesson-capture/NATIVE_RENDER_OWNERSHIP_2026-11-09.md)
-now covers exports/stills/frame batches across compositor service instances,
-accepted within scope by actual [review29](lesson-capture/CLAUDE_ROADMAP_REVIEW_29_2026-11-09.md)
-at6821c776 with no High/Medium. A bounded [required-authority/GIF follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md)
-awaits coordinator review/push before the next authorized selected-step MP4
-GUI action with native destination picker, scoped progress/cancel/status, unchanged
-source-pin/timing guards and actual validator. No selected-MP4 GUI/CLI/MCP delivery,
-portable course, timed player, audio or physical/other-platform readiness is claimed.
+Actual [review30](lesson-capture/CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts
+27136d0f with no new High/Medium/Low, closing the shared ownership authority/GIF
+follow-up; coordinator checkpointbc906e39 is pushed and verified. The bounded
+[selected-step MP4 editor slice](lesson-capture/SELECTED_STEP_MP4_2026-11-09.md) now
+integrates included confirmed ranges, native destination choice, owned progress/
+cancellation and actual Linux sample/decode/hash validation. It awaits independent
+exact-SHA coordinator review/fixes/private push; original pending notes below are
+history. Native/real Electron IPC proof is distinguished from GUI/picker/physical
+acceptance. CLI/MCP confirmation/export parity is next after acceptance. Portable
+courses, timed player, audio and other-platform readiness remain unclaimed.
 
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;

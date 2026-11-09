@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -24,6 +24,10 @@ import {
 	lessonMediaSelectionV2Schema,
 } from "@/lib/lesson/mediaSelection";
 import { lessonOutput } from "@/lib/lesson/output";
+import {
+	type LessonRangeExportProgress,
+	lessonRangeExportProgressSchema,
+} from "@/lib/lesson/rangeExport";
 import { emptyLessonQuery, queryLesson, stepFindings } from "@/lib/lesson/review";
 import {
 	type LessonManifest,
@@ -41,6 +45,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 	const t = useScopedT("timeline");
 	const document = useProjectStore((s) => s.document),
 		projectId = useProjectStore((s) => s.projectId);
+	const projectDirty = useProjectStore((s) => s.dirty);
 	const [lesson, setLesson] = useState<LessonManifest>(() => newLesson());
 	const [query, setQueryValue] = useState(emptyLessonQuery);
 	const [pinned, setPinned] = useState<string[]>([]);
@@ -56,13 +61,73 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		[notice, setNotice] = useState("");
 	const epoch = useRef({ projectId });
 	const generation = useRef(0);
+	const latestTarget = useRef({ lesson, selected });
+	latestTarget.current = { lesson, selected };
 	const replaceLesson = (value: LessonManifest) => {
+		stopExport("stale");
 		generation.current++;
 		setLesson(value);
 		setSelected(value.steps.map((step) => step.id));
 		setQuery(emptyLessonQuery());
 	};
 	const busyRef = useRef(false);
+	const exportOperation = useRef<null | {
+		id: string;
+		cancelled: boolean;
+		invalidated: boolean;
+		lesson: LessonManifest;
+		selected: string[];
+		document: typeof document;
+		projectId: string;
+		current: () => boolean;
+	}>(null);
+	const [exportProgress, setExportProgress] = useState<LessonRangeExportProgress | null>(null);
+	const [exportCancelling, setExportCancelling] = useState(false);
+	const stopExport = useCallback((reason: "cancel" | "stale" = "cancel") => {
+		const operation = exportOperation.current;
+		if (!operation) return;
+		if (reason === "stale") operation.invalidated = true;
+		if (operation.cancelled) return;
+		operation.cancelled = true;
+		setExportCancelling(true);
+		void window.electronAPI?.lessonRangeExportCancel?.(operation.id).catch(() => undefined);
+	}, []);
+	useEffect(
+		() =>
+			window.electronAPI?.onLessonRangeExportProgress?.((input) => {
+				const parsed = lessonRangeExportProgressSchema.safeParse(input);
+				if (!parsed.success) return;
+				const progress = parsed.data;
+				const operation = exportOperation.current;
+				if (
+					operation &&
+					operation.id === progress.operationId &&
+					!operation.cancelled &&
+					operation.current()
+				)
+					setExportProgress(progress);
+			}),
+		[],
+	);
+	useEffect(() => {
+		const operation = exportOperation.current;
+		if (
+			operation &&
+			(operation.lesson !== lesson ||
+				operation.selected !== selected ||
+				operation.document !== document ||
+				operation.projectId !== projectId ||
+				projectDirty)
+		)
+			stopExport("stale");
+	}, [lesson, selected, document, projectId, projectDirty, stopExport]);
+	useEffect(
+		() => () => {
+			stopExport("stale");
+		},
+		[stopExport],
+	);
+
 	const rangeOperation = useRef<{ id: string; cancelled: boolean } | null>(null);
 	const [confirmingRange, setConfirmingRange] = useState(false);
 	const [cancellingRange, setCancellingRange] = useState(false);
@@ -83,6 +148,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 		};
 	}, [projectId]);
 	const author = (operation: () => LessonManifest) => {
+		stopExport("stale");
 		try {
 			setLesson(operation());
 			setError(null);
@@ -360,6 +426,82 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 								<LessonRangeControls
 									key={`${lesson.id}-${step.id}-${generation.current}`}
 									selection={step.mediaSelection}
+									exportAvailable={
+										active.includes(step.id) &&
+										step.mediaSelection?.version === 2 &&
+										step.mediaSelection.projectId === projectId &&
+										!!document &&
+										!projectDirty &&
+										!!window.electronAPI?.lessonRangeExport &&
+										!!window.electronAPI?.lessonRangeExportCancel
+									}
+									onExport={() =>
+										void run(async (current) => {
+											const store = useProjectStore.getState(),
+												snapshot = store.document,
+												selection = step.mediaSelection;
+											if (
+												!snapshot ||
+												!store.projectId ||
+												store.dirty ||
+												selection?.version !== 2 ||
+												!active.includes(step.id)
+											)
+												throw new LessonOperationError("range-export-unattested");
+											const isCurrent = () =>
+												current() &&
+												useProjectStore.getState().document === snapshot &&
+												useProjectStore.getState().projectId === store.projectId &&
+												!useProjectStore.getState().dirty &&
+												latestTarget.current.lesson === lesson &&
+												latestTarget.current.selected === selected;
+											if (
+												selection.projectId !== store.projectId ||
+												(await lessonRenderFingerprint(snapshot)) !== selection.documentSha256
+											)
+												throw new LessonOperationError("range-export-changed");
+											if (!isCurrent()) return;
+											const operation = {
+												id: crypto.randomUUID(),
+												cancelled: false,
+												invalidated: false,
+												lesson,
+												selected,
+												document: snapshot,
+												projectId: store.projectId,
+												current: isCurrent,
+											};
+											exportOperation.current = operation;
+											setExportCancelling(false);
+											setExportProgress({
+												operationId: operation.id,
+												phase: "choosing-destination",
+											});
+											try {
+												const result = await window.electronAPI.lessonRangeExport!({
+													operationId: operation.id,
+													lesson,
+													stepId: step.id,
+													includedStepIds: active,
+												});
+												if (!isCurrent() || operation.invalidated) return;
+												if (!result.success) {
+													if (result.artifactPath)
+														setNotice(
+															t("lesson.range.exportIncomplete", { path: result.artifactPath }),
+														);
+													throw new LessonOperationError(result.code);
+												}
+												if (result.result.status === "materialized")
+													setNotice(t("lesson.range.exported", { path: result.result.path }));
+												else setNotice(t("lesson.range.exportCancelled"));
+											} finally {
+												if (exportOperation.current === operation) exportOperation.current = null;
+												setExportProgress(null);
+												setExportCancelling(false);
+											}
+										})
+									}
 									available={!!document && !!projectId && !!window.electronAPI?.lessonPlanRange}
 									confirmAvailable={
 										!!document &&
@@ -617,6 +759,24 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						);
 					})}
 				</fieldset>
+				{exportProgress && (
+					<>
+						<button type="button" disabled={exportCancelling} onClick={() => stopExport()}>
+							{t("lesson.range.exportCancel")}
+						</button>
+						<p role="status" aria-live="polite">
+							{exportCancelling
+								? t("lesson.range.exportCancelling")
+								: t(`lesson.range.exportPhases.${exportProgress.phase}`)}
+							{!exportCancelling &&
+							exportProgress.phase === "rendering" &&
+							exportProgress.frames !== undefined &&
+							exportProgress.totalFrames !== undefined
+								? ` ${t("lesson.range.exportFrames", { frames: exportProgress.frames, total: exportProgress.totalFrames })}`
+								: ""}
+						</p>
+					</>
+				)}
 				{confirmingRange && (
 					<button
 						type="button"
