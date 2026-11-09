@@ -469,7 +469,7 @@
 		"package": {
 			"title": "Portable lesson package",
 			"scope": "Inspect a derived lesson without replacing your current work. Native projects, source media, raw history, fonts, annotations, added audio and branches are not included. Package HTML is never opened inside the app.",
-			"dirty": "Save and reload the current video project before inspecting a package.",
+			"dirty": "Save the current video project to continue. Opening, copying and saving packages wait until it is saved; a package draft you are editing is kept.",
 			"open": "Open and check a package folder",
 			"checking": "Checking package files and any included video. This may take a while.",
 			"checked": "Files matched the package checks when opened. This is a read-only snapshot, not a signature or content approval. Files are checked again before saving a copy.",

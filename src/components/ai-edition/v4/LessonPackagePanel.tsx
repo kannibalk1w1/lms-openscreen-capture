@@ -14,7 +14,6 @@ export function LessonPackagePanel({
 } = {}) {
 	const t = useScopedT("timeline");
 	const projectId = useProjectStore((s) => s.projectId),
-		document = useProjectStore((s) => s.document),
 		dirty = useProjectStore((s) => s.dirty);
 	const [draft, setDraft] = useState<LessonManifest | null>(null);
 	const draftGeneration = useRef(0);
@@ -45,8 +44,10 @@ export function LessonPackagePanel({
 			void window.electronAPI?.lessonPackageRelease?.(token.current).catch(() => undefined);
 		token.current = null;
 	}, []);
+	// Only a different project ends this panel's own hold on a capability. Unsaved project edits just
+	// pause the actions: main alone decides, on the next request, whether the capability still stands.
 	useEffect(() => {
-		if (projectId || document || dirty || token.current || active.current) clear();
+		if (projectId || token.current || active.current) clear();
 		if (draftTarget.current) {
 			setNeedsReopen(true);
 			setMessage(translate.current("lesson.package.authorityLost"));
@@ -56,7 +57,7 @@ export function LessonPackagePanel({
 			setMessage("");
 		}
 		return clear;
-	}, [projectId, document, dirty, clear]);
+	}, [projectId, clear]);
 	const run = async (action: "open" | "copy" | "reseal" | "resume") => {
 		if (
 			active.current ||

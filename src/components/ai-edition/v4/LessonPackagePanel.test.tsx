@@ -551,3 +551,43 @@ it("names each package step's move buttons distinctly and keeps step titles belo
 		"Second step",
 	]);
 });
+it("unsaved project edits pause package actions without giving up the draft or its capability", async () => {
+	await startDraft();
+	const saveButton = () =>
+		screen.getByText("Save a new package with retained media") as HTMLButtonElement;
+	act(() => useProjectStore.setState({ dirty: true }));
+	await screen.findByText(/Save the current video project to continue/);
+	expect(saveButton().disabled).toBe(true);
+	save();
+	expect(api.lessonPackageReseal).not.toHaveBeenCalled();
+	expect(screen.queryByText("Reopen the same package and keep edits")).toBeNull();
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Kept instruction",
+	);
+	// Saving the project replaces the document object and clears dirty: still the same project.
+	act(() =>
+		useProjectStore.setState({
+			dirty: false,
+			document: createEmptyDocument({ projectId: "p", title: "Saved again" }),
+		}),
+	);
+	expect(api.lessonPackageRelease).not.toHaveBeenCalled();
+	expect(api.lessonPackageCancel).not.toHaveBeenCalled();
+	expect(saveButton().disabled).toBe(false);
+	save();
+	await screen.findByText(/New package checked and saved/);
+	expect(vi.mocked(api.lessonPackageReseal).mock.calls[0][0].token).toBe(opened.token);
+});
+it("main's refusal while the project is unsaved is what ends the capability, and the draft survives it", async () => {
+	vi.mocked(api.lessonPackageReseal).mockImplementationOnce(async () => {
+		act(() => useProjectStore.setState({ dirty: true }));
+		return { success: false, code: "lesson-package-invalid", capability: "reopen-required" };
+	});
+	await startDraft();
+	save();
+	await screen.findByText("Reopen the same package and keep edits");
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Kept instruction",
+	);
+});

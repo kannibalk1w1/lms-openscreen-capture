@@ -1180,3 +1180,22 @@ it("reseals changed, added and cleared LMS references into the new package and i
 	).toMatchObject({ success: false });
 	expect(host.open).not.toHaveBeenCalled();
 });
+it("a capability left unused while the project was unsaved works again once it is saved; a different project still ends it", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	dirty = true;
+	dirty = false;
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: true,
+		result: { status: "packaged" },
+	});
+	// The same registered window on another project: main refuses before any picker.
+	selectThroughProduction("other");
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+});

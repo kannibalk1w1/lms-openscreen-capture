@@ -257,3 +257,36 @@ On resuming, I confirmed that the slice 6 and 7 tests and records were already i
 
 No IPC, handler or bootstrap change, so no startup smoke for this slice. **Not tested with a
 screen reader or by keyboard-only use**; the evidence is accessible-name assertions in jsdom.
+
+Slice 8 commit: `5a2b0f14`.
+
+### Slice 9 — unsaved project edits pause package work instead of discarding its capability (review M2, narrow form)
+
+**Authority design, stated explicitly.** Main's checks are **unchanged**: a package capability
+still needs the registered editor window, its main frame, the token, the open-time project
+session, a saved project at the moment of each request, and the pinned package files. No
+main-side code changed in this slice.
+
+What changed is only the renderer's own behaviour. `LessonPackagePanel` used to cancel and
+release its capability the moment the project became unsaved or its document object changed,
+which forced the author to find the same package folder again in a file picker even after
+saving the project. It now releases only when the project itself changes (or the panel
+unmounts). While the project is unsaved, the panel disables its actions and says to save the
+project; the draft and the token stay. When a request is made, main decides as before: a
+request while unsaved is refused and revokes the capability, a different project is refused,
+and a capability that was simply left unused during the unsaved period works again.
+
+I did **not** take the wider step proposed in review finding M2 (dropping the project and
+saved-state binding in main). That would reverse behaviour that reviews 39 to 41 pinned with
+a dozen tests, and it should be decided by an independent reviewer, not by me alone.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run src/components/ai-edition/v4 electron/ipc/lessonPackageOpen.test.ts` (2 new panel cases, 1 new production-registration case) | 485 tests pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run i18n:check`; `npx vite build` | pass; 35 baseline; pass; pass |
+| 2 controls (`slice9/`): release again on unsaved project; skip the explicit release on project change | 1 killed; 1 survived, because the effect's cleanup already releases on a project change, so that explicit call matters only on mount |
+
+No IPC change, so no startup smoke. Not driven in the real app: I had no reliable way to make
+a project unsaved through the DOM. Full suite not rerun (last: slice 8).
