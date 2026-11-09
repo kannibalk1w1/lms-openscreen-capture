@@ -92,7 +92,12 @@ export function LessonPackagePanel({
 						setNeedsReopen(true);
 					}
 					setMessage(
-						t(`lesson.package.errors.${result.code}`) + " " + t("lesson.package.editsKept"),
+						t(`lesson.package.errors.${result.code}`) +
+							" " +
+							t("lesson.package.editsKept") +
+							(result.artifactPath
+								? " " + t("lesson.package.incomplete", { path: result.artifactPath })
+								: ""),
 					);
 					return;
 				}

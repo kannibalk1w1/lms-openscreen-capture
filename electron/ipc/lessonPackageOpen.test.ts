@@ -813,9 +813,16 @@ it("reseal refuses a decoder failure on copied output even when input inspection
 		if (!file.startsWith(directory + path.sep)) throw new Error("INVALID_OUTPUT_DECODE");
 		return fakePackageVideo(file, expected);
 	});
-	expect(await edited(opened.token, beginPackageEdit(opened.lesson))).toMatchObject({
-		success: false,
-	});
+	const failed = (await edited(opened.token, beginPackageEdit(opened.lesson))) as {
+		artifactPath?: string;
+	};
+	expect(failed).toMatchObject({ success: false });
+	// The author is told where the unfinished folder is; it holds no completion receipt.
+	expect(path.dirname(failed.artifactPath ?? "")).toBe(root);
+	await expect(
+		fs.access(path.join(failed.artifactPath ?? "", "package-receipt.json")),
+	).rejects.toThrow();
+	expect(await fs.readdir(failed.artifactPath ?? "")).toContain("lesson-package.json");
 	const dirs = (await fs.readdir(root)).filter((n) => n.startsWith("lesson-package-"));
 	let incomplete = 0;
 	for (const name of dirs) {
@@ -1198,4 +1205,30 @@ it("a capability left unused while the project was unsaved works again once it i
 		capability: "reopen-required",
 	});
 	expect(host.open).not.toHaveBeenCalled();
+});
+it("names an unfinished folder only to a caller still in scope, and never for refusals that wrote nothing", async () => {
+	const f = await videoPackage();
+	directory = f.directory;
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	// Refused before anything is written: no folder to name.
+	host.open.mockResolvedValue({ canceled: false, filePaths: [directory] });
+	expect(await edited(opened.token, draft)).not.toHaveProperty("artifactPath");
+	// The project changes while the copied output is being checked: the reply carries no path.
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	vi.mocked(validateRangeVideo).mockImplementation(async (file, expected) => {
+		if (!file.startsWith(directory + path.sep)) {
+			selectThroughProduction("other");
+			throw new Error("INVALID_OUTPUT_DECODE");
+		}
+		return fakePackageVideo(file, expected);
+	});
+	const revoked = await edited(opened.token, draft);
+	expect(revoked).toMatchObject({ success: false, capability: "reopen-required" });
+	expect(revoked).not.toHaveProperty("artifactPath");
+	// The static-copy route's replies are unchanged.
+	selectThroughProduction("p");
+	host.open.mockResolvedValue({ canceled: false, filePaths: [directory] });
+	const again = await open();
+	expect(Object.keys((await copy(again.token)) as object).sort()).toEqual(["code", "success"]);
 });

@@ -591,3 +591,19 @@ it("main's refusal while the project is unsaved is what ends the capability, and
 		"Kept instruction",
 	);
 });
+it("tells the author where an unfinished package folder was left, alongside the kept draft", async () => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-tool-unavailable",
+		capability: "retained",
+		artifactPath: "/chosen/lesson-package-unfinished",
+	});
+	await startDraft();
+	save();
+	await screen.findByText(
+		/An unfinished package folder was left in: \/chosen\/lesson-package-unfinished\. It has no completion receipt/,
+	);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Kept instruction",
+	);
+});

@@ -12,7 +12,13 @@ export type PackageOpenCode =
 	| "lesson-package-edit-unsupported";
 export type PackageOpenResult<T> =
 	| { success: true; result: T }
-	| { success: false; code: PackageOpenCode; capability?: "retained" | "reopen-required" };
+	| {
+			success: false;
+			code: PackageOpenCode;
+			capability?: "retained" | "reopen-required";
+			/** An unfinished package folder left in the destination the author chose. */
+			artifactPath?: string;
+	  };
 export interface OpenedLessonPackage {
 	status: "opened";
 	token: string;

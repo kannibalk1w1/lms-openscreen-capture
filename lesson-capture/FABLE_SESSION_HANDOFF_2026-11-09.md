@@ -290,3 +290,25 @@ a dozen tests, and it should be decided by an independent reviewer, not by me al
 
 No IPC change, so no startup smoke. Not driven in the real app: I had no reliable way to make
 a project unsaved through the DOM. Full suite not rerun (last: slice 8).
+
+Slice 9 commit: `b8bb657c`.
+
+### Slice 10 — tell the author where an unfinished package folder was left (review M3, user-facing part)
+
+**What changed.** When saving a re-edited package or creating one from the dialog fails after
+files were written, the reply now carries the unfinished folder's path and the UI says: "An
+unfinished package folder was left in: … It has no completion receipt and is not a usable
+package; you can delete it." Before, the folder was left silently. The shared writer already
+decided when that path may be disclosed (only while the caller's scope and the destination
+still hold); the handler passes it through and adds nothing. CLI and MCP already reported it.
+The writer still does not delete anything.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/ipc/lessonPackageOpen.test.ts` and the three package/dialog UI test files (2 new cases, 1 extended) | 143 tests pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run i18n:check`; `npx vite build`; required startup smoke | pass; 35 baseline; pass; pass; `success: true` |
+| 2 controls (`slice10/`): the writer naming the folder after scope loss; the path allowed on every route | 1 killed; 1 survived, because the static-copy route never produces such a path, so the route condition is a second layer only |
+
+Not driven in the real app: I did not force a late failure there. Full suite not rerun.

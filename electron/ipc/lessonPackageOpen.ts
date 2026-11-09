@@ -122,7 +122,18 @@ export function registerLessonPackageOpenHandlers(
 				code = "lesson-package-video-copy-unsupported";
 			if (error && typeof error === "object" && "code" in error && error.code === "EEXIST")
 				code = "destination-exists";
-			return { success: false as const, code, ...(capability ? { capability } : {}) };
+			// The shared writer names its unfinished folder only while the caller's scope still holds.
+			// Shown for the two routes that create package folders, so the author can find and remove it.
+			const artifactPath =
+				(retainToken || independent) && error instanceof LessonPackageError
+					? error.artifactPath
+					: undefined;
+			return {
+				success: false as const,
+				code,
+				...(capability ? { capability } : {}),
+				...(artifactPath ? { artifactPath } : {}),
+			};
 		} finally {
 			if (operation && state?.active === operation) state.active = undefined;
 		}

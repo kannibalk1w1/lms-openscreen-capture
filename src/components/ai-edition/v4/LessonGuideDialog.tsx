@@ -484,8 +484,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										includeVideos: packageVideos,
 									});
 									if (!current()) return;
-									if (!result.success) setPackageError(result.code);
-									else if (result.result.status === "packaged")
+									if (!result.success) {
+										setPackageError(result.code);
+										if (result.artifactPath)
+											setNotice(t("lesson.package.incomplete", { path: result.artifactPath }));
+									} else if (result.result.status === "packaged")
 										setNotice(
 											t("lesson.packageCreate.created", {
 												path: result.result.path,

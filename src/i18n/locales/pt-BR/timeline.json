@@ -508,6 +508,7 @@
 			"reseal": "Save a new package with retained media",
 			"resealed": "New package checked and saved: {{path}}. The source package is unchanged. Review edited text against the retained media before sharing. Open that new folder explicitly to continue editing.",
 			"discardDraft": "Discard package draft",
+			"incomplete": "An unfinished package folder was left in: {{path}}. It has no completion receipt and is not a usable package; you can delete it.",
 			"draftDiscardedClosed": "Draft discarded. The package view was closed because it was no longer checked. Open the package folder again to inspect or edit it.",
 			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions, LMS lesson and slide references, and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
 			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged.",
