@@ -1,4 +1,22 @@
-# Review35 decoder/guard follow-up — 9 November 2026
+# Accepted headless MP4 checkpoint — 9 November 2026
+
+Actual [review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts exact
+e45e4b34e649e800a54074690b78178a41e23769 againstbbe56356; M35-1/L35-1 CLOSED.
+Real rebuilt CLI/stdio from foreign cwd with neither decoder nor APP_ROOT override
+verify75frames and actual bundled full decode; old build reproduces incomplete.
+Invalid/fake/hanging tools give fixed actionable tool-unavailable, partial/no
+receipt. Independent305focused/16files,0skip,both TS/i18n/lint and foreign-cwd
+startup smoke pass;14own mutants yield12kills. Preservation112/1254/74 matches.
+Worker full5991/447 belongs toe45e4b34; not a fresh reviewer full/build claim.
+
+Coordinator saves/pushes accepted CLI/MCP MP4 parity, then continues portable
+lesson/media packaging prerequisites before timed-player delivery. Source pins
+are observed content equality, not immutable/authenticated history. Bundled-root/
+realpath coverage and missing configured-tool fallback are reviewer nits; GUI,
+physical/audio/platform/installer and earlier documented limits remain open.
+Autonomous private-feature workflow and mainfd2775e2/evidence constraints persist.
+
+## Historical review35 follow-up account
 
 Actual [review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts bbe56356 within
 scope but requires MediumM35-1 for ordinary non-root CLI/MCP launches and identifies

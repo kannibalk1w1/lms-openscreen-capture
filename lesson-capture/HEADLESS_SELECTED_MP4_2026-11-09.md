@@ -5,7 +5,12 @@ feature `lesson-capture/input-boundaries`; main/private-main remain `fd2775e2`.
 Actual [review34](CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts `f9dcd8df`,
 closing L33-1. Confirmation/new-copy persistence and the bootstrap fix are delivered
 and pushed. This slice adds actual selected-step MP4 export through CLI and MCP;
-it awaits coordinator exact-SHA Claude review/fixes/private push.
+Actual [review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) identified M35-1/L35-1.
+[Review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts follow-up
+e45e4b34e649e800a54074690b78178a41e23769 and closes both. Independent real
+non-root CLI/stdio exports and foreign-cwd startup smoke pass;305focused/16files,
+both TS/i18n/lint pass. Original worker evidence below remains; no broader
+platform/physical acceptance inferred. Coordinator owns the private checkpoint push.
 
 ## Commands and authority
 

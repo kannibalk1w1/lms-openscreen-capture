@@ -1,5 +1,12 @@
 # Review35 decoder resolution and export guards — 9 November 2026
 
+Coordinator disposition: actual [review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md)
+acceptse45e4b34e649e800a54074690b78178a41e23769; M35-1/L35-1 CLOSED.
+Independent305focused/16files, both TS/i18n/lint, real non-root CLI/stdio and
+startup smoke pass;14own mutants yield12kills. Invalid tools fail with fixed
+actionable errors and no receipt. Original worker account remains below; nits and
+unproven platform/physical/audio/installer limits remain documented.
+
 Base: `bbe56356a426e5e82350a0ece83027db7350f009`, private feature branch,
 main/private-main unchanged at `fd2775e2`. Actual
 [review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts the bounded architecture
