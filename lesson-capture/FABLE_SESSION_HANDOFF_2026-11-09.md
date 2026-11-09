@@ -13,7 +13,7 @@ Addon SHA256 unchanged (`5d16ea98…09efca`). Evidence:
 | `52008fac` | Full review report (Parts 1 and 2) | Part 1: 109 focused tests, 14 mutants (10 killed, 4 survived and explained), 13/13 full-app probes |
 | `26396851` | Slice 1: reseal recovery dead ends, wrong-token and busy replies, destination error code | 195 focused / 8 files, both `tsc`, lint 35 baseline, i18n, `vite build`, required startup smoke, 5/5 controls |
 | `cd444252` | Slice 2: packaging survives lesson text edits after an MP4 export | 152 focused / 5 files, both `tsc`, lint, `vite build`, 3/3 controls |
-| this commit | Slice 3: LMS lesson/slide references and `lesson-mapping.json` | 1,174 focused / 73 files; full suite 6,181 / 455, 0 skipped; both `tsc`, lint 35 baseline, i18n, `vite build`, startup smoke, real CLI export/package/verify, 2/2 controls |
+| `4800f5ae` | Slice 3: LMS lesson/slide references and `lesson-mapping.json` | 1,174 focused / 73 files; full suite 6,181 / 455, 0 skipped; both `tsc`, lint 35 baseline, i18n, `vite build`, startup smoke, real CLI export/package/verify, 2/2 controls |
 
 ## Limits encountered
 
@@ -24,7 +24,7 @@ finished. No usage information is exposed to me beyond that.
 ## State
 
 Tree clean after the slice 3 commit. All three slices are my own work and are not
-independently reviewed. The handoff commit `ebb2926c` sits between slices 1 and 2.
+independently reviewed. Documentation-only commits: `ebb2926c` (first handoff, between slices 1 and 2) and the final handoff update after `4800f5ae`.
 
 ## Unfinished and next, in priority order
 
