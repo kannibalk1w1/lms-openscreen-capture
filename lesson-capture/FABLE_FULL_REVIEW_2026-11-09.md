@@ -361,3 +361,46 @@ have no new finding there and make no claim about them.
 | 10 | Manual pilot on real hardware (spec's Enemy sequence) | Real acceptance evidence | human |
 
 Items 1 to 3 are implemented below. Items 7 and 10 cannot be done from this session.
+
+## Part 3 — implementation slices (my own work; not independently reviewed)
+
+### Slice 1 — reseal recovery follow-ups (L-F1, L-F2, L-F3, N-F4, T-F5)
+
+Parent: `52008fac`. Evidence: `../openscreen-evaluation/fable-review-2026-11-09T2130Z/slice1/`.
+
+**Changed**
+
+- `LessonPackagePanel.tsx`: discarding a draft whose verification was lost now closes the
+  unusable snapshot and says to open the package again (L-F1). A `lesson-package-busy` reply
+  no longer releases the token or demands a reopen (L-F2).
+- `lessonPackageOpen.ts`: the failure path keeps and reports a capability only for the token
+  that was presented. A wrong token gets `reopen-required` and the held capability is
+  dropped, as the static-copy route already did (L-F3).
+- `packageReseal.ts` and `packageOpen.ts`: a destination inside the package, a missing
+  folder, a non-folder or a symlinked folder returns the new code
+  `lesson-package-destination-invalid` before any source re-read or output. The capability
+  is retained (N-F4).
+- 15 `timeline.json` catalogues: two new strings. The 14 non-English catalogues carry the
+  English text, as with earlier slices; no translation is claimed.
+- Tests: 3 new production-registration tests and 5 new panel tests, covering the four fixes
+  and the F6, F9 and F11 gaps from Part 1. The cancel-plus-session-change path (F3) is still
+  untested.
+
+**Validation**
+
+| Check | Result |
+| --- | --- |
+| Focused Vitest, 8 files (`ipc/lessonPackageOpen`, `LessonPackagePanel`, `LessonPackageReseal.integration`, `LessonGuideDialog`, `lesson/package`, `package.privacy`, `cli/lessonPackage`, `mcp/package.integration`) | 195 tests pass, 0 skipped |
+| `npx tsc --noEmit` and `npx tsc -p tsconfig.test.json --noEmit` | pass |
+| `npm run lint` | 35 baseline warnings |
+| `npm run i18n:check` | pass, 15 locales, 1306 keys |
+| `npx vite build` | pass |
+| Required real startup smoke, foreign cwd, hints cleared, pinned Node | `success: true` |
+| 5 single-guard controls on my own changes (snapshot, exact restore) | 5 killed by assertions |
+| Part 1 full-app probe rerun on the new build | P0 to P2d pass; P1 now shows the destination message. The driver's old P5 line then times out waiting for the Edit button, which the fix removes; the saved page text shows the new message and no snapshot. P6 and P7 did not run in this rerun |
+
+The full suite was not run for this slice. Dialogs were stubbed; no real picker, physical
+input, audio or other platform was exercised.
+
+**Limits and next.** Failed reseals still leave a receipt-less folder in the chosen
+directory. Next: slice 2 (H3).

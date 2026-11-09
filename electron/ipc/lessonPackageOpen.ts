@@ -55,13 +55,14 @@ export function registerLessonPackageOpenHandlers(
 		event: IpcMainInvokeEvent,
 		inputId: unknown,
 		action: (state: State, authority: { assertCurrent(): void; signal: AbortSignal }) => Promise<T>,
-		retainVerifiedCapability = false,
+		/** Reseal only: the presented token, whose own capability may survive a recoverable failure. */
+		retainToken?: string,
 	) => {
 		let state: State | undefined;
 		let operation: State["active"];
 		try {
 			mainFrame(event);
-			if (retainVerifiedCapability) state = states.get(event.sender);
+			if (retainToken) state = states.get(event.sender);
 			const authority = authorize(event),
 				id = idSchema.parse(inputId);
 			authority.assertCurrent();
@@ -79,11 +80,12 @@ export function registerLessonPackageOpenHandlers(
 			return { success: true as const, result };
 		} catch (error) {
 			let capability: "retained" | "reopen-required" | undefined;
-			if (retainVerifiedCapability) {
+			if (retainToken) {
 				capability = "reopen-required";
 				try {
 					const held = state?.opened;
-					if (held) {
+					// A different token never learns about, or keeps, another capability.
+					if (held && held.token === retainToken) {
 						held.assertCurrent();
 						// Cancellation keeps the original frozen identity; retry must recheck it.
 						if (!operation?.abort.signal.aborted) held.value.assertCurrent();
@@ -98,6 +100,8 @@ export function registerLessonPackageOpenHandlers(
 				error instanceof LessonPackageError ? error.code : "lesson-package-invalid";
 			if (error instanceof Error && error.message === "package-edit-unsupported")
 				code = "lesson-package-edit-unsupported";
+			if (error instanceof Error && error.message === "package-destination-invalid")
+				code = "lesson-package-destination-invalid";
 			if (error instanceof Error && error.message === "package-video-copy-unsupported")
 				code = "lesson-package-video-copy-unsupported";
 			if (error && typeof error === "object" && "code" in error && error.code === "EEXIST")
@@ -211,7 +215,7 @@ export function registerLessonPackageOpenHandlers(
 					},
 				);
 			},
-			true,
+			request.data.token,
 		);
 	});
 	ipcMain.handle("lesson:package-cancel", (event, input: unknown) => {

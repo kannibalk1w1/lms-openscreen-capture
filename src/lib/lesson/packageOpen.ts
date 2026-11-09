@@ -7,6 +7,7 @@ export type PackageOpenCode =
 	| "lesson-package-busy"
 	| "lesson-package-video-copy-unsupported"
 	| "destination-exists"
+	| "lesson-package-destination-invalid"
 	| "lesson-package-edit-unsupported";
 export type PackageOpenResult<T> =
 	| { success: true; result: T }

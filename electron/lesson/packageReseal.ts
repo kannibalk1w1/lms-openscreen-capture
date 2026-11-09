@@ -3,7 +3,7 @@ import path from "node:path";
 import { validatePackageEdit } from "../../src/lib/lesson/packageEdit";
 import { validateLesson } from "../../src/lib/lesson/schema";
 import { LessonPackageError, type PackageAuthority, publishLessonPackage } from "./package";
-import { pinBinary } from "./packageIO";
+import { pinBinary, pinDirectory } from "./packageIO";
 import { type InspectedPackage, openSelectedLessonPackage } from "./packageOpen";
 
 /** No original project/receipt/source lookup: only the verified capability's known relative video inventory. */
@@ -25,8 +25,14 @@ export async function resealLessonPackage(
 	check();
 	if (!destination) return { status: "cancelled" as const };
 	const relative = path.relative(directory, destination);
+	// A destination mistake is the user's to correct: report it distinctly from a changed package.
 	if (!path.isAbsolute(destination) || (!relative.startsWith(".." + path.sep) && relative !== ".."))
-		throw new LessonPackageError("lesson-package-invalid");
+		throw new Error("package-destination-invalid");
+	try {
+		pinDirectory(destination)();
+	} catch {
+		throw new Error("package-destination-invalid");
+	}
 	opened.assertCurrent();
 	const verified = await openSelectedLessonPackage(directory, authority);
 	check();

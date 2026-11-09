@@ -83,7 +83,8 @@ export function LessonPackagePanel({
 				});
 				if (at !== epoch.current || generation !== draftGeneration.current) return;
 				if (!result.success) {
-					if (result.capability !== "retained") {
+					// Busy changed nothing in main: the same capability and draft remain usable.
+					if (result.capability !== "retained" && result.code !== "lesson-package-busy") {
 						if (token.current)
 							void window.electronAPI?.lessonPackageRelease?.(token.current).catch(() => undefined);
 						token.current = null;
@@ -374,7 +375,13 @@ export function LessonPackagePanel({
 									if (active.current) return;
 									draftGeneration.current++;
 									setDraft(null);
-									setMessage("");
+									if (needsReopen) {
+										// No capability remains: do not leave a snapshot whose actions cannot work.
+										clear();
+										setOpened(null);
+										setNeedsReopen(false);
+										setMessage(t("lesson.package.draftDiscardedClosed"));
+									} else setMessage("");
 								}}
 							>
 								{t("lesson.package.discardDraft")}

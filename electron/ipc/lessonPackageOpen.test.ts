@@ -1,4 +1,4 @@
-import { randomUUID, webcrypto } from "node:crypto";
+import { createHash, randomUUID, webcrypto } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -14,6 +14,7 @@ import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { validateRangeVideo } from "../lesson/encodedVideo";
 import { createLessonPackage, inspectLessonPackage } from "../lesson/package";
 import { fakePackageVideo, packageFixture } from "../lesson/package.test-support";
+import { packageManifestSchema } from "../lesson/packageContracts";
 import { readSelectedFileSnapshot } from "../lesson/selectedFile";
 import { registerLessonWorkflow } from "./lessonWorkflow";
 
@@ -915,4 +916,60 @@ it("cancel during picker does not inspect the missing source after native cancel
 		success: false,
 		capability: "reopen-required",
 	});
+});
+it("reports a destination mistake distinctly and keeps the same capability for a corrected retry", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson),
+		link = path.join(root, "linked-destination");
+	await fs.symlink(root, link);
+	for (const destination of [
+		directory,
+		path.join(directory, "assets"),
+		path.join(root, "missing-folder"),
+		link,
+	]) {
+		host.open.mockResolvedValue({ canceled: false, filePaths: [destination] });
+		expect(await edited(opened.token, draft)).toEqual({
+			success: false,
+			code: "lesson-package-destination-invalid",
+			capability: "retained",
+		});
+	}
+	expect((await fs.readdir(root)).filter((name) => name.startsWith("lesson-package-"))).toEqual([
+		path.basename(directory),
+	]);
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: true,
+		result: { status: "packaged" },
+	});
+});
+it("a wrong reseal token is never told a capability is retained and revokes the held one", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	host.open.mockClear();
+	expect(await edited(randomUUID(), draft)).toEqual({
+		success: false,
+		code: "lesson-package-invalid",
+		capability: "reopen-required",
+	});
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+});
+it("the open digest is exactly the validated package manifest, binding the whole inventory", async () => {
+	const result = (await invoke("open", randomUUID())) as { result: { snapshotSha256: string } };
+	const manifest = packageManifestSchema.parse(
+		JSON.parse(await fs.readFile(path.join(directory, "lesson-package.json"), "utf8")),
+	);
+	expect(result.result.snapshotSha256).toBe(
+		createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
+	);
+	// The inventory, not just the lesson identity, decides the digest.
+	manifest.files[0].sha256 = "0".repeat(64);
+	expect(createHash("sha256").update(JSON.stringify(manifest)).digest("hex")).not.toBe(
+		result.result.snapshotSha256,
+	);
 });

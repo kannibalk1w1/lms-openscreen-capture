@@ -431,3 +431,92 @@ it("a late failed request from an unmounted panel cannot clear a new panel draft
 		"New panel draft",
 	);
 });
+const startDraft = async () => {
+	show();
+	clickOpen();
+	fireEvent.click(await screen.findByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Kept instruction" },
+	});
+};
+const save = () => fireEvent.click(screen.getByText("Save a new package with retained media"));
+it("only a successful new package clears the draft and returns to the checked snapshot", async () => {
+	await startDraft();
+	save();
+	await screen.findByText(/New package checked and saved/);
+	expect(screen.queryByText("Discard package draft")).toBeNull();
+	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
+	expect(
+		(screen.getByText("Edit supported text and order as a new draft") as HTMLButtonElement)
+			.disabled,
+	).toBe(false);
+});
+it("a thrown reseal call keeps the draft but releases the token and requires an explicit reopen", async () => {
+	vi.mocked(api.lessonPackageReseal).mockRejectedValueOnce(new Error("ipc"));
+	await startDraft();
+	save();
+	await screen.findByText("Reopen the same package and keep edits");
+	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Kept instruction",
+	);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(true);
+});
+it("a busy reply changes nothing: same draft, same token, no reopen demand", async () => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-busy",
+	});
+	await startDraft();
+	save();
+	await screen.findByText(/Another package operation is still finishing/);
+	expect(screen.queryByText("Reopen the same package and keep edits")).toBeNull();
+	expect(api.lessonPackageRelease).not.toHaveBeenCalled();
+	save();
+	await screen.findByText(/New package checked and saved/);
+	expect(vi.mocked(api.lessonPackageReseal).mock.calls.map(([input]) => input.token)).toEqual([
+		opened.token,
+		opened.token,
+	]);
+});
+it("a destination mistake names the fix and keeps the draft ready to retry", async () => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-destination-invalid",
+		capability: "retained",
+	});
+	await startDraft();
+	save();
+	await screen.findByText(/Choose an existing folder outside the package you opened/);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Kept instruction",
+	);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(false);
+});
+it("discarding a draft whose verification was lost closes the unusable snapshot and says how to continue", async () => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-invalid",
+		capability: "reopen-required",
+	});
+	await startDraft();
+	save();
+	await screen.findByText("Reopen the same package and keep edits");
+	fireEvent.click(screen.getByText("Discard package draft"));
+	await screen.findByText(/Draft discarded. The package view was closed/);
+	expect(screen.queryByText("Close package snapshot")).toBeNull();
+	expect(screen.queryByText("Edit supported text and order as a new draft")).toBeNull();
+	expect(screen.queryByText("Save a new editable text and image copy")).toBeNull();
+	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
+		false,
+	);
+	clickOpen();
+	expect(
+		((await screen.findByText("Edit supported text and order as a new draft")) as HTMLButtonElement)
+			.disabled,
+	).toBe(false);
+});

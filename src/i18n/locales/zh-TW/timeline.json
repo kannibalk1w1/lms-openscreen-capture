@@ -473,6 +473,7 @@
 				"lesson-package-busy": "Another package operation is still finishing. Wait, then retry.",
 				"lesson-package-video-copy-unsupported": "Editable copying with video bindings is not supported yet. The package remains read-only.",
 				"destination-exists": "That file already exists. Choose a new filename; existing files are never replaced.",
+				"lesson-package-destination-invalid": "That folder cannot be used. Choose an existing folder outside the package you opened. Your package is unchanged.",
 				"lesson-package-edit-unsupported": "This draft changes unsupported package fields. Keep all original step IDs, images, video bindings and inclusion settings, then edit only the supported text and order."
 			},
 			"edit": "Edit supported text and order as a new draft",
@@ -487,6 +488,7 @@
 			"reseal": "Save a new package with retained media",
 			"resealed": "New package checked and saved: {{path}}. The source package is unchanged. Review edited text against the retained media before sharing. Open that new folder explicitly to continue editing.",
 			"discardDraft": "Discard package draft",
+			"draftDiscardedClosed": "Draft discarded. The package view was closed because it was no longer checked. Open the package folder again to inspect or edit it.",
 			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
 			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged.",
 			"editsKept": "Your unsaved text, code, order and image descriptions are kept. Retry explicitly, reopen the same unchanged package to restore verification, or discard the draft.",
