@@ -3,6 +3,12 @@ import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
+import {
+	createLessonPackage,
+	LessonPackageError,
+	lessonPackageMessages,
+	verifyLessonPackage,
+} from "../lesson/package";
 import type { CliLessonCommand } from "./args";
 import type { CliWriter } from "./projectCommands";
 
@@ -16,6 +22,28 @@ export async function runLessonCommand(
 	} = {},
 ): Promise<number> {
 	try {
+		if (command.action === "package" || command.action === "verify-package") {
+			if (!options.lifecycle) throw new LessonPackageError("lesson-package-unsupported");
+			const lifecycle = options.lifecycle,
+				authority = {
+					signal: options.signal,
+					assertCurrent: () => {
+						if (lifecycle.owner.isDestroyed()) throw new Error("caller-closed");
+					},
+				};
+			const result =
+				command.action === "package"
+					? await createLessonPackage(command.request, authority)
+					: await verifyLessonPackage({ directory: command.directory }, authority);
+			out(
+				JSON.stringify(
+					command.json ? { event: "done", result } : result,
+					null,
+					command.json ? undefined : 2,
+				) + "\n",
+			);
+			return 0;
+		}
 		if (command.action === "export-range") {
 			if (!options.lifecycle) throw new LessonFileRangeError("range-export-unsupported");
 			let start = options.render;
@@ -80,7 +108,9 @@ export async function runLessonCommand(
 	} catch (failure) {
 		// Never echo imported payloads, private file paths, source data or raw parser/OS errors.
 		const error =
-			failure instanceof LessonFileRangeError ? failure.code : "lesson-file-operation-failed";
+			failure instanceof LessonPackageError || failure instanceof LessonFileRangeError
+				? failure.code
+				: "lesson-file-operation-failed";
 		out(
 			(command.json
 				? JSON.stringify({
@@ -89,15 +119,24 @@ export async function runLessonCommand(
 						...(error === "range-export-tool-unavailable"
 							? { detail: rangeExportToolUnavailableMessage }
 							: {}),
-						...(failure instanceof LessonFileRangeError && failure.artifactPath
+						...(failure instanceof LessonPackageError
+							? { detail: lessonPackageMessages[failure.code] }
+							: {}),
+						...((failure instanceof LessonFileRangeError ||
+							failure instanceof LessonPackageError) &&
+						failure.artifactPath
 							? { artifactPath: failure.artifactPath }
 							: {}),
 					})
 				: error +
+					(failure instanceof LessonPackageError
+						? `\n${lessonPackageMessages[failure.code]}`
+						: "") +
 					(error === "range-export-tool-unavailable"
 						? `\n${rangeExportToolUnavailableMessage}`
 						: "") +
-					(failure instanceof LessonFileRangeError && failure.artifactPath
+					((failure instanceof LessonFileRangeError || failure instanceof LessonPackageError) &&
+					failure.artifactPath
 						? `\nUnfinished copy: ${failure.artifactPath}`
 						: "")) + "\n",
 		);

@@ -1,3 +1,18 @@
+# Current portable-package prerequisite authority — 9 November 2026
+
+Autonomous resumption from accepted/pushedf0eacc95 after review36 closesM35-1/L35-1.
+Deliver [bounded explicit portable lesson/media package and verification](PORTABLE_LESSON_PACKAGE_2026-11-09.md),
+validate/build/prove copy/reopen without original paths, commit locally, then stop
+for coordinator actual exact-SHA Claude review/fixes/private push. No timed-player,
+GUI import/reseal or full native-project/course phase before review. Preserve all
+original reports/evidence/user work, native bytes and main/private-main; no other
+worker, worker push, checkout/reset/stash/discard, main/upstream/release/Actions/
+publication/real-lesson/auth/config/paid-API changes, user-app termination or shared
+cache purge. Old schedules/pause records are superseded; cutoffs remain revoked.
+Required real headless startup smoke follows changed production builds/reviews.
+
+## Prior checkpoint accounts
+
 # Current review35 follow-up authority — 9 November 2026
 
 Complete only [M35-1 decoder resolution/errors and L35-1 guard closure](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)

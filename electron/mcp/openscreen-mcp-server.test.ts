@@ -331,6 +331,8 @@ describe("the MCP tool surface", () => {
 			"exportAudio",
 			"getFrames",
 			"createProject",
+			"createLessonPackage",
+			"verifyLessonPackage",
 			"exportLessonRangeFile",
 			"confirmLessonRangeFile",
 			"queryLessonFile",

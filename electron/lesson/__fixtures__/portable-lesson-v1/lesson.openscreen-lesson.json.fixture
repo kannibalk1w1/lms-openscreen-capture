@@ -1,0 +1,33 @@
+{
+  "format": "openscreen-lesson",
+  "version": 1,
+  "id": "e942b631-98eb-441c-a1b7-ae090c07c738",
+  "revision": 0,
+  "derivedFrom": {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "revision": 0,
+    "stepIds": [
+      "10000000-0000-4000-8000-000000000002"
+    ]
+  },
+  "title": "Portable v1 retained contract",
+  "output": {
+    "version": 1,
+    "preset": "standard",
+    "language": "en",
+    "direction": "auto",
+    "includeImages": false,
+    "includeCode": false
+  },
+  "steps": [
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "title": "Selected step",
+      "instructions": "This retained static package verifies without its original authoring file.",
+      "status": "draft",
+      "evidence": [],
+      "imageAlt": ""
+    }
+  ],
+  "assets": []
+}

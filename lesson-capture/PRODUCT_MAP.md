@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4 accepted within scope by review35; required decoder/guard follow-up pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite implemented, pending exact-SHA review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -17,9 +17,16 @@ desktop/web tools are generic capture subjects. No other adapters are requested 
 [Review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) found unpackaged decoder lookup
 failed from non-root client directories. [M35-1/L35-1 follow-up](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
 adds stable resolution and actionable tool errors, with real non-root CLI/stdio
-native proofs and independent authority/wiring controls. Exact-SHA review/push is
-required before packaging/player work. Earlier root-only proof accounts retain
+native proofs and independent authority/wiring controls, now accepted through
+review36 and pushed atf0eacc95. Earlier root-only proof accounts retain
 their historical limits.
+
+[Review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) closesM35-1/L35-1 and accepts
+the headless MP4 checkpoint pushed atf0eacc95. [Portable package v1](PORTABLE_LESSON_PACKAGE_2026-11-09.md)
+now supplies bounded explicit CLI/MCP selected derived guide/lesson/JPEG policy and
+validated MP4 packaging/verification, including moved-source reopen. Native projects,
+raw evidence/history and full course/player semantics remain outside this scope;
+GUI import/reseal is later. Exact-SHA review/private push remains required.
 
 ## Status and evidence rules
 
@@ -101,8 +108,10 @@ claims that every listed operation exists.
    is accepted by review34 and pushed at8a5074f0. Pushed035c8313 had a headless bootstrap regression, fixed
    by00bdbc77 and missed byreviews31/32. [Headless selected-step MP4 export](HEADLESS_SELECTED_MP4_2026-11-09.md)
    now integrates shared ownership/materialization/validation with real CLI/stdio
-   native proof, pending exact-SHA review. HTTP cancellation requires aborting its
-   active request; portable media packages remain next. Timed Next/Previous/Replay/loop/speed, captions and local
+   native proof, accepted through review36 and pushed atf0eacc95. HTTP cancellation requires aborting its
+   active request. [Portable package v1](PORTABLE_LESSON_PACKAGE_2026-11-09.md) now implements
+   explicit derived lesson/media packaging and moved-source verification/reopen,
+   pending exact-SHA review; GUI import/reseal and full native-course packaging remain. Timed Next/Previous/Replay/loop/speed, captions and local
    learner progress remain later work.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
@@ -277,7 +286,7 @@ Bounded Linux authored source content identity is accepted through review26;
 accepted through review28 at897ddceb. Shared render ownership and its authority/GIF follow-up are accepted through
 review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
-accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4 accepted within scope by review35; required decoder/guard follow-up pending exact-SHA review/push;
+accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite implemented, pending exact-SHA review/push;
 headless selected-MP4 export parity,
 full editor/course packaging and timed output acceptance remain.
 

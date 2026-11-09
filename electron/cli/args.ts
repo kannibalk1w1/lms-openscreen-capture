@@ -2,6 +2,10 @@ import {
 	type ExportLessonRangeFileRequest,
 	exportLessonRangeFileSchema,
 } from "../lesson/fileExportContracts";
+import {
+	type CreateLessonPackageRequest,
+	createLessonPackageSchema,
+} from "../lesson/packageContracts";
 // Pure argv parser for the OpenScreen CLI. No Electron imports so it can be
 // unit-tested under plain vitest.
 
@@ -29,6 +33,8 @@ import {
 } from "../lesson/fileRangeContracts";
 
 export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
+	| { action: "package"; request: CreateLessonPackageRequest }
+	| { action: "verify-package"; directory: string }
 	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
 	| { action: "export-range"; request: ExportLessonRangeFileRequest }
 	| { action: "query"; query: LessonQuery }
@@ -122,6 +128,12 @@ Usage:
   openscreen lesson export-range <lesson.json> --project <current.openscreen> --project-id <ID>
                      --step <UUID> --source <absolute-file> [--source ...] --out <existing-dir> [--json]
                             Export exactly this included confirmed step to a new verified private MP4 folder
+  openscreen lesson package <lesson.json> --step <UUID> [--step ...] --code include|exclude
+                     --images exclude|include-external-provenance --out <existing-dir>
+                     [--media <step-UUID> <explicit.mp4> <range-export.json> ...] [--json]
+                            Derived static lesson/media package; image inclusion retains external source metadata
+  openscreen lesson verify-package <explicit-package-dir> [--json]
+                            Verify/reopen package integrity without original paths; Linux subset, no player
   openscreen mcp                                     Serve the agent tools over MCP on stdio
   openscreen help                                    Show this help
 
@@ -597,6 +609,86 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+
+	if (action === "verify-package") {
+		if (
+			!file ||
+			file.startsWith("-") ||
+			args.slice(2).some((v) => v !== "--json") ||
+			args.slice(2).length > 1
+		)
+			throw new Error("Choose one explicit package directory");
+		return {
+			kind: "lesson",
+			action,
+			manifestPath: resolvePath(file, cwd),
+			directory: resolvePath(file, cwd),
+			json: args.includes("--json"),
+		};
+	}
+	if (action === "package") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit editable lesson");
+		const request: Record<string, unknown> = {
+			manifestPath: resolvePath(file, cwd),
+			stepIds: [],
+			media: [],
+		};
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json") {
+				if (json) throw new Error("Duplicate option");
+				json = true;
+				continue;
+			}
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			if (flag === "--step") {
+				(request.stepIds as string[]).push(value);
+				continue;
+			}
+			if (flag === "--media") {
+				const [mediaPath, second] = takeValue(args, i, "--media video"),
+					[receiptPath, third] = takeValue(args, second, "--media receipt");
+				i = third;
+				(request.media as unknown[]).push({
+					stepId: value,
+					mediaPath: resolvePath(mediaPath, cwd),
+					receiptPath: resolvePath(receiptPath, cwd),
+				});
+				continue;
+			}
+			const key =
+				flag === "--code"
+					? "includeCode"
+					: flag === "--images"
+						? "imagePolicy"
+						: flag === "--out"
+							? "outputDirectory"
+							: undefined;
+			if (!key || key in request) throw new Error("Unexpected or duplicate package option");
+			if (flag === "--code" && value !== "include" && value !== "exclude")
+				throw new Error("Choose include or exclude code");
+			request[key] =
+				flag === "--code"
+					? value === "include"
+					: flag === "--out"
+						? resolvePath(value, cwd)
+						: value;
+		}
+		const parsed = createLessonPackageSchema.safeParse(request);
+		if (!parsed.success)
+			throw new Error(
+				"Choose explicit steps, --code include|exclude, --images exclude|include-external-provenance, explicit media/receipt pairs and existing --out directory",
+			);
+		return {
+			kind: "lesson",
+			action,
+			manifestPath: parsed.data.manifestPath,
+			request: parsed.data,
+			json,
+		};
+	}
 
 	if (action === "export-range") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");

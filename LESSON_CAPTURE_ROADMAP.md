@@ -81,6 +81,17 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+Actual [review36](lesson-capture/CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts
+e45e4b34 and closesM35-1/L35-1; headless MP4 parity is accepted/pushed atf0eacc95.
+[P1.4 portable lesson/media integrity prerequisite](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)
+now delivers explicit CLI/MCP derived static lesson/JPEG policy and already validated
+selected MP4 packaging, relative safe paths/checksums/readback/receipt-last and
+standalone verification/reopen after original paths move away. Raw journals,
+source projects and refresh history stay excluded/external; no native editability
+or lossless/full-course claim. Exact-SHA coordinator Claude review/fixes/private
+push is next; verified GUI import/reseal and timed-player dependencies follow only
+after acceptance. Earlier pending accounts below are historical snapshots.
+
 Actual [review35](lesson-capture/CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts
 bbe56356's bounded CLI/MCP selected-MP4 architecture, with requiredM35-1: its
 unpackaged validator resolution failed outside the app root. [The follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)

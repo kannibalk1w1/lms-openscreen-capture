@@ -311,7 +311,9 @@ export function runCli(command: CliCommand): void {
 		.then(async () => {
 			milestone("app ready");
 			if (command.kind === "lesson") {
-				if (command.action !== "confirm-range" && command.action !== "export-range") {
+				if (
+					!["confirm-range", "export-range", "package", "verify-package"].includes(command.action)
+				) {
 					const code = await runLessonCommand(command, writeStdout);
 					finished = true;
 					app.exit(code);

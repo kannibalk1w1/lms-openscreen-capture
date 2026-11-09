@@ -1,0 +1,35 @@
+{
+  "format": "openscreen-portable-lesson",
+  "guideContract": "openscreen-static-guide-portable-v1",
+  "version": 1,
+  "lessonId": "e942b631-98eb-441c-a1b7-ae090c07c738",
+  "scope": {
+    "kind": "derived-static-lesson-and-rendered-video",
+    "code": "excluded",
+    "images": "exclude",
+    "sourceProjects": "external-unavailable",
+    "sourceMedia": "not-included",
+    "historyAndEvidence": "not-included",
+    "nativeEditableProject": false,
+    "nativeDependencies": "fonts-annotations-added-audio-branches-not-included",
+    "mediaMeaning": "already-rendered-video; embedded-audio-unverified; not-native-editability"
+  },
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 2580,
+      "sha256": "5ab3afd16dbf550debd5139c50b2af36f9eb9dca4bd9af8af8a21cda3292acf4"
+    },
+    {
+      "path": "lesson.md",
+      "bytes": 455,
+      "sha256": "55ff11056cc7f9f111f19a2e633b46e7b5ec0cedfc6db93e0b43e745948c11f3"
+    },
+    {
+      "path": "lesson.openscreen-lesson.json",
+      "bytes": 783,
+      "sha256": "626a3809d7994a183ecf9589df83460cf2dcab5a3694f3f89e9926ec743e2bb9"
+    }
+  ],
+  "videos": []
+}

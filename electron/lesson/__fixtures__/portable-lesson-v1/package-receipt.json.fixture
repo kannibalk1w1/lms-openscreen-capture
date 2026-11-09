@@ -1,0 +1,9 @@
+{
+  "format": "openscreen-portable-lesson-completion",
+  "version": 1,
+  "manifest": {
+    "bytes": 1116,
+    "sha256": "f7bcfecf4cffb1418db93d0928f968cd841c1847d479a4673ff2957d93fc3c6e"
+  },
+  "complete": true
+}

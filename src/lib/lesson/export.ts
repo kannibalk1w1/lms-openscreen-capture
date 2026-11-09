@@ -61,7 +61,11 @@ export async function projectLesson(
 	};
 }
 export async function renderLessonGuide(lesson: LessonManifest, ids: string[]) {
-	const selected = await projectLesson(lesson, ids);
+	return renderProjectedLessonGuide(await projectLesson(lesson, ids));
+}
+/** Render an already explicit derived lesson, keeping its provenance and identifiers. */
+export async function renderProjectedLessonGuide(input: LessonManifest) {
+	const selected = await validateLesson(input);
 	const output = lessonOutput(selected),
 		appearance = guideAppearance(output);
 	if (selected.steps.some((step) => step.imageId && !step.imageAlt.trim()))
@@ -93,7 +97,7 @@ a:focus-visible,h2:focus-visible{outline:3px solid currentColor;outline-offset:4
 	const markdown =
 		[
 			`# ${md(selected.title.replace(/[\r\n]/g, " "))}`,
-			`Derived lesson revision ${selected.revision}; source revision ${selected.derivedFrom?.revision ?? lesson.revision}. Draft steps require review.`,
+			`Derived lesson revision ${selected.revision}; source revision ${selected.derivedFrom?.revision ?? selected.revision}. Draft steps require review.`,
 			...selected.steps.map((step, index) => {
 				const image = selected.assets.find((asset) => asset.id === step.imageId);
 				const code = step.code ? `\n\n<pre>${html(step.code.text)}</pre>` : "";

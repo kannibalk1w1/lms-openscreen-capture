@@ -7,6 +7,7 @@ import { exportLessonRangeFileSchema } from "../lesson/fileExportContracts";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
+import { registerLessonPackageTools } from "./package-tools";
 
 export function registerLessonTools(
 	server: McpServer,
@@ -22,6 +23,7 @@ export function registerLessonTools(
 		render?: LessonFileRangeRenderer;
 	},
 ) {
+	registerLessonPackageTools(server, editsAllowed, lifecycle);
 	const failure = (code: string) => ({
 		isError: true as const,
 		content: [{ type: "text" as const, text: code }],

@@ -1,3 +1,37 @@
+# Portable selected lesson/media prerequisite — 9 November 2026
+
+Resumed from accepted/pushedf0eacc95 after actual [review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md)
+acceptse45e4b34 and closesM35-1/L35-1. [Portable package v1](PORTABLE_LESSON_PACKAGE_2026-11-09.md)
+now implements explicit CLI/MCP selected-step derived lesson/static-guide/JPEG policy
+and separately selected validated-MP4/receipt packaging plus standalone verification.
+Existing guide/schema/readers and actual sample/full decoder are reused; no native
+project migration, source discovery, grant inference, refresh or rendering occurs.
+Private UUID folder, strict safe relative inventory/readback and receipt-last;
+source projects/media/evidence/history remain excluded or external, with explicit
+image provenance opt-in. Guides link included MP4 files and show the limits.
+
+Actual CLI creates, then a copied folder verifies/reopens via fresh SDKstdio after
+original selected paths move away:45samples/45decoded frames/1.5s, audio flagsfalse.
+Missing assets, tampered manifest and re-signed corrupt bitstream refuse; originals
+and privacy canaries remain preserved. Final-build proof/evidence are linked.
+Current13 distinct controls (12single/1paired) assertion-kill with exact restore;
+final full6060/450,0skips (`--maxWorkers=4`), focused220/10, bothTS and
+lint35baseline/docs37/i18n15/1265 pass. Initial default-worker full6058pass/1
+unrelated clipboard load miss, unchanged4-test and adjacent rechecks pass; initial
+log remains. Final Vite and real non-root startup pass (63MCPtools, expected absent-project
+CLI failure); final build/video/link proof matches. Preservation112/1485/76 and
+unchanged native addon verified; exact evidence/counts/limits are linked.
+
+Derived text/code/JPEG editability is explicit, not native project/media editability;
+copy/verify works offline, edited-package resealing and dedicated GUI verification
+are still gaps. Retained v1 byte fixture prevents silent guide-contract drift.
+No player, full course, GUI/physical/installer/audio/other-platform acceptance.
+Coordinator exact-SHA actual Claude review/fixes/private push is next before any
+GUI import/reseal/player slice. Main/private-main stayfd2775e2; native unchanged,
+original evidence/reports/user work and earlier regression histories preserved.
+
+## Prior checkpoint accounts
+
 # Accepted headless MP4 checkpoint — 9 November 2026
 
 Actual [review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) accepts exact
