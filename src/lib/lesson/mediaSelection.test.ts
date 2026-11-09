@@ -80,3 +80,45 @@ it("applies a delayed plan to current authored text and refuses a changed target
 	])
 		expect(attachLessonMediaSelection(stale, request, selection)).toBe(stale);
 });
+
+it("refuses v1 over a current confirmed pin at the model boundary, preserving explicit remove and refresh", async () => {
+	const { attachLessonMediaSelection, reviseLesson } = await import("./authoring");
+	const { lessonMediaSelectionV2Schema } = await import("./mediaSelection");
+	const reference = selectionFixture();
+	const pin = lessonMediaSelectionV2Schema.parse({
+		...reference,
+		version: 2,
+		identity: {
+			version: 1,
+			observationId: crypto.randomUUID(),
+			basis: "explicit-author-current",
+			sources: [{ role: "screen", bindings: ["b".repeat(64)], bytes: 10, sha256: "c".repeat(64) }],
+		},
+		previousSelections: [reference],
+	});
+	const step = { ...newStep(), mediaSelection: pin },
+		lesson = { ...newLesson(), steps: [step] };
+	const request = {
+		lessonId: lesson.id,
+		stepId: step.id,
+		revision: lesson.revision,
+		previous: pin,
+	};
+	expect(attachLessonMediaSelection(lesson, request, reference)).toBe(lesson);
+	const refresh = {
+		...pin,
+		identity: {
+			...pin.identity,
+			observationId: crypto.randomUUID(),
+			basis: "explicit-refresh-current" as const,
+		},
+	};
+	expect(attachLessonMediaSelection(lesson, request, refresh).steps[0].mediaSelection).toEqual(
+		refresh,
+	);
+	const removed = reviseLesson(lesson, { steps: [{ ...step, mediaSelection: undefined }] });
+	expect(
+		attachLessonMediaSelection(removed, { ...request, previous: undefined }, reference).steps[0]
+			.mediaSelection,
+	).toEqual(reference);
+});

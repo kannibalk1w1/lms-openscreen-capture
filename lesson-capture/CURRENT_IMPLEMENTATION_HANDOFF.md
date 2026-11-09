@@ -1,3 +1,18 @@
+# Review27 follow-up — 9 November 2026
+
+Actual [review27](CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts1dad5a7c with no
+High/Medium. The sole writer implements the requested bounded
+[follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md): model/handler pin-downgrade
+refusal, independent boundary tests/mutation controls, shared production registration
+tests and consistent busy wording. Hash navigation remains fail-closed with exact
+URL restoration plus explicit reselect required; no navigation grant is broadened.
+Review27's real Electron IPC proof is preserved and distinguished from UI clicks,
+native picker and physical acceptance. Exact-SHA follow-up review/push remain
+coordinator-owned; no next roadmap slice starts here. Final146focused/12files and5829full/436files pass,0skip;15selected guard controls
+are assertion kills with0timeouts/load failures and restored source hashes. Both
+TS, production Vite, lint35existing warnings/docs/i18n and108links pass. Final
+evidence is in the follow-up report; earlier counts below belong to their own SHA.
+
 # Resumed authoring prerequisite — 9 November 2026
 
 The user explicitly resumed from clean existing `7b6f4a73` on

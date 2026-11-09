@@ -440,6 +440,8 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									onRemove={() => update(step.id, { mediaSelection: undefined })}
 									onAttach={(startSec, endSec) =>
 										void run(async (current) => {
+											if (step.mediaSelection?.version === 2)
+												throw new LessonOperationError("range-target-changed");
 											const store = useProjectStore.getState(),
 												snapshot = store.document;
 											if (!snapshot || !store.projectId || store.dirty)

@@ -81,6 +81,11 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
+Actual [review27](lesson-capture/CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts1dad5a7c
+with no High/Medium. A bounded [follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md)
+strengthens pin-downgrade and authority contracts before coordinator review/push;
+it does not start native-render integration.
+
 **9 November resumption:** [editor source confirmation](lesson-capture/RANGE_AUTHORING_2026-11-09.md)
 adds explicit current-source attachment and same-project refresh, bounded editor
 caller/project authority, cancellation and stale-safe attachment. It is a coherent

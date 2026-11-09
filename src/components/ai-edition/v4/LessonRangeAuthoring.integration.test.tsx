@@ -30,6 +30,21 @@ vi.mock("electron", () => ({
 	app: { getPath: electron.getPath },
 	dialog: { showSaveDialog: electron.save, showOpenDialog: electron.open },
 }));
+const rangeControl = vi.hoisted(() => ({
+	props: null as null | {
+		onAttach: (startSec: number, endSec: number) => void;
+	},
+}));
+vi.mock("./LessonRangeControls", async () => {
+	const actual =
+		await vi.importActual<typeof import("./LessonRangeControls")>("./LessonRangeControls");
+	return {
+		LessonRangeControls: (props: Parameters<typeof actual.LessonRangeControls>[0]) => {
+			rangeControl.props = props;
+			return <actual.LessonRangeControls {...props} />;
+		},
+	};
+});
 let root: string;
 beforeEach(async () => {
 	vi.stubGlobal("crypto", webcrypto);
@@ -104,7 +119,13 @@ async function fixture() {
 	registerLessonHandlers(new LessonService(read, renderFrames));
 	const invoke = (channel: string, ...args: unknown[]) =>
 		electron.handle.mock.calls.find(([name]) => name === channel)![1](event, ...args);
+	const plan = vi.fn((input: Parameters<NonNullable<LessonApi["lessonPlanRange"]>>[0]) =>
+		new LessonService(read, renderFrames)
+			.planRange(input)
+			.then((result) => ({ success: true as const, result })),
+	);
 	const api: LessonApi = {
+		lessonPlanRange: plan,
 		lessonConfirmRange: (input) => invoke("lesson:confirm-range", input),
 		lessonCancelRange: (id) => invoke("lesson:cancel-range", id),
 		lessonSave: (input) => invoke("lesson:save", input),
@@ -125,6 +146,7 @@ async function fixture() {
 		read,
 		renderFrames,
 		confirm,
+		plan,
 		cancel,
 		setAllowed: (value: boolean) => {
 			allowed = value;
@@ -277,4 +299,28 @@ it("requires an included step and a saved project before starting source reads",
 	await screen.findByText(/Save and reload the current video project/);
 	expect(f.read).not.toHaveBeenCalled();
 	expect(f.confirm).not.toHaveBeenCalled();
+});
+
+it("blocks direct reference-handler calls over a pin and ignores pre-pin stale callbacks without losing history", async () => {
+	const f = await fixture(),
+		staleAttach = rangeControl.props!.onAttach;
+	fireEvent.click(confirmButton());
+	await screen.findByText(/Current source confirmed and attached/);
+	const attach = screen.getByRole("button", { name: "Attach range from saved project" });
+	expect((attach as HTMLButtonElement).disabled).toBe(true);
+	await act(async () => rangeControl.props!.onAttach(0, 1));
+	await screen.findByText(/The lesson step or its saved range changed/);
+	expect(f.plan).not.toHaveBeenCalled();
+	await act(async () => staleAttach(0, 1));
+	await waitFor(() => expect(f.plan).toHaveBeenCalledOnce());
+	await waitFor(() => expect(screen.queryByText("Working…")).toBeNull());
+	const file = path.join(root, "still-confirmed.json");
+	electron.save.mockResolvedValueOnce({ canceled: false, filePath: file });
+	fireEvent.click(saveButton());
+	await screen.findByText(`Editable copy saved: ${file}`);
+	const lesson = await validateLesson(JSON.parse(await fs.readFile(file, "utf8")));
+	expect(lesson.steps[0].mediaSelection).toMatchObject({
+		version: 2,
+		previousSelections: [{ version: 1 }],
+	});
 });

@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { DesktopCapturerSource, Rectangle, WebContents } from "electron";
+import type { DesktopCapturerSource, Rectangle } from "electron";
 import {
 	app,
 	BrowserWindow,
@@ -49,7 +49,6 @@ import {
 	type StoreRecordedSessionInput,
 } from "../../src/lib/recordingSession";
 import {
-	AI_EDITION_OPEN_PROJECT_CHANNEL,
 	type CursorRecordingData,
 	type ProjectFileResult,
 	type ProjectPathResult,
@@ -77,8 +76,6 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
-import { editorRangeSessions } from "../lesson/editorRangeSession";
-import { RangeAuthoringService } from "../lesson/rangeAuthoring";
 import { LessonService } from "../lesson/service";
 import {
 	DEFAULT_RECORDINGS_DIR,
@@ -178,11 +175,11 @@ import {
 } from "../windows-update";
 import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
+import { registerEditorRangeAuthoring } from "./editorRangeAuthoring";
 import { registerLessonHandlers } from "./lesson";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
-import { registerRangeAuthoringHandlers } from "./rangeAuthoring";
 import { registerRecordingPrefsHandlers } from "./recordingPrefs";
 import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./recordingStream";
 import { type SelectSourceContext, selectSourceWithOwnership } from "./selectSourceOwnership";
@@ -5110,35 +5107,10 @@ export function registerIpcHandlers(
 	});
 	const mcpController = new McpController(mcpSettings, mcpToolDeps, mcpRunTool, mcpMedia);
 
-	// The editor says which project it holds, so `openscreen mcp`, a process of its own
-	// that cannot ask it, refuses to edit that project behind its back (#1138).
-	// Only the window that set the marker clears it, so an older window going away
-	// never unmarks the project a newer one holds.
-	let markedBy: WebContents | null = null;
-	const watchedEditors = new WeakSet<WebContents>();
-	registerRangeAuthoringHandlers(
-		new RangeAuthoringService((id) => aiEditionDocuments.getSavedProject(id)),
-		(event) => ({
-			...editorRangeSessions.capture(event.sender, () => editorHasUnsavedChanges?.() ?? false),
-			canReadSource: (source) => !!readableApprovedPath(source),
-		}),
-	);
-	ipcMain.on(AI_EDITION_OPEN_PROJECT_CHANNEL, (event, projectId: unknown) => {
-		const id =
-			typeof projectId === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(projectId) ? projectId : null;
-		if (event.senderFrame === event.sender.mainFrame) editorRangeSessions.select(event.sender, id);
-		if (id === null && markedBy !== null && markedBy !== event.sender) return;
-		markedBy = id === null ? null : event.sender;
-		aiEditionDocuments.markOpenInEditor(id);
-		if (watchedEditors.has(event.sender)) return;
-		watchedEditors.add(event.sender);
-		event.sender.on("did-start-navigation", () => editorRangeSessions.invalidate(event.sender));
-		event.sender.on("render-process-gone", () => editorRangeSessions.invalidate(event.sender));
-		event.sender.once("destroyed", () => {
-			if (markedBy !== event.sender) return;
-			markedBy = null;
-			aiEditionDocuments.markOpenInEditor(null);
-		});
+	registerEditorRangeAuthoring({
+		documents: aiEditionDocuments,
+		editorHasUnsavedChanges: () => editorHasUnsavedChanges?.() ?? false,
+		readableApprovedPath,
 	});
 
 	registerNativeBridgeHandlers({

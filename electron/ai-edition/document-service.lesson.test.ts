@@ -63,3 +63,15 @@ it("shares serialization with saved project writes and returns the completed sav
 	await save;
 	expect((await read).project.title).toBe("After");
 });
+
+it("rejects an invalid saved-reader ID before entering the project queue", async () => {
+	const service = new DocumentService(root, root);
+	const queue = vi.spyOn(
+		service as unknown as {
+			enqueue: (id: string, run: () => Promise<unknown>) => Promise<unknown>;
+		},
+		"enqueue",
+	);
+	await expect(service.getSavedProject("../private")).rejects.toThrow();
+	expect(queue).not.toHaveBeenCalled();
+});

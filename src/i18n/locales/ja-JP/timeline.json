@@ -321,7 +321,7 @@
 			"lesson-operation-failed": "The lesson operation could not finish. Check the selected lesson or destination and retry. Existing files are preserved.",
 			"project-changed": "Save and reload the current video project, then retry the lesson operation. Its render inputs changed or edits are unsaved.",
 			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
-			"render-busy": "A lesson still is already rendering. Wait for it to finish, then retry.",
+			"render-busy": "A lesson operation is already running. Wait for it to finish, then retry.",
 			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced.",
 			"local-draft-limit": "The local recovery limit is reached. Delete unwanted local copies or save a new editable file elsewhere. Existing copies are preserved.",
 			"local-draft-unavailable": "The local recovery operation could not finish. Existing source lessons remain unchanged. Check the visible storage location and retry.",

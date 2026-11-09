@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation prerequisite pending coordinator review). **Record once. Produce multiple editable teaching resources.**
+Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation accepted by review27; bounded guard follow-up pending review). **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -84,7 +84,7 @@ claims that every listed operation exists.
    review25 and review26 at d017e4b8; it is not immutable or authenticated history.
    [Editor confirmation](RANGE_AUTHORING_2026-11-09.md) now explicitly attaches
    current content or refreshes within the same project, with cancellation and
-   caller/source/stale-target guards; coordinator review is pending. Selected MP4
+   caller/source/stale-target guards; review27 accepts1dad5a7c with no High/Medium; the [bounded follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md) awaits coordinator review. Selected MP4
    export remains backend-only: shared native render-job ownership, native picker,
    progress/cancellation/status and actual materializer/validator integration are
    next. CLI/MCP confirmation/export parity, timed Next/Previous/Replay/loop/speed,

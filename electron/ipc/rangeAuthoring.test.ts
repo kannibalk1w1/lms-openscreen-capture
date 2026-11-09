@@ -194,3 +194,23 @@ it.each([
 	});
 	expect(await f.confirm(f.event, f.request)).toEqual({ success: false, code: "project-changed" });
 });
+
+it("rejects cancellation from an owner's subframe without cancelling its active operation", async () => {
+	const f = await fixture();
+	let release!: () => void;
+	const wait = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	f.read.mockImplementationOnce(async () => {
+		await wait;
+		return f.doc;
+	});
+	const pending = f.confirm(f.event, f.request);
+	await vi.waitFor(() => expect(f.read).toHaveBeenCalledOnce());
+	expect(await f.cancel({ ...f.event, senderFrame: {} }, f.request.operationId)).toEqual({
+		success: false,
+		code: "project-changed",
+	});
+	release();
+	expect((await pending).success).toBe(true);
+});

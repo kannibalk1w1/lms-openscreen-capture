@@ -228,3 +228,80 @@ it("cancels on owner destruction even during a later backend revalidation", asyn
 	});
 	expect(f.lesson.steps[0].mediaSelection).toBeUndefined();
 });
+
+it("requires absolute source declarations before approval or filesystem resolution", async () => {
+	const f = await fixture();
+	f.doc.assets[0].originalPath = path.relative(process.cwd(), f.source);
+	const range = { ...f.request.range, documentSha256: await lessonRenderFingerprint(f.doc) };
+	const resolve = vi.spyOn(fs, "realpath");
+	await expect(f.service.confirm({ ...f.request, range }, f.authority)).rejects.toMatchObject({
+		code: "range-source-unavailable",
+	});
+	expect(f.authority.canReadSource).not.toHaveBeenCalled();
+	expect(resolve).not.toHaveBeenCalled();
+});
+it("rejects a document carrying another actual project ID before planning", async () => {
+	const f = await fixture(),
+		plan = await import("./rangePlan");
+	const planning = vi.spyOn(plan, "planLessonRange");
+	f.doc.project.id = "other";
+	await expect(f.service.confirm(f.request, f.authority)).rejects.toMatchObject({
+		code: "project-changed",
+	});
+	expect(planning).not.toHaveBeenCalled();
+});
+it("checks standalone service authority before lesson validation and backend reads", async () => {
+	const f = await fixture();
+	f.authority.assertCurrent = () => {
+		throw new Error("INITIAL_AUTHORITY_REFUSED");
+	};
+	await expect(f.service.confirm({ ...f.request, lesson: null }, f.authority)).rejects.toThrow(
+		"INITIAL_AUTHORITY_REFUSED",
+	);
+	expect(f.read).not.toHaveBeenCalled();
+});
+it("constrains the backend reader callback even if a backend requests a foreign ID", async () => {
+	const f = await fixture(),
+		identity = await import("./sourceIdentity");
+	vi.spyOn(identity, "captureLessonSourceIdentity").mockImplementationOnce(async (options) => {
+		await options.readDocument("other");
+		throw new Error("FOREIGN_READ_NOT_REFUSED");
+	});
+	await expect(f.service.confirm(f.request, f.authority)).rejects.toMatchObject({
+		code: "project-changed",
+	});
+	expect(f.read.mock.calls).toEqual([["p"]]);
+});
+it("rechecks service authority when the asynchronous backend settles", async () => {
+	const f = await fixture(),
+		pin = await f.service.confirm(f.request, f.authority);
+	let current = true;
+	f.authority.assertCurrent = () => {
+		if (!current) throw new Error("FINAL_AUTHORITY_REFUSED");
+	};
+	const identity = await import("./sourceIdentity");
+	vi.spyOn(identity, "captureLessonSourceIdentity").mockImplementationOnce(async () => {
+		current = false;
+		return pin;
+	});
+	await expect(f.service.confirm(f.request, f.authority)).rejects.toThrow(
+		"FINAL_AUTHORITY_REFUSED",
+	);
+});
+
+it("does not cancel an active operation when a different owner's lifecycle ends", async () => {
+	const f = await fixture();
+	let release!: () => void;
+	const wait = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	f.read.mockImplementationOnce(async () => {
+		await wait;
+		return f.doc;
+	});
+	const pending = f.service.confirm(f.request, f.authority);
+	await vi.waitFor(() => expect(f.read).toHaveBeenCalledOnce());
+	f.service.cancelOwner({});
+	release();
+	expect((await pending).version).toBe(2);
+});

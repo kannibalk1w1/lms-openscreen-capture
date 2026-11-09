@@ -136,7 +136,8 @@ export function attachLessonMediaSelection(
 		current.id !== request.lessonId ||
 		current.revision < request.revision ||
 		!step ||
-		JSON.stringify(step.mediaSelection) !== JSON.stringify(request.previous)
+		JSON.stringify(step.mediaSelection) !== JSON.stringify(request.previous) ||
+		(step.mediaSelection?.version === 2 && selection.version === 1)
 	)
 		return current;
 	const next = reviseLesson(current, {

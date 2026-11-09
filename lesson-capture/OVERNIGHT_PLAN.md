@@ -1,3 +1,12 @@
+# Current bounded review follow-up — 9 November 2026
+
+The coordinator requests the [review27 follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md)
+before private push. Complete only those source-confirmation guards/tests/wording,
+preserve the original review and all evidence, validate and commit locally, then
+stop for exact-SHA coordinator Claude review/fixes/push. No native render/export
+phase or worker is authorized by this follow-up. Earlier explicit resumption and
+revoked schedules remain as recorded below; main is unchanged.
+
 # Explicit user resumption — 9 November 2026
 
 The user explicitly resumes the roadmap from clean existing feature checkpoint
