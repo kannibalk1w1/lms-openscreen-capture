@@ -220,3 +220,40 @@ No mutation controls and no full-suite run for this slice.
 
 **Limits.** No headless illustration, reordering or review-status change. One new file per
 call.
+
+Slice 7 commit: `d4d152e9`.
+
+### Follow-up validation for slices 6 and 7 (third continuation)
+
+On resuming, I confirmed that the slice 6 and 7 tests and records were already inside
+`be758ca7` and `d4d152e9`. Two gaps those records admitted are now closed:
+
+- 7 single-guard controls on the slice 6 and 7 code, in a fresh `git archive` snapshot
+  (`slice6-7-controls/`): reseal ignoring a slide or lesson reference edit; edited text
+  keeping `reviewed`; a slide-reference change demoting; overwrite allowed; MCP write without
+  consent; a removed step keeping its image. **7 killed by assertions.**
+- Full suite: see slice 8 below.
+
+### Slice 8 — distinguishable step buttons, heading order and plainer package wording (review L2)
+
+**What changed**
+
+- Lesson guide dialog and package draft panel: each step's Move up, Move down, Remove and
+  Illustrate buttons now have an accessible name that ends with the step number and title
+  ("Move up: step 2, Attach the script"). The visible words are unchanged and remain at the
+  start of the name.
+- Package panel: step titles are `h5` under the lesson's `h4`.
+- Four package messages are reworded for authors, without "verification authority" or
+  "rebased". The package panel's remaining text is unchanged.
+- 15 catalogues: one new key and four reworded strings, English in all.
+
+**Commands and results**
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run src/components/ai-edition/v4` (2 new cases; 6 existing selectors updated to the new names) | 396 tests pass, 0 skipped |
+| Full suite, `npm run test -- --maxWorkers=4` (covers slices 6, 7 and 8) | 6,232 tests / 457 files pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run i18n:check`; `npx vite build` | pass; 35 baseline; pass; pass |
+
+No IPC, handler or bootstrap change, so no startup smoke for this slice. **Not tested with a
+screen reader or by keyboard-only use**; the evidence is accessible-name assertions in jsdom.

@@ -535,3 +535,19 @@ it("edits LMS references in a package draft and submits them with the new packag
 	expect(sent.lessonRef).toBe("RPG C1 / L1");
 	expect(sent.steps[0]).toMatchObject({ slideRef: "slide 12", status: "draft" });
 });
+it("names each package step's move buttons distinctly and keeps step titles below the lesson heading", async () => {
+	opened.lesson = { ...opened.lesson, steps: [...opened.lesson.steps, newStep("Second step")] };
+	const view = show();
+	clickOpen();
+	fireEvent.click(await screen.findByText("Edit supported text and order as a new draft"));
+	expect(
+		screen.getByRole("button", { name: "Move package step up: step 2, Second step" }),
+	).toBeDefined();
+	expect(
+		screen.getByRole("button", { name: "Move package step down: step 1, Package step" }),
+	).toBeDefined();
+	expect([...view.container.querySelectorAll("h5")].map((h) => h.textContent)).toEqual([
+		"Package step",
+		"Second step",
+	]);
+});

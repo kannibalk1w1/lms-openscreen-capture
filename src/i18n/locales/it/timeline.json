@@ -292,6 +292,7 @@
 		"scope": "Build editable, application-neutral steps and export an offline HTML/Markdown guide. No application integration is required.",
 		"unsaved": "This lesson is separate from the video project. Save an editable copy before leaving this project; saving never replaces an existing file.",
 		"lessonTitle": "Lesson title",
+		"stepName": "step {{number}}, {{title}}",
 		"packageCreate": {
 			"action": "Create a portable package from selected steps",
 			"videos": "Include exported step MP4s (you choose their export folders next)",
@@ -510,11 +511,11 @@
 			"draftDiscardedClosed": "Draft discarded. The package view was closed because it was no longer checked. Open the package folder again to inspect or edit it.",
 			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions, LMS lesson and slide references, and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
 			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged.",
-			"editsKept": "Your unsaved text, code, order and image descriptions are kept. Retry explicitly, reopen the same unchanged package to restore verification, or discard the draft.",
-			"authorityLost": "Verification authority is no longer current. Your draft is kept. Save/reload or select a clean current project, then explicitly reopen the same unchanged package before retrying. Changed media or inventory cannot be rebased automatically.",
+			"editsKept": "Your unsaved text, code, order and image descriptions are kept. You can try again, choose the same package folder again if asked, or discard the draft.",
+			"authorityLost": "The package or your video project changed, so this draft cannot be saved yet. Your edits are kept. If your video project has unsaved changes, save it. Then use the button below and choose the same package folder again. A package whose files have changed cannot be used for this draft.",
 			"resume": "Reopen the same package and keep edits",
-			"resumed": "The same package inventory was checked again under the current editor session. Your edits are unchanged; you may retry saving.",
-			"differentPackage": "That package differs from this draft’s original inventory. Your edits are kept, but saving remains blocked. Choose the original unchanged package or explicitly discard the draft."
+			"resumed": "The same package inventory was checked again. Your edits are unchanged and you can save now.",
+			"differentPackage": "That package differs from the one this draft was started from. Your edits are kept, but saving stays blocked. Choose the original, unchanged package folder, or discard the draft."
 		}
 	}
 }

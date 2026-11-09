@@ -37,7 +37,7 @@ it("authors and renumbers stable steps with every integration/API absent", () =>
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
 	fireEvent.change(screen.getAllByLabelText("Step title")[1], { target: { value: "Second" } });
 	fireEvent.blur(screen.getAllByLabelText("Step title")[1]);
-	fireEvent.click(screen.getAllByRole("button", { name: "Move up" })[1]);
+	fireEvent.click(screen.getByRole("button", { name: /^Move up: step 2, / }));
 	expect(
 		screen.getAllByLabelText("Step title").map((input) => (input as HTMLInputElement).value),
 	).toEqual(["Second", "First"]);
@@ -238,7 +238,9 @@ it.each([
 				.disabled,
 		).toBe(false),
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: /^Illustrate from current saved playhead: / }),
+	);
 	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
 	// Deliberately inject the independent restore callback while rendering is pending.
 	fireEvent.click(screen.getByRole("button", { name: "Show local recovery copies" }));
@@ -268,7 +270,9 @@ it("preserves text edits delivered while an illustration is pending", async () =
 	vi.stubGlobal("electronAPI", { lessonFrame: frame });
 	show();
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
-	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: /^Illustrate from current saved playhead: / }),
+	);
 	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
 	fireEvent.change(screen.getByLabelText("Instructions"), {
 		target: { value: "Later authored text" },
@@ -291,7 +295,9 @@ it("refuses a pending illustration after the source document changes", async () 
 	vi.stubGlobal("electronAPI", { lessonFrame: frame });
 	show();
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
-	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: /^Illustrate from current saved playhead: / }),
+	);
 	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
 	await act(async () => {
 		useProjectStore.setState({
@@ -318,7 +324,9 @@ it("rejects source changes while illustration integrity validation is still pend
 	vi.stubGlobal("electronAPI", { lessonFrame: frame });
 	show();
 	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
-	fireEvent.click(screen.getByRole("button", { name: "Illustrate from current saved playhead" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: /^Illustrate from current saved playhead: / }),
+	);
 	await waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
 	const original = webcrypto.subtle.digest.bind(webcrypto.subtle);
 	const digest = vi
@@ -694,4 +702,22 @@ it("creates a package from the selected steps with the dialog's output settings 
 	expect(screen.queryByText(/Those folders cannot be used for videos/)).toBeNull();
 	act(() => useProjectStore.setState({ dirty: true }));
 	expect(create().disabled).toBe(true);
+});
+it("names every repeated step button with its step number and title", () => {
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	const names = screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"));
+	for (const action of [
+		"Move up",
+		"Move down",
+		"Remove step",
+		"Illustrate from current saved playhead",
+	])
+		for (const number of [1, 2])
+			expect(names.filter((name) => name?.startsWith(`${action}: step ${number}, `))).toHaveLength(
+				1,
+			);
+	// The visible words stay inside the accessible name.
+	expect(screen.getAllByText("Move up")).toHaveLength(2);
 });

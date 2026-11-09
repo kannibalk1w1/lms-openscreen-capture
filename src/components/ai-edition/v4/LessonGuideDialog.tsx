@@ -511,6 +511,8 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					{lesson.steps.map((step, index) => {
 						if (!visible.has(step.id)) return null;
 						const image = lesson.assets.find((image) => image.id === step.imageId);
+						// Each step repeats the same buttons: name the step so they can be told apart without sight.
+						const stepName = t("lesson.stepName", { number: index + 1, title: step.title });
 						return (
 							<section
 								key={step.id}
@@ -817,6 +819,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										type="button"
 										disabled={index === 0 || matches.length !== lesson.steps.length}
 										onClick={() => author(() => moveStep(lesson, step.id, -1))}
+										aria-label={`${t("lesson.up")}: ${stepName}`}
 									>
 										{t("lesson.up")}
 									</button>
@@ -826,6 +829,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 											index === lesson.steps.length - 1 || matches.length !== lesson.steps.length
 										}
 										onClick={() => author(() => moveStep(lesson, step.id, 1))}
+										aria-label={`${t("lesson.down")}: ${stepName}`}
 									>
 										{t("lesson.down")}
 									</button>
@@ -843,6 +847,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 											);
 											setSelected(active.filter((id) => id !== step.id));
 										}}
+										aria-label={`${t("lesson.remove")}: ${stepName}`}
 									>
 										{t("lesson.remove")}
 									</button>
@@ -898,6 +903,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 												});
 											})
 										}
+										aria-label={`${t("lesson.capture")}: ${stepName}`}
 									>
 										{t("lesson.capture")}
 									</button>

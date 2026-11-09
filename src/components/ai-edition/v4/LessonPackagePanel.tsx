@@ -240,7 +240,7 @@ export function LessonPackagePanel({
 								video = opened.videos.find((v) => v.stepId === step.id);
 							return (
 								<li key={step.id}>
-									<h4>{step.title}</h4>
+									<h5>{step.title}</h5>
 									<p style={{ whiteSpace: "pre-wrap" }}>{step.instructions}</p>
 									{image && (
 										<img
@@ -366,6 +366,7 @@ export function LessonPackagePanel({
 										type="button"
 										disabled={index === 0}
 										onClick={() => edit(() => moveStep(draft, step.id, -1))}
+										aria-label={`${t("lesson.package.up")}: ${t("lesson.stepName", { number: index + 1, title: step.title })}`}
 									>
 										{t("lesson.package.up")}
 									</button>
@@ -373,6 +374,7 @@ export function LessonPackagePanel({
 										type="button"
 										disabled={index === draft.steps.length - 1}
 										onClick={() => edit(() => moveStep(draft, step.id, 1))}
+										aria-label={`${t("lesson.package.down")}: ${t("lesson.stepName", { number: index + 1, title: step.title })}`}
 									>
 										{t("lesson.package.down")}
 									</button>
