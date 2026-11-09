@@ -439,3 +439,29 @@ No mutation controls and no full-suite run for this slice (last full run: slice 
 458). With this slice the "could continue without outside input" list above loses headless
 reordering and the command reference; an MCP illustration tool and the output-format work
 remain.
+
+Slice 12 commit: `06259913`.
+
+### Slice 13 — MCP illustration tool
+
+**What changed.** MCP `illustrateLessonStep`, the tool form of slice 11's command, registered
+last. It needs MCP edits on both transports, checks consent before any file or render access
+and again before returning, tracks its work on the connection lifetime, and returns only
+fixed codes (`frame-unavailable` and the other fixed lesson codes, otherwise
+`lesson-file-operation-failed`). One new dependency, `renderLessonFrames`, is supplied at the
+single place the MCP tool dependencies are built (`electron/ipc/handlers.ts`); the stdio
+server inherits it.
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/mcp` (3 new cases in `lesson-illustrate.test.ts`) | 209 tests pass, 0 skipped |
+| Both `tsc`; `npm run lint`; `npm run docs:check`; `npx vite build`; required startup smoke | pass; 35 baseline; OK; pass; `success: true` |
+| Real `openscreen mcp` over the SDK stdio transport, production build under Xvfb, real native compositor (`slice13/results.json`, driver `stdio.cjs`), reading the preserved proof project and video | `createLessonFile`, `addLessonSteps`, then `illustrateLessonStep`: a time inside the cut returns `frame-unavailable`; a valid time saves a lesson with a 640-pixel-wide frame; a wrong source grant is refused; `queryLessonFile` shows the references. Preserved inputs still match their hashes |
+
+No mutation controls and no full-suite run for this slice (last full run: slice 11). The HTTP
+transport was exercised only through the SDK in-memory transport in tests.
+
+With this slice an agent can do, through MCP or the CLI and without the GUI: create a lesson,
+add, edit, move and remove steps, record LMS references, attach project frames, export the
+guide with its mapping file, confirm and render step videos, and create and verify a package.
+It still cannot mark a step reviewed, by design.

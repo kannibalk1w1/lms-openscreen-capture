@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
+import { LessonOperationError, rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
 import {
 	addLessonStepsFile,
 	createLessonFile,
@@ -20,6 +20,11 @@ import {
 } from "../lesson/fileContracts";
 import { exportLessonRangeFile, type LessonFileRangeRenderer } from "../lesson/fileExport";
 import { exportLessonRangeFileSchema } from "../lesson/fileExportContracts";
+import {
+	illustrateLessonStepFile,
+	illustrateLessonStepFileSchema,
+	type LessonFrameRenderer,
+} from "../lesson/fileIllustrate";
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
@@ -32,11 +37,13 @@ export function registerLessonTools(
 		editsAllowed,
 		lifecycle,
 		render,
+		renderFrames,
 	}: {
 		transport: "http" | "stdio";
 		editsAllowed: () => boolean;
 		lifecycle?: LessonFileLifecycle;
 		render?: LessonFileRangeRenderer;
+		renderFrames?: LessonFrameRenderer;
 	},
 ) {
 	registerLessonPackageTools(server, editsAllowed, lifecycle);
@@ -255,4 +262,41 @@ export function registerLessonTools(
 				}
 			},
 		);
+	server.registerTool(
+		"illustrateLessonStep",
+		{
+			description:
+				"Attach one composed frame of an explicitly selected SAVED project (projectPath, projectId, rulerSec on the editor ruler) to one step of an explicitly selected editable lesson file, with a required imageAlt description, and save the result as a NEW file at an explicit absolute outputPath. sourcePaths must name every source file the project's clips play; nothing is discovered or relinked and symlinked sources are refused. The step returns to draft: a person must still review the pixels for private content and check that the frame shows the step. Selected files are unchanged and no file is replaced. Fails with frame-unavailable for a time inside a cut. Requires MCP edits.",
+			inputSchema: illustrateLessonStepFileSchema,
+			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+		},
+		async (args: unknown, extra) => {
+			const refused = "consent_required: Enable MCP edits to illustrate a lesson step.";
+			if (!editsAllowed()) return failure(refused);
+			if (!lifecycle || !renderFrames) return failure("lesson-file-operation-failed");
+			try {
+				const pending = illustrateLessonStepFile(
+					args,
+					{
+						signal: AbortSignal.any([extra.signal, lifecycle.signal]),
+						assertCurrent: () => {
+							if (!editsAllowed() || lifecycle.owner.isDestroyed())
+								throw new Error("caller-scope-changed");
+						},
+					},
+					renderFrames,
+				);
+				lifecycle.track(pending);
+				const result = await pending;
+				if (!editsAllowed()) return failure(refused);
+				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+			} catch (error) {
+				if (!editsAllowed()) return failure(refused);
+				// Fixed codes only, such as a trimmed time; no paths, payloads or raw errors.
+				return failure(
+					error instanceof LessonOperationError ? error.code : "lesson-file-operation-failed",
+				);
+			}
+		},
+	);
 }

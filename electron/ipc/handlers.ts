@@ -4976,6 +4976,7 @@ export function registerIpcHandlers(
 	const mcpSettings = new McpSettingsStore(app.getPath("userData"), safeStorage);
 	const mcpToolDeps: McpToolDeps = {
 		startLessonRangeRender: (...args) => loudnessService.startExportMulti(...args),
+		renderLessonFrames: (...args) => loudnessService.renderFrames(...args),
 		transport: "http",
 		host: new EditorDocumentHost(ipcMain),
 		projects: aiEditionDocuments,

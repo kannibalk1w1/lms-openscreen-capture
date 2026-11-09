@@ -1,4 +1,5 @@
 import type { LessonFileRangeRenderer } from "../lesson/fileExport";
+import type { LessonFrameRenderer } from "../lesson/fileIllustrate";
 import { createLessonFileLifecycle, type LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { registerLessonTools } from "./lesson-tools";
 // The OpenScreen MCP server: the in-app agent's tools, offered to any MCP client
@@ -169,6 +170,7 @@ export type McpTransport = "http" | "stdio";
 export interface McpToolDeps extends ImportMediaDeps {
 	lessonLifecycle?: LessonFileLifecycle;
 	startLessonRangeRender?: LessonFileRangeRenderer;
+	renderLessonFrames?: LessonFrameRenderer;
 	transport: McpTransport;
 	host: McpDocumentHost;
 	projects: McpProjectStore;
@@ -950,6 +952,7 @@ export function createOpenScreenMcpServer(
 		editsAllowed: () => deps.editsAllowed(),
 		lifecycle: deps.lessonLifecycle,
 		render: deps.startLessonRangeRender,
+		renderFrames: deps.renderLessonFrames,
 	});
 	// The effect contract: too long for addEffect's description, and versioned with the contract.
 	server.registerResource(

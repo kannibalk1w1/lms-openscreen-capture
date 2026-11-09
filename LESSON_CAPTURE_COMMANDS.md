@@ -181,7 +181,7 @@ replaced), the selected lesson file left unchanged, and fixed error text.
 | `lesson edit-step <lesson.json> --step <UUID> [--title] [--instructions] [--slide-ref \| --clear-slide-ref] [--code-language --code-text \| --clear-code] --out <new.json>` | `updateLessonStep` | Change one step; changed teaching text returns it to draft |
 | `lesson move-step <lesson.json> --step <UUID> --to <position> --out <new.json>` | `moveLessonStep` | Change order only |
 | `lesson remove-step <lesson.json> --step <UUID> --out <new.json>` | `removeLessonStep` | Remove a step and any image only it used |
-| `lesson illustrate <lesson.json> --project <saved.openscreen> --project-id <ID> --step <UUID> --at <seconds> --alt <description> --source <file> [...] --out <new.json>` | none yet | Attach one composed project frame; every played source must be named; the step returns to draft |
+| `lesson illustrate <lesson.json> --project <saved.openscreen> --project-id <ID> --step <UUID> --at <seconds> --alt <description> --source <file> [...] --out <new.json>` | `illustrateLessonStep` | Attach one composed project frame; every played source must be named; the step returns to draft |
 
 `lesson query` and `queryLessonFile` also return `lessonRef` and each step's `slideRef` when
 set. No command can mark a step reviewed. The MCP tools need MCP edits on both transports.
