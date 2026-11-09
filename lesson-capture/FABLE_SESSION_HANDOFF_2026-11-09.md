@@ -465,3 +465,23 @@ With this slice an agent can do, through MCP or the CLI and without the GUI: cre
 add, edit, move and remove steps, record LMS references, attach project frames, export the
 guide with its mapping file, confirm and render step videos, and create and verify a package.
 It still cannot mark a step reviewed, by design.
+
+Slice 13 commit: `a42d70a5`.
+
+## Final state of this session (supersedes the "Current state" section above where they differ)
+
+Thirteen slices: the eleven in the table above, then `06259913` (slice 12, headless
+reordering and command reference) and `a42d70a5` (slice 13, MCP illustration tool).
+Documentation-only commits: `ebb2926c`, `5308811b`, `a9163c39` and the one adding this section.
+
+Final full suite at `a42d70a5`: **6,261 tests / 459 files pass, 0 skipped**
+(`final/full-suite.log`). `npm run i18n:check` passes (15 locales, 1335 keys). Last startup
+smoke: slice 13, `success: true`. Tree clean. Main and private main `fd2775e2`; private
+feature ref `5d73f835`; addon SHA256 unchanged. Nothing pushed. **Nothing here is
+independently reviewed.**
+
+Stopped because every remaining item on the "needs outside input" list needs a reviewer, the
+owner, Windows hardware or a person at a real desktop. The one item left on the
+"could continue" list, GIF and PNG step outputs and the 1280 px cap, changes accepted render
+and package contracts and should be designed with a reviewer first. No new usage limit was
+hit after the second one recorded above.
