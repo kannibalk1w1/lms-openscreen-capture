@@ -9,12 +9,12 @@ import {
 import { z } from "zod";
 import type { PackageOpenCode } from "../../src/lib/lesson/packageOpen";
 import { LessonPackageError } from "../lesson/package";
+import { digest } from "../lesson/packageIO";
 import {
 	type InspectedPackage,
 	openSelectedLessonPackage,
 	saveStaticPackageCopy,
 } from "../lesson/packageOpen";
-
 import { resealLessonPackage } from "../lesson/packageReseal";
 
 const idSchema = z.string().uuid();
@@ -55,11 +55,13 @@ export function registerLessonPackageOpenHandlers(
 		event: IpcMainInvokeEvent,
 		inputId: unknown,
 		action: (state: State, authority: { assertCurrent(): void; signal: AbortSignal }) => Promise<T>,
+		retainVerifiedCapability = false,
 	) => {
 		let state: State | undefined;
 		let operation: State["active"];
 		try {
 			mainFrame(event);
+			if (retainVerifiedCapability) state = states.get(event.sender);
 			const authority = authorize(event),
 				id = idSchema.parse(inputId);
 			authority.assertCurrent();
@@ -76,7 +78,22 @@ export function registerLessonPackageOpenHandlers(
 			check();
 			return { success: true as const, result };
 		} catch (error) {
-			if (state) state.opened = undefined;
+			let capability: "retained" | "reopen-required" | undefined;
+			if (retainVerifiedCapability) {
+				capability = "reopen-required";
+				try {
+					const held = state?.opened;
+					if (held) {
+						held.assertCurrent();
+						// Cancellation keeps the original frozen identity; retry must recheck it.
+						if (!operation?.abort.signal.aborted) held.value.assertCurrent();
+						capability = "retained";
+					}
+				} catch {
+					/* Keep edits in the renderer; no replacement identity or authority is captured. */
+				}
+			}
+			if (state && capability !== "retained") state.opened = undefined;
 			let code: PackageOpenCode =
 				error instanceof LessonPackageError ? error.code : "lesson-package-invalid";
 			if (error instanceof Error && error.message === "package-edit-unsupported")
@@ -85,7 +102,7 @@ export function registerLessonPackageOpenHandlers(
 				code = "lesson-package-video-copy-unsupported";
 			if (error && typeof error === "object" && "code" in error && error.code === "EEXIST")
 				code = "destination-exists";
-			return { success: false as const, code };
+			return { success: false as const, code, ...(capability ? { capability } : {}) };
 		} finally {
 			if (operation && state?.active === operation) state.active = undefined;
 		}
@@ -113,6 +130,7 @@ export function registerLessonPackageOpenHandlers(
 			return {
 				status: "opened" as const,
 				token,
+				snapshotSha256: digest(JSON.stringify(value.manifest)),
 				lesson: value.lesson,
 				videos: value.manifest.videos.map(({ stepId, frames, durationSec }) => ({
 					stepId,
@@ -160,36 +178,41 @@ export function registerLessonPackageOpenHandlers(
 	ipcMain.handle("lesson:package-reseal", (event, input: unknown) => {
 		const request = resealSchema.safeParse(input);
 		if (!request.success) return { success: false, code: "lesson-package-invalid" };
-		return run(event, request.data.operationId, async (state, authority) => {
-			const opened = state.opened;
-			if (!opened || opened.token !== request.data.token)
-				throw new LessonPackageError("lesson-package-invalid");
-			opened.assertCurrent();
-			return resealLessonPackage(
-				opened.directory,
-				opened.value,
-				request.data.lesson,
-				{
-					...authority,
-					assertCurrent: () => {
-						authority.assertCurrent();
-						opened.assertCurrent();
-						if (state.opened !== opened) throw new LessonPackageError("lesson-package-cancelled");
+		return run(
+			event,
+			request.data.operationId,
+			async (state, authority) => {
+				const opened = state.opened;
+				if (!opened || opened.token !== request.data.token)
+					throw new LessonPackageError("lesson-package-invalid");
+				opened.assertCurrent();
+				return resealLessonPackage(
+					opened.directory,
+					opened.value,
+					request.data.lesson,
+					{
+						...authority,
+						assertCurrent: () => {
+							authority.assertCurrent();
+							opened.assertCurrent();
+							if (state.opened !== opened) throw new LessonPackageError("lesson-package-cancelled");
+						},
 					},
-				},
-				async () => {
-					const parent = BrowserWindow.fromWebContents(event.sender);
-					const options = {
-						title: "Choose an existing folder for a new edited lesson package",
-						properties: ["openDirectory"] as ["openDirectory"],
-					};
-					const selected = parent
-						? await dialog.showOpenDialog(parent, options)
-						: await dialog.showOpenDialog(options);
-					return selected.canceled ? null : (selected.filePaths[0] ?? null);
-				},
-			);
-		});
+					async () => {
+						const parent = BrowserWindow.fromWebContents(event.sender);
+						const options = {
+							title: "Choose an existing folder for a new edited lesson package",
+							properties: ["openDirectory"] as ["openDirectory"],
+						};
+						const selected = parent
+							? await dialog.showOpenDialog(parent, options)
+							: await dialog.showOpenDialog(options);
+						return selected.canceled ? null : (selected.filePaths[0] ?? null);
+					},
+				);
+			},
+			true,
+		);
 	});
 	ipcMain.handle("lesson:package-cancel", (event, input: unknown) => {
 		try {

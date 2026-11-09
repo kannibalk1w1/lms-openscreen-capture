@@ -25,6 +25,12 @@ export function LessonPackagePanel({
 	const draftTarget = useRef(draft);
 	draftTarget.current = draft;
 	const [opened, setOpened] = useState<OpenedLessonPackage | null>(null);
+	const [needsReopen, setNeedsReopen] = useState(false);
+	const translate = useRef(t);
+	translate.current = t;
+	const sourceTarget = useRef(opened);
+	sourceTarget.current = opened;
+	const cancelled = useRef(false);
 	const [busy, setBusy] = useState(false),
 		[message, setMessage] = useState("");
 	const active = useRef<string | null>(null),
@@ -41,24 +47,35 @@ export function LessonPackagePanel({
 	}, []);
 	useEffect(() => {
 		if (projectId || document || dirty || token.current || active.current) clear();
-		setOpened(null);
-		setDraft(null);
-		setMessage("");
+		if (draftTarget.current) {
+			setNeedsReopen(true);
+			setMessage(translate.current("lesson.package.authorityLost"));
+		} else {
+			setOpened(null);
+			setNeedsReopen(false);
+			setMessage("");
+		}
 		return clear;
 	}, [projectId, document, dirty, clear]);
-	const run = async (action: "open" | "copy" | "reseal") => {
-		if (active.current || dirty || !projectId || (action !== "reseal" && draftTarget.current))
+	const run = async (action: "open" | "copy" | "reseal" | "resume") => {
+		if (
+			active.current ||
+			dirty ||
+			!projectId ||
+			((action === "open" || action === "copy") && draftTarget.current)
+		)
 			return;
 		const id = crypto.randomUUID(),
 			at = epoch.current,
 			generation = draftGeneration.current;
 		active.current = id;
+		cancelled.current = false;
 		setBusy(true);
 		setMessage(t("lesson.package.checking"));
 		try {
 			if (action === "reseal") {
 				const submitted = draftTarget.current;
-				if (!token.current || !submitted) return;
+				if (!token.current || !submitted || needsReopen) return;
 				const result = await window.electronAPI!.lessonPackageReseal!({
 					operationId: id,
 					token: token.current,
@@ -66,9 +83,15 @@ export function LessonPackagePanel({
 				});
 				if (at !== epoch.current || generation !== draftGeneration.current) return;
 				if (!result.success) {
-					setOpened(null);
-					setDraft(null);
-					setMessage(t(`lesson.package.errors.${result.code}`));
+					if (result.capability !== "retained") {
+						if (token.current)
+							void window.electronAPI?.lessonPackageRelease?.(token.current).catch(() => undefined);
+						token.current = null;
+						setNeedsReopen(true);
+					}
+					setMessage(
+						t(`lesson.package.errors.${result.code}`) + " " + t("lesson.package.editsKept"),
+					);
 					return;
 				}
 				if (result.result.status === "packaged") setDraft(null);
@@ -95,12 +118,16 @@ export function LessonPackagePanel({
 						: t("lesson.package.cancelled"),
 				);
 			} else {
+				const resumeSource = sourceTarget.current;
+				if (action === "resume" && (!draftTarget.current || !resumeSource)) return;
 				if (token.current) await window.electronAPI?.lessonPackageRelease?.(token.current);
 				token.current = null;
-				setOpened(null);
-				setDraft(null);
+				if (action !== "resume") {
+					setOpened(null);
+					setDraft(null);
+				}
 				const result = await window.electronAPI!.lessonPackageOpen!(id);
-				if (at !== epoch.current) {
+				if (at !== epoch.current || cancelled.current) {
 					if (result.success && result.result.status === "opened")
 						void window.electronAPI?.lessonPackageRelease?.(result.result.token);
 					return;
@@ -115,16 +142,35 @@ export function LessonPackagePanel({
 				}
 				const value = result.result,
 					lesson = await validateLesson(value.lesson);
-				if (at !== epoch.current) {
+				if (at !== epoch.current || cancelled.current) {
 					void window.electronAPI?.lessonPackageRelease?.(value.token);
 					return;
 				}
+				if (
+					action === "resume" &&
+					(!/^[a-f0-9]{64}$/.test(value.snapshotSha256) ||
+						value.snapshotSha256 !== resumeSource!.snapshotSha256)
+				) {
+					void window.electronAPI?.lessonPackageRelease?.(value.token);
+					setNeedsReopen(true);
+					setMessage(t("lesson.package.differentPackage"));
+					return;
+				}
 				token.current = value.token;
+				setNeedsReopen(false);
 				setOpened({ ...value, lesson });
-				setMessage(t("lesson.package.checked"));
+				setMessage(t(action === "resume" ? "lesson.package.resumed" : "lesson.package.checked"));
 			}
 		} catch {
-			if (at === epoch.current) setMessage(t("lesson.package.errors.lesson-package-invalid"));
+			if (at === epoch.current) {
+				if (draftTarget.current) {
+					if (token.current)
+						void window.electronAPI?.lessonPackageRelease?.(token.current).catch(() => undefined);
+					token.current = null;
+					setNeedsReopen(true);
+				}
+				setMessage(t("lesson.package.errors.lesson-package-invalid"));
+			}
 		} finally {
 			if (active.current === id) active.current = null;
 			setBusy(false);
@@ -165,9 +211,9 @@ export function LessonPackagePanel({
 				<button
 					type="button"
 					onClick={() => {
-						clear();
-						setDraft(null);
-						setOpened(null);
+						cancelled.current = true;
+						if (active.current)
+							void window.electronAPI?.lessonPackageCancel?.(active.current).catch(() => undefined);
 						setMessage(t("lesson.package.cancelling"));
 					}}
 				>
@@ -224,7 +270,7 @@ export function LessonPackagePanel({
 					{!draft && (
 						<button
 							type="button"
-							disabled={busy || dirty || !window.electronAPI?.lessonPackageReseal}
+							disabled={busy || dirty || needsReopen || !window.electronAPI?.lessonPackageReseal}
 							onClick={() => {
 								if (active.current) return;
 								draftGeneration.current++;
@@ -236,8 +282,21 @@ export function LessonPackagePanel({
 						</button>
 					)}
 					{draft && (
-						<fieldset disabled={busy || dirty}>
+						<fieldset disabled={busy}>
 							<legend>{t("lesson.package.draft")}</legend>
+							<p>{t("lesson.package.editsKept")}</p>
+							{needsReopen && (
+								<div>
+									<p>{t("lesson.package.authorityLost")}</p>
+									<button
+										type="button"
+										disabled={dirty || !projectId || !window.electronAPI?.lessonPackageOpen}
+										onClick={() => void run("resume")}
+									>
+										{t("lesson.package.resume")}
+									</button>
+								</div>
+							)}
 							<label>
 								{t("lesson.lessonTitle")}
 								<LessonTitleInput
@@ -302,7 +361,9 @@ export function LessonPackagePanel({
 							))}
 							<button
 								type="button"
-								disabled={!window.electronAPI?.lessonPackageReseal}
+								disabled={
+									needsReopen || dirty || !projectId || !window.electronAPI?.lessonPackageReseal
+								}
 								onClick={() => void run("reseal")}
 							>
 								{t("lesson.package.reseal")}

@@ -10,10 +10,11 @@ export type PackageOpenCode =
 	| "lesson-package-edit-unsupported";
 export type PackageOpenResult<T> =
 	| { success: true; result: T }
-	| { success: false; code: PackageOpenCode };
+	| { success: false; code: PackageOpenCode; capability?: "retained" | "reopen-required" };
 export interface OpenedLessonPackage {
 	status: "opened";
 	token: string;
+	snapshotSha256: string;
 	lesson: LessonManifest;
 	videos: Array<{ stepId: string; frames: number; durationSec: number }>;
 	images: "exclude" | "include-external-provenance";

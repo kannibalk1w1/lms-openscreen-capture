@@ -826,3 +826,93 @@ it("reseal refuses a decoder failure on copied output even when input inspection
 	}
 	expect(incomplete).toBe(1);
 });
+it("reseal source identity failure cannot silently regain authority after bytes are restored", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson),
+		named = path.join(directory, "index.html"),
+		bytes = await fs.readFile(named);
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	await fs.appendFile(named, "tamper");
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	await fs.writeFile(named, bytes);
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [directory] });
+	const fresh = await open();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(fresh.token, draft)).toMatchObject({
+		success: true,
+		result: { status: "packaged" },
+	});
+});
+it("unsupported reseal edits refuse before picker while keeping the unchanged capability for explicit corrected retry", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	draft.steps[0].status = "reviewed";
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		code: "lesson-package-edit-unsupported",
+		capability: "retained",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+	draft.steps[0].status = "draft";
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: true,
+		result: { status: "packaged" },
+	});
+});
+it("a dirty reseal refusal revokes the old main capability until an explicit fresh open", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson);
+	dirty = true;
+	host.open.mockClear();
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	dirty = false;
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+	const fresh = await open();
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(fresh.token, draft)).toMatchObject({ success: true });
+});
+it("cancel during picker does not inspect the missing source after native cancellation; retry still verifies the original frozen identity", async () => {
+	const opened = await open(),
+		draft = beginPackageEdit(opened.lesson),
+		id = randomUUID();
+	let settle!: (value: unknown) => void;
+	host.open.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve;
+			}),
+	);
+	const pending = edited(opened.token, draft, id);
+	await vi.waitFor(() => expect(settle).toBeDefined());
+	await invoke("cancel", id);
+	await fs.rename(directory, directory + ".missing");
+	settle({ canceled: true });
+	expect(await pending).toMatchObject({
+		success: false,
+		code: "lesson-package-cancelled",
+		capability: "retained",
+	});
+	host.open.mockResolvedValue({ canceled: false, filePaths: [root] });
+	expect(await edited(opened.token, draft)).toMatchObject({
+		success: false,
+		capability: "reopen-required",
+	});
+});

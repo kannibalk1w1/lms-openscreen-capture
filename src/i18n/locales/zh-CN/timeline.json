@@ -477,7 +477,7 @@
 			},
 			"edit": "Edit supported text and order as a new draft",
 			"draft": "New package draft — review required",
-			"editing": "Draft changes are not saved. Retained videos and images may no longer match edited text; review before sharing. Save or discard before opening another package. Switching video projects discards this package draft.",
+			"editing": "Draft changes are not saved. Retained videos and images may no longer match edited text; review before sharing. Failed operations and project changes keep your draft, but may require explicit revalidation.",
 			"stepTitle": "Package step title",
 			"instructions": "Package step instructions",
 			"code": "Included code text",
@@ -488,7 +488,12 @@
 			"resealed": "New package checked and saved: {{path}}. The source package is unchanged. Review edited text against the retained media before sharing. Open that new folder explicitly to continue editing.",
 			"discardDraft": "Discard package draft",
 			"resealScope": "Supported edits: lesson/step titles, instructions, included code text, image descriptions and step order. All step IDs, included images and video bindings stay fixed. No adding, removing or excluding steps/assets, changing inclusion policy, playback or native project editing. Every new package step requires review; old approval is not inherited.",
-			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged."
+			"discardConfirm": "Discard the unsaved package draft and close? The source package is unchanged.",
+			"editsKept": "Your unsaved text, code, order and image descriptions are kept. Retry explicitly, reopen the same unchanged package to restore verification, or discard the draft.",
+			"authorityLost": "Verification authority is no longer current. Your draft is kept. Save/reload or select a clean current project, then explicitly reopen the same unchanged package before retrying. Changed media or inventory cannot be rebased automatically.",
+			"resume": "Reopen the same package and keep edits",
+			"resumed": "The same package inventory was checked again under the current editor session. Your edits are unchanged; you may retry saving.",
+			"differentPackage": "That package differs from this draft’s original inventory. Your edits are kept, but saving remains blocked. Choose the original unchanged package or explicitly discard the draft."
 		}
 	}
 }

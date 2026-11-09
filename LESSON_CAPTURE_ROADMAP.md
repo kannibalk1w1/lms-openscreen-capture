@@ -92,6 +92,14 @@ acceptance remain outside this scope.
 
 ## Active work and next concrete slices
 
+Review41 found MediumM41-1 in9479172b: failed reseals discarded unsaved package
+drafts. [The correction](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md)
+keeps exact edits, retains the same pinned authority where safe, and requires an
+explicit matching-inventory reopen after authority loss. It is validated locally
+and awaits exact-SHA follow-up/private push. Stop for coordinator review/handoff;
+headless reseal/player work does not start automatically.
+
+
 Actual [review38](lesson-capture/CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts
 17bed4e6 and closes review37's L37-1, with no new findings; checkpointb0463121 is
 pushed. [Portable v1 packaging](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)

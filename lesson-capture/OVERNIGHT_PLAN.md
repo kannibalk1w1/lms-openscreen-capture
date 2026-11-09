@@ -1,3 +1,17 @@
+# Current M41-1 correction and handoff authority — 9 November 2026
+
+Complete only [retained drafts and explicit verification recovery](CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md)
+from9479172b; validate/commit locally and stop for coordinator actual exact-SHA
+review/fixes/private push and the requested full-review handoff decision. Do not
+start headless reseal/player/another slice or writer. No quota/reset/model guesses,
+provider/credential switch or paid-API use; no supported allowance signal observed.
+Preserve original reports/evidence/user work, native bytes and main/private-main.
+Existing no other-worker/push/reset/stash/new-checkout/main/upstream/release/Actions/
+publication/real-lesson/auth/config/user-app-kill/cache-purge boundaries persist.
+Old cutoff/pause accounts remain historical and revoked as previously authorized.
+
+## Prior checkpoint accounts
+
 # Current media-preserving package reseal authority — 9 November 2026
 
 Autonomous resumption from accepted/pushed5d73f835 after review40 closesL39-1.

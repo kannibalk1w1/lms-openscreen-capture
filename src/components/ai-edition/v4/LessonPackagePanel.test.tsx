@@ -20,6 +20,7 @@ beforeEach(() => {
 	});
 	opened = {
 		status: "opened",
+		snapshotSha256: "ab".repeat(32),
 		token: crypto.randomUUID(),
 		lesson: {
 			...newLesson("Package title"),
@@ -260,7 +261,13 @@ it("reseal freezes the submitted draft, cancels on project replacement and ignor
 	expect(api.lessonPackageCancel).toHaveBeenCalled();
 	expect(api.lessonPackageRelease).toHaveBeenCalledWith(opened.token);
 	expect(screen.queryByText(/must-not-attach/)).toBeNull();
-	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
+	expect(api.lessonPackageOpen).toHaveBeenCalledTimes(1);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Submitted text",
+	);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(true);
 });
 it("discarding a draft explicitly returns to the original snapshot without changing package data", async () => {
 	show();
@@ -275,7 +282,7 @@ it("discarding a draft explicitly returns to the original snapshot without chang
 	expect(api.lessonPackageReseal).not.toHaveBeenCalled();
 	expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeDefined();
 });
-it("cancelling reseal discards the unpublishable draft and allows a fresh open after settlement", async () => {
+it("cancelling reseal keeps the exact draft and allows explicit retry after settlement", async () => {
 	let settle!: (value: unknown) => void;
 	vi.mocked(api.lessonPackageReseal).mockImplementationOnce(
 		() =>
@@ -287,15 +294,140 @@ it("cancelling reseal discards the unpublishable draft and allows a fresh open a
 	clickOpen();
 	await screen.findByText("Package step");
 	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Keep cancelled edits" },
+	});
 	fireEvent.click(screen.getByText("Save a new package with retained media"));
 	fireEvent.click(screen.getByText("Cancel package operation"));
+	expect(
+		(screen.getByLabelText("Package step instructions").closest("fieldset") as HTMLFieldSetElement)
+			.disabled,
+	).toBe(true);
 	await act(async () => {
-		settle({ success: false, code: "lesson-package-cancelled" });
+		settle({ success: false, code: "lesson-package-cancelled", capability: "retained" });
 	});
-	expect(screen.queryByLabelText("Package step instructions")).toBeNull();
-	expect((screen.getByText("Open and check a package folder") as HTMLButtonElement).disabled).toBe(
-		false,
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Keep cancelled edits",
 	);
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText(/New package checked and saved/);
+	expect(vi.mocked(api.lessonPackageReseal).mock.calls[1][0].lesson.steps[0].instructions).toBe(
+		"Keep cancelled edits",
+	);
+});
+it.each([
+	"lesson-package-invalid",
+	"lesson-package-tool-unavailable",
+] as const)("recoverable %s keeps exact edits for explicit retry", async (code) => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code,
+		capability: "retained",
+	});
+	show();
 	clickOpen();
 	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Keep instructions" },
+	});
+	fireEvent.change(screen.getByLabelText("Included code text"), {
+		target: { value: "keep_code();" },
+	});
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText(/Your unsaved text/, { exact: false });
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Keep instructions",
+	);
+	expect((screen.getByLabelText("Included code text") as HTMLTextAreaElement).value).toBe(
+		"keep_code();",
+	);
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText(/New package checked and saved/);
+	expect(vi.mocked(api.lessonPackageReseal).mock.calls[1][0].lesson).toEqual(
+		vi.mocked(api.lessonPackageReseal).mock.calls[0][0].lesson,
+	);
+});
+it("source revocation keeps visible edits and only explicit matching reopen can restore authority", async () => {
+	vi.mocked(api.lessonPackageReseal).mockResolvedValueOnce({
+		success: false,
+		code: "lesson-package-invalid",
+		capability: "reopen-required",
+	});
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "Do not rebase" },
+	});
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText("Reopen the same package and keep edits");
+	expect(api.lessonPackageOpen).toHaveBeenCalledTimes(1);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(true);
+	vi.mocked(api.lessonPackageOpen).mockResolvedValueOnce({
+		success: true,
+		result: { ...opened, token: crypto.randomUUID(), snapshotSha256: "cd".repeat(32) },
+	});
+	fireEvent.click(screen.getByText("Reopen the same package and keep edits"));
+	await waitFor(() =>
+		expect(
+			(
+				screen
+					.getByLabelText("Package step instructions")
+					.closest("fieldset") as HTMLFieldSetElement
+			).disabled,
+		).toBe(false),
+	);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(true);
+	expect(screen.queryByText(/That package differs/)).not.toBeNull();
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Do not rebase",
+	);
+	expect(
+		(screen.getByText("Save a new package with retained media") as HTMLButtonElement).disabled,
+	).toBe(true);
+	vi.mocked(api.lessonPackageOpen).mockResolvedValueOnce({
+		success: true,
+		result: { ...opened, token: crypto.randomUUID() },
+	});
+	fireEvent.click(screen.getByText("Reopen the same package and keep edits"));
+	await screen.findByText(/The same package inventory was checked/);
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"Do not rebase",
+	);
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	await screen.findByText(/New package checked and saved/);
+});
+it("a late failed request from an unmounted panel cannot clear a new panel draft", async () => {
+	let settle!: (value: unknown) => void;
+	vi.mocked(api.lessonPackageReseal).mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				settle = resolve as typeof settle;
+			}),
+	);
+	const old = show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.click(screen.getByText("Save a new package with retained media"));
+	old.unmount();
+	show();
+	clickOpen();
+	await screen.findByText("Package step");
+	fireEvent.click(screen.getByText("Edit supported text and order as a new draft"));
+	fireEvent.change(screen.getByLabelText("Package step instructions"), {
+		target: { value: "New panel draft" },
+	});
+	await act(async () => {
+		settle({ success: false, code: "lesson-package-invalid", capability: "reopen-required" });
+	});
+	expect((screen.getByLabelText("Package step instructions") as HTMLTextAreaElement).value).toBe(
+		"New panel draft",
+	);
 });

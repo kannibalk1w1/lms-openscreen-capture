@@ -1,3 +1,30 @@
+# M41-1 retained package-draft recovery — 9 November 2026
+
+Actual [review41](CLAUDE_ROADMAP_REVIEW_41_2026-11-09.md) found reproduced MediumM41-1
+at9479172b: ordinary reseal errors discarded typed edits and verification capability.
+[The correction](CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md) separates draft lifetime from
+capability lifetime. Recoverable failures/cancellation keep exact text/code/order/alt
+and the same pinned capability where safe; source/session changes preserve the
+visible local draft but block publication until explicit matching-inventory reopen.
+No implicit authority refresh or rebase; changed inventory releases its new token.
+Only current success or explicit discard/confirmed guide close clears the draft.
+Main keeps ownership until actual settlement; native picker cancel adds no file reads.
+
+Actual full production app/editor/CDP fills controls, refuses an invalid destination,
+preserves visible edits and retries successfully; fresh CLI verifies45samples/45frames/
+1.5s and original source/project data unchanged. Native dialogs stubbed, no physical
+input/picker/audio/platform claim. Final219focused/10 and6162full/454,0skips, bothTS,
+Vite, lint35baseline/docs37/i18n15/1305 and required foreign-cwd CLI/MCP startup pass.
+Seven independent assertion kills restore source exactly; original report/evidence/
+user work/addon/main remain preserved. In-memory recovery is not crash autosave.
+
+M41-1 awaits coordinator actual exact-SHA follow-up/fixes/private push. Stop after
+this checkpoint for coordinator review/full-review handoff decision; no further
+writer/slice, headless reseal or player phase. No quota/reset/model assumptions or
+supported subscription signal encountered; main/private-mainfd2775e2 unchanged.
+
+## Prior checkpoint accounts
+
 # Media-preserving derived package reseal slice — 9 November 2026
 
 Actual [review40](CLAUDE_ROADMAP_REVIEW_40_2026-11-09.md) accepts93a84456 and
