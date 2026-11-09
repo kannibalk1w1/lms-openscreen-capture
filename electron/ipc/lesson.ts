@@ -1,19 +1,30 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
+import type { IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
 import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
 import { LessonDraftStore } from "../lesson/draftStore";
 import { LessonService } from "../lesson/service";
-export function registerLessonHandlers(service: LessonService) {
+import { renderOwnerJobs } from "./exportJobs";
+import { NativeRenderBusyError, NativeRenderInvalidatedError } from "./nativeRenderJobs";
+export function registerLessonHandlers(
+	service: LessonService,
+	authorizeFrame?: (event: IpcMainInvokeEvent) => { projectId: string; assertCurrent: () => void },
+) {
 	const bounded = async <T>(run: () => Promise<T>) => {
 		try {
 			return { success: true as const, result: await run() };
 		} catch (error) {
 			const code: LessonErrorCode =
-				error instanceof LessonOperationError
-					? error.code
-					: error instanceof Error && "code" in error && error.code === "EEXIST"
-						? "destination-exists"
-						: "lesson-operation-failed";
+				error instanceof NativeRenderInvalidatedError
+					? "project-changed"
+					: error instanceof NativeRenderBusyError
+						? "render-busy"
+						: error instanceof LessonOperationError
+							? error.code
+							: error instanceof Error && "code" in error && error.code === "EEXIST"
+								? "destination-exists"
+								: "lesson-operation-failed";
 			return { success: false as const, code };
 		}
 	};
@@ -29,8 +40,33 @@ export function registerLessonHandlers(service: LessonService) {
 	ipcMain.handle("lesson:plan-range", (_event, input: unknown) =>
 		bounded(() => service.planRange(input)),
 	);
-	ipcMain.handle("lesson:frame", (_event, input: unknown) =>
-		bounded(() => service.captureFrame(input)),
+	ipcMain.handle("lesson:frame", (event, input: unknown) =>
+		bounded(async () => {
+			if (!event?.sender || event.senderFrame !== event.sender.mainFrame)
+				throw new LessonOperationError("project-changed");
+			const authority = authorizeFrame?.(event);
+			if (
+				authority &&
+				(!input ||
+					typeof input !== "object" ||
+					!("projectId" in input) ||
+					input.projectId !== authority.projectId)
+			)
+				throw new LessonOperationError("project-changed");
+			return renderOwnerJobs.run(
+				event.sender,
+				randomUUID(),
+				() => ({
+					result: service.captureFrame(input).then((image) => {
+						authority?.assertCurrent();
+						return image;
+					}),
+					cancel: () => false,
+				}),
+				() => undefined,
+				"lesson-frame",
+			);
+		}),
 	);
 	ipcMain.handle("lesson:save", (_event, input: unknown) =>
 		bounded(() =>

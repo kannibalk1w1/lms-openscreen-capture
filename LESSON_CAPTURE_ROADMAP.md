@@ -81,20 +81,15 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-Actual [review27](lesson-capture/CLAUDE_ROADMAP_REVIEW_27_2026-11-09.md) accepts1dad5a7c
-with no High/Medium. A bounded [follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md)
-strengthens pin-downgrade and authority contracts before coordinator review/push;
-it does not start native-render integration.
-
-**9 November resumption:** [editor source confirmation](lesson-capture/RANGE_AUTHORING_2026-11-09.md)
-adds explicit current-source attachment and same-project refresh, bounded editor
-caller/project authority, cancellation and stale-safe attachment. It is a coherent
-prerequisite, pending exact-SHA coordinator review; selected MP4 export is still
-backend-only. Next: shared native render-job ownership, explicit native destination
-selection, progress/cancel/status and accepted materializer/actual validator integration.
-CLI/MCP source confirmation and selected MP4 export remain absent. Timed player,
-portable course packaging, verified audio and physical/other-platform acceptance
-remain separate. No old pause or schedule blocks this explicit user resumption.
+Actual [review28](lesson-capture/CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts
+897ddceb with no new High/Medium/Low, closing the bounded authoring follow-ups.
+The accepted checkpoint623fa85c is pushed and reviewed; previous pending labels
+below remain history. [Shared native render ownership](lesson-capture/NATIVE_RENDER_OWNERSHIP_2026-11-09.md)
+now covers exports/stills/frame batches across compositor service instances,
+pending exact-SHA coordinator review. Next is the authorized selected-step MP4
+GUI action with native destination picker, scoped progress/cancel/status, unchanged
+source-pin/timing guards and actual validator. No selected-MP4 GUI/CLI/MCP delivery,
+portable course, timed player, audio or physical/other-platform readiness is claimed.
 
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;

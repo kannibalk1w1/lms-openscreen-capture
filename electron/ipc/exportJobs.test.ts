@@ -32,7 +32,7 @@ describe("export jobs", () => {
 		expect(jobs.cancel(sender, "job_1")).toBe(true);
 		expect(job.cancel).toHaveBeenCalledTimes(2);
 		job.resolve(1);
-		await run;
+		await expect(run).rejects.toThrow("RENDER_JOB_INVALIDATED");
 		expect(jobs.cancel(sender, "job_1")).toBe(false);
 		expect(sender.listenerCount("destroyed")).toBe(0);
 	});
@@ -74,7 +74,7 @@ describe("export jobs", () => {
 		sender.emit("destroyed");
 		expect(job.cancel).toHaveBeenCalledOnce();
 		job.resolve(1);
-		await run;
+		await expect(run).rejects.toThrow("RENDER_JOB_INVALIDATED");
 		const next = pending();
 		const retry = jobs.run(sender, "new", () => next, progress);
 		oldProgress(99);
@@ -113,4 +113,93 @@ describe("export jobs", () => {
 		);
 		expect(start).not.toHaveBeenCalled();
 	});
+});
+
+it("uses owner object identity and channel, not a reused numeric window ID", async () => {
+	const jobs = new ExportJobs(),
+		a = owner(1),
+		impostor = owner(1),
+		native = pending();
+	const job = jobs.run(a, "scoped", () => native, vi.fn(), "lesson-frame");
+	expect(jobs.cancel(impostor, "scoped", "lesson-frame")).toBe(false);
+	expect(jobs.cancel(a, "scoped")).toBe(false);
+	expect(jobs.cancel(a, "scoped", "lesson-frame")).toBe(true);
+	native.resolve(1);
+	await expect(job).rejects.toThrow("RENDER_JOB_INVALIDATED");
+	await expect(
+		jobs.run(
+			a,
+			"scoped",
+			() => ({ result: Promise.resolve(2), cancel: () => false }),
+			vi.fn(),
+			"lesson-frame",
+		),
+	).rejects.toThrow("already been used");
+});
+it.each([
+	"did-start-navigation",
+	"render-process-gone",
+])("invalidates %s, holds the owner until settlement, and clears listeners", async (event) => {
+	const jobs = new ExportJobs(),
+		sender = owner(),
+		native = pending();
+	native.cancel.mockReturnValue(false);
+	const job = jobs.run(sender, "lifecycle", () => native, vi.fn());
+	sender.emit(event);
+	await expect(jobs.run(sender, "too-early", () => pending(), vi.fn())).rejects.toThrow(
+		"already running",
+	);
+	native.resolve(1);
+	await expect(job).rejects.toThrow("RENDER_JOB_INVALIDATED");
+	for (const name of ["destroyed", "did-start-navigation", "render-process-gone"])
+		expect(sender.listenerCount(name)).toBe(0);
+	await expect(
+		jobs.run(sender, "next", () => ({ result: Promise.resolve(2), cancel: () => false }), vi.fn()),
+	).resolves.toBe(2);
+});
+it("reserves before synchronous start/progress reentrancy and cleans up a throwing start", async () => {
+	const jobs = new ExportJobs(),
+		sender = owner();
+	let nested!: Promise<number>;
+	const result = jobs.run(
+		sender,
+		"first",
+		(progress) => {
+			progress(1);
+			throw new Error("start failed");
+		},
+		() => {
+			nested = jobs.run(
+				sender,
+				"nested",
+				() => ({ result: Promise.resolve(2), cancel: () => false }),
+				vi.fn(),
+			);
+		},
+	);
+	await expect(result).rejects.toThrow("start failed");
+	await expect(nested).rejects.toThrow("already running");
+	expect(sender.listenerCount("destroyed")).toBe(0);
+	await expect(
+		jobs.run(sender, "retry", () => ({ result: Promise.resolve(3), cancel: () => false }), vi.fn()),
+	).resolves.toBe(3);
+});
+
+it("bounds retired operation IDs per owner without affecting a fresh window", async () => {
+	const { MAX_OWNER_RENDER_OPERATIONS } = await import("./exportJobs");
+	const jobs = new ExportJobs(),
+		sender = owner();
+	for (let index = 0; index < MAX_OWNER_RENDER_OPERATIONS; index++)
+		await jobs.run(
+			sender,
+			`operation-${index}`,
+			() => ({ result: Promise.resolve(1), cancel: () => false }),
+			vi.fn(),
+		);
+	const start = vi.fn(() => ({ result: Promise.resolve(2), cancel: () => false }));
+	await expect(jobs.run(sender, "over-limit", start, vi.fn())).rejects.toThrow(
+		"Reopen this window",
+	);
+	expect(start).not.toHaveBeenCalled();
+	await expect(jobs.run(owner(), "fresh", start, vi.fn())).resolves.toBe(2);
 });

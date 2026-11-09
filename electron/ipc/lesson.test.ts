@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -23,7 +24,15 @@ it("actual lesson IPC returns fixed errors without exposing source exception con
 	});
 	registerLessonHandlers(new LessonService(read, async () => null));
 	const frame = electron.handle.mock.calls.find(([name]) => name === "lesson:frame")![1];
-	const result = await frame(null, { projectId: "p", rulerSec: 1, documentSha256: "a".repeat(64) });
+	const sender = Object.assign(new EventEmitter(), {
+		id: 1,
+		mainFrame: {},
+		isDestroyed: () => false,
+	});
+	const result = await frame(
+		{ sender, senderFrame: sender.mainFrame },
+		{ projectId: "p", rulerSec: 1, documentSha256: "a".repeat(64) },
+	);
 	expect(result).toEqual({ success: false, code: "lesson-operation-failed" });
 	expect(JSON.stringify(result)).not.toContain("PRIVATE");
 });

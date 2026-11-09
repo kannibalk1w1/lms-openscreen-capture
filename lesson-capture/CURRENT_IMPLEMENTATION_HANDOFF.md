@@ -1,3 +1,21 @@
+# Shared native-render ownership prerequisite — 9 November 2026
+
+Resumed from clean accepted/pushed623fa85c; the sole implementation writer delivers
+[shared native-render ownership](NATIVE_RENDER_OWNERSHIP_2026-11-09.md) for normal
+exports, legacy CLI/MCP runner exports, lesson stills and direct frame batches.
+The existing owner registry now shares one native-compute lease across compositor
+service instances. Lifecycle/project invalidation refuses stale completion without
+releasing still-running native work; previews remain outside this long-job gate.
+Final215focused/17files and5845full/438files pass,0skip; both TS, production
+Vite, lint35baseline/docs/i18n/111links pass. Six ownership controls are assertion
+kills; actual Linux Node/N-API proof verifies2decoded export frames, frame JPEG,
+uncancellable invalidation/serialization and real MP4 cancellation. An initial
+unrelated copy-message wait failure is preserved with passing isolated/full retry.
+Full proof/limits are in the linked report. Coordinator exact-SHA
+Claude review/fixes/push remain pending; no next phase starts in this dispatch.
+Next: selected-step MP4 GUI action with native picker, scoped cancellation/status,
+source/timing guards and actual validator; CLI/MCP parity remains separate.
+
 # Accepted editor authoring checkpoint — 9 November 2026
 
 Actual [review28](CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts exact

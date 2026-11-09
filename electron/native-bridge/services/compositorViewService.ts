@@ -25,6 +25,7 @@ import type {
 } from "../../../src/native/contracts";
 import type { SceneAnnotation } from "../../../src/native/sceneDescription";
 import type { ExportJob } from "../../ipc/exportJobs";
+import { nativeRenderJobs } from "../../ipc/nativeRenderJobs";
 import type {
 	ClipInput,
 	CompositorBackend,
@@ -895,7 +896,7 @@ export class CompositorViewService {
 	 *  sprite) since the native process can't resolve renderer-relative URLs either.
 	 *  `onProgress` — see `export()` above.
 	 *  Returns null when the addon is absent. */
-	async exportMulti(
+	private async exportMultiRaw(
 		clips: ClipInput[],
 		outPath?: string,
 		sceneJson?: string,
@@ -918,6 +919,10 @@ export class CompositorViewService {
 		);
 	}
 
+	async exportMulti(...args: Parameters<CompositorViewService["exportMultiRaw"]>) {
+		return nativeRenderJobs.run(() => this.exportMultiRaw(...args));
+	}
+
 	/** Frames of a timeline as an export composes them, without the export: see `renderFrames`
 	 *  in the addon. `null` when this addon cannot render them. */
 	async renderFrames(
@@ -929,7 +934,10 @@ export class CompositorViewService {
 	): Promise<Array<{ index: number; width: number; height: number; jpeg: Buffer }> | null> {
 		const addon = this.ensureAddon();
 		if (!addon || typeof addon.renderFrames !== "function") return null;
-		return addon.renderFrames(clips, resolveSceneAssetPaths(sceneJson), fps, frames, maxWidth);
+		const render = addon.renderFrames.bind(addon);
+		return nativeRenderJobs.run(() =>
+			render(clips, resolveSceneAssetPaths(sceneJson), fps, frames, maxWidth),
+		);
 	}
 
 	/** `startGifExport` for MP4, except that an addon built before MP4 cancellation still
@@ -944,17 +952,17 @@ export class CompositorViewService {
 	): ExportJob<ExportStats | null> {
 		const addon = this.ensureAddon();
 		if (!addon?.createMp4ExportControl || !addon.cancelMp4Export) {
-			return {
-				result: this.exportMulti(clips, outPath, sceneJson, params, onProgress),
+			return nativeRenderJobs.start(() => ({
+				result: this.exportMultiRaw(clips, outPath, sceneJson, params, onProgress),
 				cancel: () => false,
-			};
+			}));
 		}
 		const control = addon.createMp4ExportControl();
 		const cancel = addon.cancelMp4Export.bind(addon);
-		return {
-			result: this.exportMulti(clips, outPath, sceneJson, params, onProgress, control),
+		return nativeRenderJobs.start(() => ({
+			result: this.exportMultiRaw(clips, outPath, sceneJson, params, onProgress, control),
 			cancel: () => cancel(control),
-		};
+		}));
 	}
 
 	/** Native GIF export. Same inputs as `exportMulti` — one clip list, one scene —
@@ -964,7 +972,7 @@ export class CompositorViewService {
 	 *
 	 *  Returns null when the addon is absent, which the renderer surfaces as a failed
 	 *  export — there is no longer a renderer-side GIF path to fall back to. */
-	async exportGif(
+	private async exportGifRaw(
 		clips: ClipInput[],
 		outPath?: string,
 		sceneJson?: string,
@@ -987,25 +995,35 @@ export class CompositorViewService {
 		);
 	}
 
+	async exportGif(...args: Parameters<CompositorViewService["exportGifRaw"]>) {
+		return nativeRenderJobs.run(() => this.exportGifRaw(...args));
+	}
+
 	startGifExport(
 		clips: ClipInput[],
 		outPath?: string,
 		sceneJson?: string,
 		params?: GifParamsInput,
 		onProgress?: (frames: number) => void,
+		allowUncancellable = false,
 	): ExportJob<GifExportStats | null> {
 		const addon = this.ensureAddon();
 		if (!addon?.createGifExportControl || !addon.cancelGifExport) {
+			if (allowUncancellable)
+				return nativeRenderJobs.start(() => ({
+					result: this.exportGifRaw(clips, outPath, sceneJson, params, onProgress),
+					cancel: () => false,
+				}));
 			throw new Error(
 				"Native GIF cancellation is unavailable. Rebuild or update the compositor addon.",
 			);
 		}
 		const control = addon.createGifExportControl();
 		const cancel = addon.cancelGifExport.bind(addon);
-		return {
-			result: this.exportGif(clips, outPath, sceneJson, params, onProgress, control),
+		return nativeRenderJobs.start(() => ({
+			result: this.exportGifRaw(clips, outPath, sceneJson, params, onProgress, control),
 			cancel: () => cancel(control),
-		};
+		}));
 	}
 
 	/** Stream-copy `inputPath` to `outputPath` through libavformat's matroska muxer.

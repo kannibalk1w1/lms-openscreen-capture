@@ -8,7 +8,7 @@ import { type NativeBridgeContext, registerNativeBridgeHandlers } from "./native
 const electron = vi.hoisted(() => ({ handle: vi.fn() }));
 vi.mock("electron", () => ({
 	app: { getAppPath: () => "", isPackaged: false },
-	ipcMain: { handle: electron.handle, removeHandler: vi.fn() },
+	ipcMain: { handle: electron.handle, on: vi.fn(), removeHandler: vi.fn() },
 	shell: {},
 }));
 const compositor = vi.hoisted(() => ({ startExportMulti: vi.fn(), exportMulti: vi.fn() }));
@@ -76,13 +76,17 @@ describe("native bridge MP4 export", () => {
 		expect(await running).toMatchObject({ ok: false, error: { code: "CANCELLED" } });
 	});
 
-	it("runs an export without an ID outside the job registry, as the CLI does", async () => {
+	it("owns an export without an ID with a private operation ID, as the CLI needs", async () => {
 		const stats = { frames: 1, wallS: 1, fps: 1, videoDurationS: 1 };
-		compositor.exportMulti.mockResolvedValue(stats);
+		compositor.startExportMulti.mockReturnValue({
+			result: Promise.resolve(stats),
+			cancel: () => false,
+		});
 		expect(await invoke("exportMulti", { clips: [], outPath: "/tmp/a.mp4" })).toMatchObject({
 			ok: true,
 			data: stats,
 		});
-		expect(compositor.startExportMulti).not.toHaveBeenCalled();
+		expect(compositor.startExportMulti).toHaveBeenCalledOnce();
+		expect(compositor.exportMulti).not.toHaveBeenCalled();
 	});
 });

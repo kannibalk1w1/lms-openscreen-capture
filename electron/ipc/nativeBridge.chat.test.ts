@@ -7,7 +7,7 @@ import { type NativeBridgeContext, registerNativeBridgeHandlers } from "./native
 const electron = vi.hoisted(() => ({ handle: vi.fn() }));
 vi.mock("electron", () => ({
 	app: { getAppPath: () => "", isPackaged: false },
-	ipcMain: { handle: electron.handle, removeHandler: vi.fn() },
+	ipcMain: { handle: electron.handle, on: vi.fn(), removeHandler: vi.fn() },
 	shell: {},
 }));
 vi.mock("../native-bridge/services/compositorViewService", () => ({

@@ -14,7 +14,7 @@ const electron = vi.hoisted(() => ({
 }));
 vi.mock("electron", () => ({
 	app: { getAppPath: () => "", isPackaged: false },
-	ipcMain: { handle: electron.handle, removeHandler: vi.fn() },
+	ipcMain: { handle: electron.handle, on: vi.fn(), removeHandler: vi.fn() },
 	shell: { showItemInFolder: electron.showItemInFolder, openPath: electron.openPath },
 }));
 // The bridge builds these at registration; none of them is under test here.

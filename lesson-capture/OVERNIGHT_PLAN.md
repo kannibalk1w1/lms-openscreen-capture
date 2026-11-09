@@ -1,3 +1,11 @@
+# Current ownership prerequisite — 9 November 2026
+
+Coordinator dispatch resumes the autonomous roadmap after accepted/pushed623fa85c.
+Deliver only [shared native-render ownership](NATIVE_RENDER_OWNERSHIP_2026-11-09.md),
+validate/commit locally and stop for coordinator exact-SHA Claude review/fixes/push.
+No worker push or additional worker; main/private-main and all prior authority /
+evidence limits remain unchanged. Selected-MP4 GUI integration is next after review.
+
 # Current bounded review follow-up — 9 November 2026
 
 The coordinator requests the [review27 follow-up](CLAUDE_ROADMAP_FOLLOWUP_27_2026-11-09.md)

@@ -41,7 +41,6 @@ const frameRequest = z
 	})
 	.strict();
 export class LessonService {
-	private rendering = false;
 	constructor(
 		private readonly readDocument: (id: string) => Promise<AxcutDocument>,
 		private readonly renderFrames: LessonRenderFrames,
@@ -51,64 +50,58 @@ export class LessonService {
 		return planLessonRange(await this.readDocument(request.projectId), request);
 	}
 	async captureFrame(input: unknown): Promise<LessonImage> {
-		if (this.rendering) throw new LessonOperationError("render-busy");
 		const request = frameRequest.parse(input);
-		this.rendering = true;
-		try {
-			const doc = await this.readDocument(request.projectId);
-			const digest = await lessonRenderFingerprint(doc);
-			if (doc.project.id !== request.projectId || digest !== request.documentSha256)
-				throw new LessonOperationError("project-changed");
-			const visible = keptRawSpans(doc.timeline.clips, doc.timeline.trimRanges).some(
-				(span) => request.rulerSec >= span.startSec && request.rulerSec < span.endSec,
-			);
-			if (!visible) throw new LessonOperationError("frame-unavailable");
-			const paths = new Map(doc.assets.map((asset) => [asset.id, asset.originalPath]));
-			if (doc.timeline.clips.some((clip) => !paths.get(clip.assetId)))
-				throw new Error("Project source is missing");
-			const programmeSec = projectRawTimelineSecToPlayback(
-				doc.timeline.clips,
-				doc.timeline.trimRanges,
-				request.rulerSec,
-				readSpeedRegions(doc),
-			);
-			const index = Math.floor(programmeSec * 60 + 1e-6);
-			const frames = await this.renderFrames(
-				buildNativeClipList(doc),
-				JSON.stringify(buildLessonSceneDescription(doc)),
-				60,
-				[index],
-				1280,
-			);
-			const frame = frames?.find((frame) => frame.index === index);
-			if (!frame || frame.jpeg.length > 1024 * 1024)
-				throw new Error("Native lesson frame unavailable or too large");
-			const size = jpegDimensions(frame.jpeg);
-			if (
-				size.width !== frame.width ||
-				size.height !== frame.height ||
-				size.width > 4096 ||
-				size.height > 4096 ||
-				size.width * size.height > 8388608
-			)
-				throw new Error("Invalid native frame");
-			return {
-				id: randomUUID(),
-				mime: "image/jpeg",
-				base64: frame.jpeg.toString("base64"),
-				sha256: await sha256(frame.jpeg),
-				width: frame.width,
-				height: frame.height,
-				source: {
-					...request,
-					fingerprintKind: "render-inputs-v1",
-					basis: "editor-ruler-seconds",
-					precision: "60fps-floor",
-				},
-			};
-		} finally {
-			this.rendering = false;
-		}
+		const doc = await this.readDocument(request.projectId);
+		const digest = await lessonRenderFingerprint(doc);
+		if (doc.project.id !== request.projectId || digest !== request.documentSha256)
+			throw new LessonOperationError("project-changed");
+		const visible = keptRawSpans(doc.timeline.clips, doc.timeline.trimRanges).some(
+			(span) => request.rulerSec >= span.startSec && request.rulerSec < span.endSec,
+		);
+		if (!visible) throw new LessonOperationError("frame-unavailable");
+		const paths = new Map(doc.assets.map((asset) => [asset.id, asset.originalPath]));
+		if (doc.timeline.clips.some((clip) => !paths.get(clip.assetId)))
+			throw new Error("Project source is missing");
+		const programmeSec = projectRawTimelineSecToPlayback(
+			doc.timeline.clips,
+			doc.timeline.trimRanges,
+			request.rulerSec,
+			readSpeedRegions(doc),
+		);
+		const index = Math.floor(programmeSec * 60 + 1e-6);
+		const frames = await this.renderFrames(
+			buildNativeClipList(doc),
+			JSON.stringify(buildLessonSceneDescription(doc)),
+			60,
+			[index],
+			1280,
+		);
+		const frame = frames?.find((frame) => frame.index === index);
+		if (!frame || frame.jpeg.length > 1024 * 1024)
+			throw new Error("Native lesson frame unavailable or too large");
+		const size = jpegDimensions(frame.jpeg);
+		if (
+			size.width !== frame.width ||
+			size.height !== frame.height ||
+			size.width > 4096 ||
+			size.height > 4096 ||
+			size.width * size.height > 8388608
+		)
+			throw new Error("Invalid native frame");
+		return {
+			id: randomUUID(),
+			mime: "image/jpeg",
+			base64: frame.jpeg.toString("base64"),
+			sha256: await sha256(frame.jpeg),
+			width: frame.width,
+			height: frame.height,
+			source: {
+				...request,
+				fingerprintKind: "render-inputs-v1",
+				basis: "editor-ruler-seconds",
+				precision: "60fps-floor",
+			},
+		};
 	}
 	async saveEditable(input: unknown, pickPath: () => Promise<string | null>) {
 		const lesson = await validateLesson(input);

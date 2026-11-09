@@ -1,10 +1,12 @@
 import type { WebContents } from "electron";
+import { NativeRenderBusyError, NativeRenderInvalidatedError } from "./nativeRenderJobs";
 
 type ExportOwner = Pick<WebContents, "id" | "isDestroyed" | "once" | "removeListener">;
 
 export interface ExportJob<T> {
 	result: Promise<T>;
 	cancel: () => boolean;
+	invalidate?: () => void;
 }
 
 export function isExportId(value: unknown): value is string {
@@ -12,12 +14,21 @@ export function isExportId(value: unknown): value is string {
 }
 
 /** Controls never leave main. Unknown and foreign IDs have the same result. */
+export const MAX_OWNER_RENDER_OPERATIONS = 4096;
 export class ExportJobs {
-	private readonly jobs = new Map<number, { exportId: string; cancel: () => boolean }>();
+	private readonly used = new WeakMap<ExportOwner, Set<string>>();
+	private readonly jobs = new Map<
+		ExportOwner,
+		{ exportId: string; channel: string; cancel: () => boolean; invalidate: () => void }
+	>();
 
-	cancel(owner: ExportOwner, exportId: string): boolean {
-		const job = this.jobs.get(owner.id);
-		return job?.exportId === exportId && job.cancel();
+	cancel(owner: ExportOwner, exportId: string, channel = "export"): boolean {
+		const job = this.jobs.get(owner);
+		return job?.exportId === exportId && job.channel === channel && job.cancel();
+	}
+
+	invalidate(owner: ExportOwner) {
+		this.jobs.get(owner)?.invalidate();
 	}
 
 	async run<T>(
@@ -25,26 +36,68 @@ export class ExportJobs {
 		exportId: string,
 		start: (progress: (frames: number) => void) => ExportJob<T>,
 		onProgress: (frames: number) => void,
+		channel = "export",
 	): Promise<T> {
 		if (!isExportId(exportId)) throw new Error("Invalid export ID.");
 		if (owner.isDestroyed()) throw new Error("Export window is closed.");
-		if (this.jobs.has(owner.id)) throw new Error("An export is already running in this window.");
-		let active = true;
-		const job = start((frames) => {
-			if (active && !owner.isDestroyed()) onProgress(frames);
-		});
-		const entry = { exportId, cancel: job.cancel };
-		this.jobs.set(owner.id, entry);
-		const onDestroyed = () => {
-			job.cancel();
+		if (this.jobs.has(owner)) throw new NativeRenderBusyError();
+		const used = this.used.get(owner) ?? new Set<string>();
+		const key = `${channel}:${exportId}`;
+		if (used.has(key)) throw new Error("This render operation ID has already been used.");
+		if (used.size >= MAX_OWNER_RENDER_OPERATIONS)
+			throw new Error("Reopen this window before starting more render operations.");
+		used.add(key);
+		this.used.set(owner, used);
+		let active = true,
+			invalidated = false;
+		// Reserve the window before start: synchronous progress/reentrancy cannot take it.
+		let job: ExportJob<T> | undefined;
+		const invalidate = () => {
+			if (!active) return;
+			invalidated = true;
+			try {
+				if (job?.invalidate) job.invalidate();
+				else job?.cancel();
+			} catch {
+				/* A failed native cancel never releases a still-running job. */
+			}
 		};
-		owner.once("destroyed", onDestroyed);
+		const entry = {
+			exportId,
+			channel,
+			cancel: () => {
+				const accepted = active && !!job?.cancel();
+				if (accepted) invalidated = true;
+				return accepted;
+			},
+			invalidate,
+		};
+		this.jobs.set(owner, entry);
+		// ExportOwner deliberately exposes only the emitter surface shared by callers/tests.
 		try {
-			return await job.result;
+			owner.once("destroyed", invalidate);
+			owner.once("render-process-gone", invalidate);
+			owner.once("did-start-navigation", invalidate);
+			job = start((frames) => {
+				if (active && !invalidated && !owner.isDestroyed()) {
+					try {
+						onProgress(frames);
+					} catch {
+						/* Sender teardown can race delivery. */
+					}
+				}
+			});
+			if (invalidated) invalidate();
+			const result = await job.result;
+			if (invalidated || owner.isDestroyed()) throw new NativeRenderInvalidatedError();
+			return result;
 		} finally {
 			active = false;
-			owner.removeListener("destroyed", onDestroyed);
-			if (this.jobs.get(owner.id) === entry) this.jobs.delete(owner.id);
+			owner.removeListener("destroyed", invalidate);
+			owner.removeListener("render-process-gone", invalidate);
+			owner.removeListener("did-start-navigation", invalidate);
+			if (this.jobs.get(owner) === entry) this.jobs.delete(owner);
 		}
 	}
 }
+export const renderOwnerJobs = new ExportJobs();

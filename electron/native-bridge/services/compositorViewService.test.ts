@@ -46,7 +46,7 @@ describe("native GIF cancellation capability", () => {
 		expect(cancelGifExport).toHaveBeenCalledWith(control);
 		const stats = { frames: 1, wallS: 1, fps: 1, videoDurationS: 1, fileBytes: 100 };
 		finish(stats);
-		await expect(job.result).resolves.toEqual(stats);
+		await expect(job.result).rejects.toThrow("RENDER_JOB_INVALIDATED");
 	});
 
 	it("rejects a stale addon before starting an export that cannot be cancelled", () => {
@@ -87,7 +87,7 @@ describe("native MP4 cancellation capability", () => {
 		);
 		expect(job.cancel()).toBe(true);
 		expect(cancelMp4Export).toHaveBeenCalledWith(control);
-		await expect(job.result).resolves.toEqual(stats);
+		await expect(job.result).rejects.toThrow("RENDER_JOB_INVALIDATED");
 	});
 
 	it("still exports through an addon that cannot cancel an MP4, and refuses the cancel", async () => {
@@ -924,4 +924,64 @@ describe("resolveSceneAssetPaths", () => {
 
 		expect(out.background.path).toBe("/wallpapers/absent.jpg");
 	});
+});
+
+it("shares one native-compute gate across service instances and export/frame channels", async () => {
+	let finish!: (stats: {
+		frames: number;
+		wallS: number;
+		fps: number;
+		videoDurationS: number;
+	}) => void;
+	const exportMulti = vi.fn(
+		() =>
+			new Promise<{ frames: number; wallS: number; fps: number; videoDurationS: number }>(
+				(resolve) => {
+					finish = resolve;
+				},
+			),
+	);
+	const renderFrames = vi.fn(async () => []),
+		exportGif = vi.fn(async () => null);
+	const one = new CompositorViewService({
+		addon: { exportMulti } as unknown as CompositorViewAddon,
+	});
+	const two = new CompositorViewService({
+		addon: { renderFrames, exportGif } as unknown as CompositorViewAddon,
+	});
+	const job = one.startExportMulti([], "/tmp/owned.mp4");
+	expect(job.cancel()).toBe(false);
+	await expect(two.renderFrames([], "{}", 30, [0], 64)).rejects.toThrow("already running");
+	await expect(two.exportGif([], "/tmp/other.gif")).rejects.toThrow("already running");
+	expect(renderFrames).not.toHaveBeenCalled();
+	expect(exportGif).not.toHaveBeenCalled();
+	job.invalidate?.();
+	finish({ frames: 1, wallS: 1, fps: 30, videoDurationS: 1 / 30 });
+	await expect(job.result).rejects.toThrow("RENDER_JOB_INVALIDATED");
+	await expect(two.renderFrames([], "{}", 30, [0], 64)).resolves.toEqual([]);
+});
+
+it("a native frame batch blocks exports until real batch completion across instances", async () => {
+	let finish!: (frames: []) => void;
+	const renderFrames = vi.fn(
+		() =>
+			new Promise<[]>((resolve) => {
+				finish = resolve;
+			}),
+	);
+	const exportMulti = vi.fn(async () => null);
+	const frames = new CompositorViewService({
+		addon: { renderFrames } as unknown as CompositorViewAddon,
+	});
+	const exporter = new CompositorViewService({
+		addon: { exportMulti } as unknown as CompositorViewAddon,
+	});
+	const pending = frames.renderFrames([], "{}", 30, [0], 64);
+	await expect(exporter.exportMulti([], "/tmp/must-not-render.mp4")).rejects.toThrow(
+		"already running",
+	);
+	expect(exportMulti).not.toHaveBeenCalled();
+	finish([]);
+	await pending;
+	await expect(exporter.exportMulti([], "/tmp/next.mp4")).resolves.toBeNull();
 });

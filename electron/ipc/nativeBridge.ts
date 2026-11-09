@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { BrowserWindow, ipcMain, shell } from "electron";
 import type { AiEditionChatEvent } from "../../src/native/contracts";
 import {
+	AI_EDITION_OPEN_PROJECT_CHANNEL,
 	NATIVE_BRIDGE_CHANNEL,
 	NATIVE_BRIDGE_VERSION,
 	type NativeBridgeErrorCode,
@@ -25,7 +27,7 @@ import { ProjectService } from "../native-bridge/services/projectService";
 import { SystemService } from "../native-bridge/services/systemService";
 import { createNativeBridgeState } from "../native-bridge/store";
 import { ChatRuns } from "./chatRuns";
-import { ExportJobs, isExportId } from "./exportJobs";
+import { isExportId, renderOwnerJobs } from "./exportJobs";
 
 export interface NativeBridgeContext {
 	getPlatform: () => NodeJS.Platform;
@@ -259,7 +261,10 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 		deleteSession: context.deleteAiEditionChatSession,
 	});
 
-	const exportJobs = new ExportJobs();
+	const exportJobs = renderOwnerJobs;
+	ipcMain.on(AI_EDITION_OPEN_PROJECT_CHANNEL, (event) => {
+		if (event.senderFrame === event.sender.mainFrame) exportJobs.invalidate(event.sender);
+	});
 	const chatRuns = new ChatRuns<Electron.WebContents>();
 	ipcMain.handle(NATIVE_BRIDGE_CHANNEL, async (event, request: unknown) => {
 		if (!isBridgeRequest(request)) {
@@ -449,6 +454,12 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 							compositorViewService.destroyView(request.payload.id);
 							return createSuccessResponse(requestId, { ok: true });
 						case "exportMulti": {
+							if (event.senderFrame !== event.sender.mainFrame)
+								return createErrorResponse(
+									requestId,
+									"INVALID_REQUEST",
+									"Render requests require the main frame.",
+								);
 							const sender = event.sender;
 							const exportId = request.payload?.exportId;
 							if (exportId !== undefined && !isExportId(exportId)) {
@@ -457,27 +468,19 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 							const onProgress = (frames: number) => {
 								if (!sender.isDestroyed()) sender.send("export:native-progress", frames, exportId);
 							};
-							const stats = exportId
-								? await exportJobs.run(
-										sender,
-										exportId,
-										(progress) =>
-											compositorViewService.startExportMulti(
-												request.payload.clips,
-												request.payload.outPath,
-												request.payload.sceneJson,
-												request.payload.params,
-												progress,
-											),
-										onProgress,
-									)
-								: await compositorViewService.exportMulti(
+							const stats = await exportJobs.run(
+								sender,
+								exportId ?? randomUUID(),
+								(progress) =>
+									compositorViewService.startExportMulti(
 										request.payload.clips,
 										request.payload.outPath,
 										request.payload.sceneJson,
 										request.payload.params,
-										onProgress,
-									);
+										progress,
+									),
+								onProgress,
+							);
 							if (!stats) {
 								return createErrorResponse(
 									requestId,
@@ -488,6 +491,12 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 							return createSuccessResponse(requestId, stats);
 						}
 						case "exportGif": {
+							if (event.senderFrame !== event.sender.mainFrame)
+								return createErrorResponse(
+									requestId,
+									"INVALID_REQUEST",
+									"Render requests require the main frame.",
+								);
 							const sender = event.sender;
 							const exportId = request.payload?.exportId;
 							if (exportId !== undefined && !isExportId(exportId)) {
@@ -496,27 +505,20 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 							const onProgress = (frames: number) => {
 								if (!sender.isDestroyed()) sender.send("export:native-progress", frames, exportId);
 							};
-							const stats = exportId
-								? await exportJobs.run(
-										sender,
-										exportId,
-										(progress) =>
-											compositorViewService.startGifExport(
-												request.payload.clips,
-												request.payload.outPath,
-												request.payload.sceneJson,
-												request.payload.params,
-												progress,
-											),
-										onProgress,
-									)
-								: await compositorViewService.exportGif(
+							const stats = await exportJobs.run(
+								sender,
+								exportId ?? randomUUID(),
+								(progress) =>
+									compositorViewService.startGifExport(
 										request.payload.clips,
 										request.payload.outPath,
 										request.payload.sceneJson,
 										request.payload.params,
-										onProgress,
-									);
+										progress,
+										exportId === undefined,
+									),
+								onProgress,
+							);
 							if (!stats) {
 								return createErrorResponse(
 									requestId,
@@ -527,6 +529,12 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 							return createSuccessResponse(requestId, stats);
 						}
 						case "cancelExport": {
+							if (event.senderFrame !== event.sender.mainFrame)
+								return createErrorResponse(
+									requestId,
+									"INVALID_REQUEST",
+									"Render requests require the main frame.",
+								);
 							const exportId = request.payload?.exportId;
 							if (!isExportId(exportId)) {
 								return createErrorResponse(requestId, "INVALID_REQUEST", "Invalid export ID.");
@@ -881,7 +889,8 @@ export function registerNativeBridgeHandlers(context: NativeBridgeContext) {
 			if (
 				request.domain === "compositor" &&
 				error instanceof Error &&
-				((request.action === "exportGif" && error.message === "GIF_EXPORT_CANCELLED") ||
+				(error.message === "RENDER_JOB_INVALIDATED" ||
+					(request.action === "exportGif" && error.message === "GIF_EXPORT_CANCELLED") ||
 					(request.action === "exportMulti" && error.message === "MP4_EXPORT_CANCELLED"))
 			) {
 				return createErrorResponse(requestId, "CANCELLED", "Export cancelled.");
