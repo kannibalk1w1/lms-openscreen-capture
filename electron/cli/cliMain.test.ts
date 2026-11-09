@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { registerIpcHandlers } from "../ipc/handlers";
 import { sendUsagePing, setUsagePingEnabled } from "../usage-ping";
 import { runCli } from "./cliMain";
 
@@ -191,4 +192,11 @@ it("routes a selected lesson query before media permissions, runner and applicat
 	expect(createRunnerWindow).not.toHaveBeenCalled();
 	expect(registerIpcHandlers).not.toHaveBeenCalled();
 	expect(mocks.netFetch).not.toHaveBeenCalled();
+});
+
+it("the actual headless bootstrap supplies a fail-closed editor dirty provider", async () => {
+	await runMcp();
+	const call = vi.mocked(registerIpcHandlers).mock.calls.at(-1)!;
+	expect(typeof call[10]).toBe("function");
+	expect(call[10]!()).toBe(true);
 });

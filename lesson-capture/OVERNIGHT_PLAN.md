@@ -1,3 +1,14 @@
+# Current headless confirmation prerequisite — 9 November 2026
+
+Autonomous dispatch resumes from accepted/pushed035c8313 after actual review32.
+Deliver the [explicit CLI/MCP source confirmation and save prerequisite](HEADLESS_RANGE_CONFIRMATION_2026-11-09.md),
+validate/commit locally, then stop for independent actual Claude exact-SHA review/
+fixes/coordinator private push. Native headless selected-MP4 export is the next
+bounded slice after this prerequisite, not a claimed result of it. No worker push,
+additional worker, main/upstream/real-lesson/auth/config changes; all prior source/
+evidence/user-report limits remain. Original schedules/pause records below are
+superseded history; cutoffs remain revoked.
+
 # Current review31 test follow-up — 9 November 2026
 
 Actual review31 acceptsedb74a00 with no High/Medium. Complete only the

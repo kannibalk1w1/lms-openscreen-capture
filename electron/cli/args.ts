@@ -19,8 +19,13 @@ import {
 } from "../../src/lib/exporter/types";
 import { type LessonQuery, lessonQuerySchema } from "../../src/lib/lesson/review";
 import { exportLessonFileSchema } from "../lesson/fileContracts";
+import {
+	type ConfirmLessonFileRangeRequest,
+	confirmLessonFileRangeSchema,
+} from "../lesson/fileRangeContracts";
 
 export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
+	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
 	| { action: "query"; query: LessonQuery }
 	| { action: "export"; outputDirectory: string; stepIds: string[] }
 );
@@ -105,6 +110,10 @@ Usage:
                      [--source <all|authored|recording-flag|typing-section>] [--problems-only] [--json]
   openscreen lesson export <lesson.json> --out <existing-dir> --step <UUID> [--step <UUID> ...] [--json]
                             Selected file only; preserves source and creates a fresh verified guide folder
+  openscreen lesson confirm-range <lesson.json> --project <current.openscreen> --project-id <ID>
+                     --step <UUID> --start <seconds> --end <seconds> --source <absolute-file> [--source ...]
+                     --intent <author-current|refresh-current> --out <new-lesson.json> [--json]
+                            Explicit source grants and new editable copy; Linux supported subset, no MP4 export
   openscreen mcp                                     Serve the agent tools over MCP on stdio
   openscreen help                                    Show this help
 
@@ -580,6 +589,57 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+	if (action === "confirm-range") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const request: Record<string, unknown> = {
+			manifestPath: resolvePath(file, cwd),
+			sourcePaths: [],
+		};
+		let json = false;
+		const fields: Record<string, string> = {
+			"--project": "projectPath",
+			"--project-id": "projectId",
+			"--step": "stepId",
+			"--start": "startSec",
+			"--end": "endSec",
+			"--source": "sourcePaths",
+			"--intent": "intent",
+			"--out": "outputPath",
+		};
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json") {
+				if (json) throw new Error("Duplicate option");
+				json = true;
+				continue;
+			}
+			const field = fields[flag];
+			if (!field) throw new Error("Unexpected confirmation option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			if (field === "sourcePaths") {
+				(request.sourcePaths as string[]).push(resolvePath(value, cwd));
+				continue;
+			}
+			if (field in request) throw new Error("Duplicate confirmation option");
+			request[field] =
+				field === "startSec" || field === "endSec"
+					? Number(value)
+					: field === "projectPath" || field === "outputPath"
+						? resolvePath(value, cwd)
+						: value;
+		}
+		const parsed = confirmLessonFileRangeSchema.safeParse(request);
+		if (!parsed.success)
+			throw new Error("Choose explicit project, step, range, intent, sources and new output file");
+		return {
+			kind: "lesson",
+			action,
+			manifestPath: parsed.data.manifestPath,
+			request: parsed.data,
+			json,
+		};
+	}
 	if ((action !== "query" && action !== "export") || !file || file.startsWith("-"))
 		throw new Error(
 			"Use lesson query <lesson.json> or lesson export <lesson.json> --out <existing-dir> --step <UUID>",

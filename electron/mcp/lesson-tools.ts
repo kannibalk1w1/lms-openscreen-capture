@@ -1,15 +1,67 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { exportLessonFile, queryLessonFile } from "../lesson/fileCommands";
 import { exportLessonFileSchema, queryLessonFileSchema } from "../lesson/fileContracts";
+import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
+import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
+import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
 
 export function registerLessonTools(
 	server: McpServer,
-	{ transport, editsAllowed }: { transport: "http" | "stdio"; editsAllowed: () => boolean },
+	{
+		transport,
+		editsAllowed,
+		lifecycle,
+	}: { transport: "http" | "stdio"; editsAllowed: () => boolean; lifecycle?: LessonFileLifecycle },
 ) {
 	const failure = (code: string) => ({
 		isError: true as const,
 		content: [{ type: "text" as const, text: code }],
 	});
+	server.registerTool(
+		"confirmLessonRangeFile",
+		{
+			description:
+				"Explicitly confirm or same-project refresh one selected step into a NEW editable lesson file (never overwrite). Requires MCP edits permission before filesystem access, even on stdio. Explicit absolute manifestPath, current-schema saved projectPath/projectId, outputPath, stepId, ruler startSec/endSec, sourcePaths grants and author-current/refresh-current intent are all required. Source paths are NEVER inferred as grants from imported lesson/project contents. Linux bounded video-only source identity; no MP4 rendering/export, discovery, relinking or legacy upgrade. Results omit pins, source paths, instructions and code; cancelled/failed staged output may be retained for authorized inspection.",
+			inputSchema: confirmLessonFileRangeSchema,
+			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+		},
+		async (args, extra) => {
+			if (!editsAllowed())
+				return failure("consent_required: Enable MCP edits to confirm selected lesson sources.");
+			const assertCurrent = () => {
+				if (!editsAllowed()) throw new Error("consent_required");
+			};
+			try {
+				const signal = lifecycle ? AbortSignal.any([extra.signal, lifecycle.signal]) : extra.signal;
+				const pending = confirmLessonFileRange(args, { assertCurrent, signal });
+				lifecycle?.track(pending);
+				const result = await pending;
+				assertCurrent();
+				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+			} catch (error) {
+				if (!editsAllowed())
+					return failure("consent_required: Enable MCP edits to confirm selected lesson sources.");
+				return {
+					isError: true,
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify({
+								code:
+									error instanceof LessonFileRangeError
+										? error.code
+										: "lesson-file-operation-failed",
+								...(error instanceof LessonFileRangeError && error.artifactPath
+									? { artifactPath: error.artifactPath }
+									: {}),
+							}),
+						},
+					],
+				};
+			}
+		},
+	);
+
 	server.registerTool(
 		"queryLessonFile",
 		{

@@ -1,3 +1,4 @@
+import { createLessonFileLifecycle, type LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { registerLessonTools } from "./lesson-tools";
 // The OpenScreen MCP server: the in-app agent's tools, offered to any MCP client
 // (Claude Code, Codex, Cursor…) that the user runs themselves, on any of the
@@ -165,6 +166,7 @@ type ProjectRead = Awaited<ReturnType<McpProjectStore["getProjectForUpdate"]>>;
 export type McpTransport = "http" | "stdio";
 
 export interface McpToolDeps extends ImportMediaDeps {
+	lessonLifecycle?: LessonFileLifecycle;
 	transport: McpTransport;
 	host: McpDocumentHost;
 	projects: McpProjectStore;
@@ -301,7 +303,7 @@ export function mcpInstructions(options: {
 		...(media ? [media] : []),
 		...CORE_PREAMBLES[transport],
 		CHECKPOINT_LIFETIMES[transport],
-		"Portable lessons are separate from video projects: queryLessonFile reads only an explicitly selected absolute manifestPath and returns minimal authored step metadata. exportLessonGuide requires explicit stepIds/outputDirectory and MCP edits permission; HTTP lesson-file queries require MCP edits too before accessing an arbitrary path. No lesson discovery, recovery inventory or app-data location is exposed; request a source file from the user instead of guessing paths. Source review labels are advisory, not approval.",
+		"confirmLessonRangeFile explicitly pins or same-project refreshes a selected source range into a new editable lesson file; it requires edits permission and explicit lesson/project/output/source grants, never inferred grants or MP4 export. Portable lessons are separate from video projects: queryLessonFile reads only an explicitly selected absolute manifestPath and returns minimal authored step metadata. exportLessonGuide requires explicit stepIds/outputDirectory and MCP edits permission; HTTP lesson-file queries require MCP edits too before accessing an arbitrary path. No lesson discovery, recovery inventory or app-data location is exposed; request a source file from the user instead of guessing paths. Source review labels are advisory, not approval.",
 		...(media && !editsAllowed
 			? [
 					`startRecording, exportVideo, exportAudio and createProject are refused too while ${MCP_EDITS_SETTING} is off.`,
@@ -944,6 +946,7 @@ export function createOpenScreenMcpServer(
 	registerLessonTools(server, {
 		transport: deps.transport,
 		editsAllowed: () => deps.editsAllowed(),
+		lifecycle: deps.lessonLifecycle,
 	});
 	// The effect contract: too long for addEffect's description, and versioned with the contract.
 	server.registerResource(
@@ -1019,12 +1022,14 @@ export async function startMcpHttpServer(options: {
 		// for a server that keeps no per-session state. Tools read the live editor
 		// on every call, and what the media tools hold (the take, the exports) lives in
 		// `media`, built once, so there is nothing a session would need to remember.
-		const server = createOpenScreenMcpServer(deps, runTool, options.media);
+		const lessonLifecycle = createLessonFileLifecycle();
+		const server = createOpenScreenMcpServer({ ...deps, lessonLifecycle }, runTool, options.media);
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: undefined,
 			enableJsonResponse: true,
 		});
 		res.on("close", () => {
+			lessonLifecycle.abort();
 			void transport.close();
 			void server.close();
 		});

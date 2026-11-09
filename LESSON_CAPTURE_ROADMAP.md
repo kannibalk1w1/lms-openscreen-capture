@@ -81,18 +81,18 @@ No telemetry, cloud upload or third-party AI processing is to be enabled by defa
 
 ## Active work and next concrete slices
 
-Actual [review30](lesson-capture/CLAUDE_ROADMAP_REVIEW_30_2026-11-09.md) accepts
-27136d0f with no new High/Medium/Low, closing the shared ownership authority/GIF
-follow-up; coordinator checkpointbc906e39 is pushed and verified. The bounded
-[selected-step MP4 editor slice](lesson-capture/SELECTED_STEP_MP4_2026-11-09.md) now
-integrates included confirmed ranges, native destination choice, owned progress/
-cancellation and actual Linux sample/decode/hash validation. Actual [review31](lesson-capture/CLAUDE_ROADMAP_REVIEW_31_2026-11-09.md) accepts
-edb74a00 within scope with no High/Medium; the narrow
-[L31-1/N31-2 test follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_31_2026-11-09.md)
-awaits exact-SHA coordinator follow-up review/fixes/private push; original pending notes below are
-history. Native/real Electron IPC proof is distinguished from GUI/picker/physical
-acceptance. CLI/MCP confirmation/export parity is next after acceptance. Portable
-courses, timed player, audio and other-platform readiness remain unclaimed.
+Actual [review32](lesson-capture/CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md) accepts
+bde9a618 with no new findings; L31-1/N31-2 CLOSED and checkpoint035c8313 is pushed.
+The accepted editor workflow exports included confirmed ranges with native picker,
+owned cancellation and Linux sample/decode/hash validation. The next coherent
+[CLI/MCP explicit-file confirmation prerequisite](lesson-capture/HEADLESS_RANGE_CONFIRMATION_2026-11-09.md)
+now implements explicit source grants, confirmation/same-project refresh and
+stale-safe new editable-copy publication plus connection cancellation. It awaits
+exact-SHA coordinator review/fixes/private push. CLI/MCP selected-step MP4 export
+is still next: real caller/job ownership, explicit directory authority, native
+settlement and actual validator/transport proof must be integrated first. No
+headless MP4 parity, portable course, timed player, audio/physical/other-platform
+readiness is claimed; earlier pending labels below are historical snapshots.
 
 The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
 after a subscription interruption. Both scheduled checkpoints are disabled;

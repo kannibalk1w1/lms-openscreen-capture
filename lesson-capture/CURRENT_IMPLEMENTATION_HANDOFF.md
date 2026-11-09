@@ -1,3 +1,36 @@
+# Explicit CLI/MCP confirmation prerequisite — 9 November 2026
+
+Resumed from accepted/pushed035c8313 after actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md)
+acceptsbde9a618 with no new findings; L31-1/N31-2 CLOSED. The sole writer delivers
+[explicit-file source confirmation/refresh parity](HEADLESS_RANGE_CONFIRMATION_2026-11-09.md):
+CLI lesson confirm-range and MCP confirmLessonRangeFile, explicit saved-project /
+step/source grants, shared RangeAuthoringService, stale-safe new editable copy,
+atomic no-overwrite publication, bounded redacted results and caller cancellation.
+Headless bootstrap now supplies its missing fail-closed dirty provider; editor
+registration/source/dirty boundaries are preserved. HTTP closes only its request
+lifetime; stdio aborts/drains new confirmation file work before exit.
+
+This is a coherent prerequisite, **not selected-MP4 CLI/MCP export parity**. New
+commands do not render, choose native dialogs, create video receipts or certify
+sample/decode/audio timing. Existing editor exports/stills/shared native ownership
+remain. Next after exact-SHA coordinator Claude review/fixes/private push: owned
+headless selected-step MP4 export with explicit directory authority, accepted
+materializer/validator, scoped native controls and actual transport media proof.
+Packaging/timed player and physical/platform/audio acceptance remain later.
+
+Real production Electron CLI and SDK stdio subprocess proofs confirm/save/reopen/
+explicitly refresh a disposable real-MP4 source with original hashes unchanged;
+this is source-content observation, no new headless native export acceptance.
+Final282focused/16 and5941full/444 pass,0skip; bothTS, productionVite,
+Biome35baseline/docs37/i18n15 pass;12single-guard assertion controls kill/restored.
+Preservation112/521/68 and unchanged addon verified. Exact commands and limits
+are in the linked report and unique evidence. Original reports/initial logs/user
+report persist; coordinator summary-hash updates are identified against git and
+archived original bytes preserved. N31-3/N31-4/N29-3/N27-3 remain unchanged.
+No other worker or push; main/private-main remainfd2775e2. Stop for review here.
+
+## Historical accepted selected-step checkpoint
+
 # Accepted selected-step MP4 checkpoint — 9 November 2026
 
 Actual [review32](CLAUDE_ROADMAP_REVIEW_32_2026-11-09.md) accepts exact

@@ -15,6 +15,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { DocumentService } from "../ai-edition/document-service";
 import { openStdin } from "../cli/stdin";
+import { createLessonFileLifecycle } from "../lesson/fileLifecycle";
 import { routeToApp } from "./app-channel";
 import { createMediaTools, type MediaToolDeps } from "./media-tools";
 import {
@@ -37,8 +38,10 @@ export async function serveMcpOverStdio(options: {
 	/** The client went away: nothing is left to serve. */
 	onClose(): void;
 }): Promise<void> {
+	const lessonLifecycle = createLessonFileLifecycle();
 	const deps: McpToolDeps = {
 		...options.mcpToolDeps,
+		lessonLifecycle,
 		transport: "stdio",
 		editsAllowed: () => true,
 		updateNotice: options.updateNotice,
@@ -68,7 +71,8 @@ export async function serveMcpOverStdio(options: {
 	const close = () => {
 		if (closed) return;
 		closed = true;
-		options.onClose();
+		lessonLifecycle.abort();
+		void lessonLifecycle.drain().finally(() => options.onClose());
 	};
 	stdin.once("end", close);
 	stdin.once("close", close);

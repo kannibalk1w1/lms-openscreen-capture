@@ -12,7 +12,7 @@ The same tools are served over two transports, by two different processes:
 | Edits, recording, export | Off until the user turns on **MCP edits** | Always allowed |
 | Project open in the editor | Edited live through the editor, one undo step per call | The same while the app runs: the call is forwarded to it. With no app answering, refused ([the marker](#the-open-in-editor-marker)) |
 | Other projects | Read from and saved to their file, a checkpoint first | Same |
-| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject` | The same |
+| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject`; explicit lesson tools `queryLessonFile`, `exportLessonGuide`, `confirmLessonRangeFile` | The same |
 | A take | Recorded by the app's recording bar, as its Record button records; the editor opens it ([below](#the-media-tools)) | Recorded by a hidden runner of its own process, and made a project there |
 | Checkpoints | In the app's memory, shared with forwarded `openscreen mcp` calls, lost when the app quits | In the app's while it runs; otherwise in this process's, lost when it exits, which it does when the client disconnects |
 
@@ -256,3 +256,15 @@ runner checks mutation consent with `isMutatingTool` before executing a write. T
 HTTP tests exercise a real client/server add/move/set/read/remove cycle, compare the
 document and native scene with the UI's shared mutations, verify the preset enum and
 mutation annotations, and refuse all three layout writes when MCP edits are disabled.
+
+## Explicit lesson source confirmation
+
+`confirmLessonRangeFile` confirms one explicitly selected step's range, or explicitly
+refreshes it within the same saved project, into a new editable file. It requires
+existing MCP edits permission before filesystem inspection and explicit absolute
+lesson/project/output/source paths; imported declarations grant no source access.
+The stdio caller retains explicit-launch authority. Current project schema only;
+no automatic relinking, migration or discovery. Query stays redacted. Request/stdio
+disconnects abort the appropriate new file-work lifetime; stdio drains that work
+before exit. This tool does not render video or create timing/decode receipts.
+See [the bounded prerequisite and remaining native export plan](../../lesson-capture/HEADLESS_RANGE_CONFIRMATION_2026-11-09.md).

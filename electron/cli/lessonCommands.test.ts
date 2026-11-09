@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { emptyLessonQuery } from "../../src/lib/lesson/review";
+import { fixture } from "../lesson/fileRange.test-support";
+import { parseCliArgs } from "./args";
 import { runLessonCommand } from "./lessonCommands";
 
 let root: string;
@@ -11,6 +13,7 @@ beforeEach(async () => {
 	root = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-cli-"));
 });
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await fs.rm(root, { recursive: true, force: true });
 });
 it("queries and exports the selected source with bounded NDJSON results", async () => {
@@ -100,4 +103,46 @@ it("returns fixed errors without OS paths or imported content and nonzero exit s
 	).toBe(1);
 	expect(chunks[1]).toBe("lesson-file-operation-failed\n");
 	expect(await fs.readdir(root)).toEqual(["PRIVATE_USERNAME.json"]);
+});
+
+it("runs the actual explicit-file command through shared confirmation, save/reopen and fixed denial", async () => {
+	vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+	const f = await fixture(root),
+		chunks: string[] = [];
+	const command = parseCliArgs(
+		[
+			"electron",
+			"app",
+			"lesson",
+			"confirm-range",
+			f.manifestPath,
+			"--project",
+			f.projectPath,
+			"--project-id",
+			"project",
+			"--step",
+			f.request.stepId,
+			"--start",
+			".5",
+			"--end",
+			"4",
+			"--source",
+			f.source,
+			"--intent",
+			"author-current",
+			"--out",
+			f.request.outputPath,
+			"--json",
+		],
+		2,
+	)!;
+	if (command.kind !== "lesson") throw new Error("missing CLI lesson command");
+	expect(await runLessonCommand(command, (s) => chunks.push(s))).toBe(0);
+	expect(JSON.parse(chunks[0])).toMatchObject({
+		event: "done",
+		result: { status: "confirmed", path: f.request.outputPath },
+	});
+	expect(chunks[0]).not.toContain("PRIVATE_CODE_CANARY");
+	expect(await runLessonCommand(command, (s) => chunks.push(s))).toBe(1);
+	expect(JSON.parse(chunks[1])).toMatchObject({ event: "error", message: "destination-exists" });
 });

@@ -144,6 +144,7 @@ function registerAppHandlersForCli(cliWindowRef: () => BrowserWindow | null) {
 		() => null,
 		noop, // onRecordingStateChange: no tray to update
 		noop, // switchToHud
+		() => true, // Headless runners have no registered editor; fail closed for editor-only lesson authority.
 	);
 }
 
@@ -309,7 +310,27 @@ export function runCli(command: CliCommand): void {
 		.then(async () => {
 			milestone("app ready");
 			if (command.kind === "lesson") {
-				const code = await runLessonCommand(command, writeStdout);
+				if (command.action !== "confirm-range") {
+					const code = await runLessonCommand(command, writeStdout);
+					finished = true;
+					app.exit(code);
+					return;
+				}
+				const abort = new AbortController(),
+					cancel = () => abort.abort();
+				process.once("SIGINT", cancel);
+				process.once("SIGTERM", cancel);
+				process.stdout.once("close", cancel);
+				process.stdout.once("error", cancel);
+				let code: number;
+				try {
+					code = await runLessonCommand(command, writeStdout, { signal: abort.signal });
+				} finally {
+					process.off("SIGINT", cancel);
+					process.off("SIGTERM", cancel);
+					process.stdout.off("close", cancel);
+					process.stdout.off("error", cancel);
+				}
 				finished = true;
 				app.exit(code);
 				return;

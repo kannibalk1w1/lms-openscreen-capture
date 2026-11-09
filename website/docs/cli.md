@@ -316,3 +316,29 @@ The CLI is part of the [OpenScreen repository](https://github.com/getopenscreen/
 - `electron/mcp/stdio-server.ts` and `electron/mcp/media-tools.ts`: `mcp`.
 - `src/cli/`: the hidden-window runners for `record`, `sources`, `export` and `captions`.
 - `src/lib/cliContracts.ts`: the request and result types shared by both sides.
+
+## Explicit source confirmation for an editable lesson
+
+`lesson confirm-range` confirms the current contents of explicitly chosen source
+files for one step, or explicitly refreshes its range within the same saved project.
+It saves a new editable lesson file and never overwrites the source lesson.
+
+```sh
+openscreen lesson confirm-range lesson.json --project current.openscreen \
+  --project-id PROJECT_ID --step STEP_UUID --start 0.5 --end 4 \
+  --source /absolute/source.mp4 --intent author-current --out confirmed.json --json
+```
+
+Use `refresh-current` with an existing range reference/pin; repeat `--source` for
+each authorized source. Project/lesson declarations never grant source access.
+Linux supported video-only subset, current saved-project schema only; no automatic
+relink, migration, discovery or source refresh. SIGINT/SIGTERM and closed output
+pipes cancel this confirmation operation; a failed staged copy can remain for
+inspection. This command confirms source identity, **not MP4 rendering or timing**.
+Selected-step MP4 CLI/MCP export is a separate pending integration; the editor's
+existing selected-step MP4 action remains available within its supported subset.
+
+MCP clients can use `confirmLessonRangeFile` with explicit absolute lesson/project/
+output/source paths and the same step/range/intent. HTTP requires MCP edits before
+filesystem access; stdio uses its existing explicit-launch authority. Query stays
+redacted; selected-step MP4 CLI/MCP export remains a separate integration.

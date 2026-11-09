@@ -381,3 +381,51 @@ describe("selected lesson commands", () => {
 			expect(parse(["lesson", ...args])).toMatchObject({ kind: "error" });
 	});
 });
+
+it("parses explicit confirmation/refresh authority and rejects missing/duplicated/implicit options", () => {
+	const id = "12345678-1234-4123-8123-123456789012",
+		args = [
+			"lesson",
+			"confirm-range",
+			"lesson.json",
+			"--project",
+			"saved.openscreen",
+			"--project-id",
+			"project",
+			"--step",
+			id,
+			"--start",
+			"0.5",
+			"--end",
+			"4",
+			"--source",
+			"source.mp4",
+			"--intent",
+			"author-current",
+			"--out",
+			"new.json",
+			"--json",
+		];
+	expect(parse(args)).toMatchObject({
+		kind: "lesson",
+		action: "confirm-range",
+		json: true,
+		request: {
+			manifestPath: inCwd("lesson.json"),
+			projectPath: inCwd("saved.openscreen"),
+			sourcePaths: [inCwd("source.mp4")],
+			outputPath: inCwd("new.json"),
+			intent: "author-current",
+			startSec: 0.5,
+			endSec: 4,
+		},
+	});
+	for (const extra of [
+		["--project-id", "foreign"],
+		["--source", "source.mp4"],
+		["--all"],
+		["--intent", "refresh-current"],
+	])
+		expect(parse([...args, ...extra])).toMatchObject({ kind: "error" });
+	expect(parse(args.slice(0, 17))).toMatchObject({ kind: "error" });
+});
