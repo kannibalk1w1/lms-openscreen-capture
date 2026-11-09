@@ -552,3 +552,41 @@ it("reopens the retained v1 guide contract fixture, so future renderer changes c
 	});
 	expect(result.manifest.guideContract).toBe("openscreen-static-guide-portable-v1");
 });
+it("packages a video after later lesson text edits, while a changed pin still refuses", async () => {
+	const f = await packageFixture(root),
+		receiptBefore = await fs.readFile(f.request.media[0].receiptPath);
+	// The author fixed wording after exporting the MP4: only the revision and text moved on.
+	const edited = {
+		...f.lesson,
+		revision: f.lesson.revision + 3,
+		steps: f.lesson.steps.map((step, index) =>
+			index === 0 ? { ...step, instructions: "Corrected after the video export" } : step,
+		),
+	};
+	await fs.writeFile(f.request.manifestPath, JSON.stringify(edited));
+	const packaged = await createLessonPackage(f.request, authority);
+	expect(packaged).toMatchObject({ status: "packaged", videos: 1 });
+	const inspected = await inspectLessonPackage({ directory: packaged.path }, authority);
+	expect(inspected.lesson.steps[0].instructions).toBe("Corrected after the video export");
+	expect(inspected.manifest.videos[0].stepId).toBe(f.step.id);
+	expect(await fs.readFile(f.request.media[0].receiptPath)).toEqual(receiptBefore);
+	// A range changed after the export is a different video claim, whatever the revision says.
+	const pin = edited.steps[0].mediaSelection;
+	await fs.writeFile(
+		f.request.manifestPath,
+		JSON.stringify({
+			...edited,
+			revision: edited.revision + 1,
+			steps: edited.steps.map((step, index) =>
+				index === 0
+					? { ...step, mediaSelection: { ...pin, documentSha256: "cd".repeat(32) } }
+					: step,
+			),
+		}),
+	);
+	await expect(createLessonPackage(f.request, authority)).rejects.toHaveProperty(
+		"code",
+		"lesson-package-invalid",
+	);
+	expect((await fs.readdir(f.outputDirectory)).length).toBe(1);
+});

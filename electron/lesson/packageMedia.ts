@@ -66,7 +66,8 @@ export async function selectedPackageMedia(
 		!pin ||
 		pin.version !== 2 ||
 		receipt.target.lessonId !== lesson.id ||
-		receipt.target.revision !== lesson.revision ||
+		// Text edits after the export advance the revision; the exact pin below is what binds the video.
+		receipt.target.revision > lesson.revision ||
 		receipt.target.stepId !== binding.stepId ||
 		JSON.stringify(receipt.selection) !== JSON.stringify({ ...pin, previousSelections: [] })
 	)

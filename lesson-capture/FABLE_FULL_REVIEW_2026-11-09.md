@@ -404,3 +404,33 @@ input, audio or other platform was exercised.
 
 **Limits and next.** Failed reseals still leave a receipt-less folder in the chosen
 directory. Next: slice 2 (H3).
+
+### Slice 2 — packaging survives lesson text edits made after an MP4 export (H3)
+
+Parent: `ebb2926c`. Evidence: `../openscreen-evaluation/fable-review-2026-11-09T2130Z/slice2/`.
+
+**Changed.** `electron/lesson/packageMedia.ts`: the receipt's target revision must now be
+**no later than** the lesson's revision, instead of equal to it. Lesson ID, step ID and the
+exact confirmed selection are still compared as before, and the video bytes, timing and
+decode checks are untouched. This deliberately relaxes a guard that review 37 accepted; the
+reason is in finding H3. A receipt that claims a later revision than the lesson file is still
+refused (existing `receipt-target` case).
+
+**Test.** One new case in `electron/lesson/package.test.ts`: a lesson whose text and revision
+moved on after the export packages and verifies with the corrected text and the same video
+binding; the receipt file is unchanged; a lesson whose confirmed range changed afterwards is
+refused and leaves no second package.
+
+**Validation**
+
+| Check | Result |
+| --- | --- |
+| Focused Vitest, 5 files (`lesson/package`, `package.privacy`, `cli/lessonPackage`, `mcp/package.integration`, `ipc/lessonPackageOpen`) | 152 tests pass, 0 skipped |
+| Both `tsc` configurations, `npm run lint` (35 baseline), `npx vite build` | pass |
+| 3 controls: restore strict equality; remove the revision check; remove the pin comparison | 3 killed by assertions |
+
+Not run for this slice: the full suite, the startup smoke (no registration or bootstrap
+change) and a real CLI packaging run with an actual rendered MP4. The unit fixture uses the
+mocked video validator.
+
+**Next:** slice 3 (H2, LMS references and mapping file).
