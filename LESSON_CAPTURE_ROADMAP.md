@@ -86,7 +86,9 @@ Actual [review28](lesson-capture/CLAUDE_ROADMAP_REVIEW_28_2026-11-09.md) accepts
 The accepted checkpoint623fa85c is pushed and reviewed; previous pending labels
 below remain history. [Shared native render ownership](lesson-capture/NATIVE_RENDER_OWNERSHIP_2026-11-09.md)
 now covers exports/stills/frame batches across compositor service instances,
-pending exact-SHA coordinator review. Next is the authorized selected-step MP4
+accepted within scope by actual [review29](lesson-capture/CLAUDE_ROADMAP_REVIEW_29_2026-11-09.md)
+at6821c776 with no High/Medium. A bounded [required-authority/GIF follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md)
+awaits coordinator review/push before the next authorized selected-step MP4
 GUI action with native destination picker, scoped progress/cancel/status, unchanged
 source-pin/timing guards and actual validator. No selected-MP4 GUI/CLI/MCP delivery,
 portable course, timed player, audio or physical/other-platform readiness is claimed.

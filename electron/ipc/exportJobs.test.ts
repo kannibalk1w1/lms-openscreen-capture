@@ -203,3 +203,44 @@ it("bounds retired operation IDs per owner without affecting a fresh window", as
 	expect(start).not.toHaveBeenCalled();
 	await expect(jobs.run(owner(), "fresh", start, vi.fn())).resolves.toBe(2);
 });
+
+it("delivers invalidation after a synchronous start callback returns its native handle", async () => {
+	const jobs = new ExportJobs(),
+		sender = owner(),
+		native = pending(),
+		invalidate = vi.fn();
+	const running = jobs.run(
+		sender,
+		"sync-invalidation",
+		() => {
+			sender.emit("did-start-navigation");
+			return { ...native, invalidate };
+		},
+		vi.fn(),
+	);
+	expect(invalidate).toHaveBeenCalledOnce();
+	native.resolve(1);
+	await expect(running).rejects.toThrow("RENDER_JOB_INVALIDATED");
+});
+it("suppresses progress after invalidation independently of active/destruction checks", async () => {
+	const jobs = new ExportJobs(),
+		sender = owner(),
+		native = pending(),
+		progress = vi.fn();
+	let report!: (frames: number) => void;
+	const running = jobs.run(
+		sender,
+		"late-progress",
+		(callback) => {
+			report = callback;
+			return native;
+		},
+		progress,
+	);
+	report(1);
+	jobs.invalidate(sender);
+	report(99);
+	expect(progress.mock.calls).toEqual([[1]]);
+	native.resolve(1);
+	await expect(running).rejects.toThrow("RENDER_JOB_INVALIDATED");
+});

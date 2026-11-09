@@ -76,7 +76,6 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
-import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { LessonService } from "../lesson/service";
 import {
 	DEFAULT_RECORDINGS_DIR,
@@ -177,7 +176,7 @@ import {
 import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
 import { registerEditorRangeAuthoring } from "./editorRangeAuthoring";
-import { registerLessonHandlers } from "./lesson";
+import { registerEditorLessonHandlers } from "./lesson";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { createNativeMacMidCaptureErrorWatch } from "./nativeMacMidCaptureErrorWatch";
@@ -5073,13 +5072,12 @@ export function registerIpcHandlers(
 		return restore;
 	}
 
-	registerLessonHandlers(
+	registerEditorLessonHandlers(
 		new LessonService(
 			(id) => aiEditionDocuments.getProject(id),
 			(...args) => loudnessService.renderFrames(...args),
 		),
-		(event) =>
-			editorRangeSessions.capture(event.sender, () => editorHasUnsavedChanges?.() ?? false),
+		() => editorHasUnsavedChanges?.() ?? false,
 	);
 
 	const mcpAppRecorder = createAppRecorder({

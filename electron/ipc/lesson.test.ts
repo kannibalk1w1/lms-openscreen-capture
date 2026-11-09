@@ -22,7 +22,10 @@ it("actual lesson IPC returns fixed errors without exposing source exception con
 	const read = vi.fn(async () => {
 		throw new Error("PRIVATE_LESSON_SOURCE_CANARY");
 	});
-	registerLessonHandlers(new LessonService(read, async () => null));
+	registerLessonHandlers(new LessonService(read, async () => null), () => ({
+		projectId: "p",
+		assertCurrent: () => undefined,
+	}));
 	const frame = electron.handle.mock.calls.find(([name]) => name === "lesson:frame")![1];
 	const sender = Object.assign(new EventEmitter(), {
 		id: 1,
@@ -48,6 +51,7 @@ it("routes explicit local recovery operations through the real bounded store wit
 			},
 			async () => null,
 		),
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
 	);
 	const callback = (channel: string) =>
 		electron.handle.mock.calls.find(([name]) => name === channel)![1];
@@ -82,7 +86,10 @@ it("range planning IPC validates the request before project reads and hides raw 
 		throw new Error("PRIVATE_RANGE_PROJECT_ERROR");
 	});
 	electron.handle.mockClear();
-	registerLessonHandlers(new LessonService(read, async () => null));
+	registerLessonHandlers(new LessonService(read, async () => null), () => ({
+		projectId: "p",
+		assertCurrent: () => undefined,
+	}));
 	const plan = electron.handle.mock.calls.find(([name]) => name === "lesson:plan-range")![1];
 	expect(
 		await plan(null, { projectId: "p", documentSha256: "a".repeat(64), startSec: 2, endSec: 1 }),

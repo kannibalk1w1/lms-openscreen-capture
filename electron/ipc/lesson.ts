@@ -4,13 +4,16 @@ import type { IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
 import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
 import { LessonDraftStore } from "../lesson/draftStore";
+import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { LessonService } from "../lesson/service";
 import { renderOwnerJobs } from "./exportJobs";
 import { NativeRenderBusyError, NativeRenderInvalidatedError } from "./nativeRenderJobs";
 export function registerLessonHandlers(
 	service: LessonService,
-	authorizeFrame?: (event: IpcMainInvokeEvent) => { projectId: string; assertCurrent: () => void },
+	authorizeFrame: (event: IpcMainInvokeEvent) => { projectId: string; assertCurrent: () => void },
 ) {
+	if (typeof authorizeFrame !== "function")
+		throw new Error("Lesson frame authorization is required.");
 	const bounded = async <T>(run: () => Promise<T>) => {
 		try {
 			return { success: true as const, result: await run() };
@@ -44,13 +47,12 @@ export function registerLessonHandlers(
 		bounded(async () => {
 			if (!event?.sender || event.senderFrame !== event.sender.mainFrame)
 				throw new LessonOperationError("project-changed");
-			const authority = authorizeFrame?.(event);
+			const authority = authorizeFrame(event);
 			if (
-				authority &&
-				(!input ||
-					typeof input !== "object" ||
-					!("projectId" in input) ||
-					input.projectId !== authority.projectId)
+				!input ||
+				typeof input !== "object" ||
+				!("projectId" in input) ||
+				input.projectId !== authority.projectId
 			)
 				throw new LessonOperationError("project-changed");
 			return renderOwnerJobs.run(
@@ -58,7 +60,7 @@ export function registerLessonHandlers(
 				randomUUID(),
 				() => ({
 					result: service.captureFrame(input).then((image) => {
-						authority?.assertCurrent();
+						authority.assertCurrent();
 						return image;
 					}),
 					cancel: () => false,
@@ -102,5 +104,15 @@ export function registerLessonHandlers(
 				return result.canceled ? null : (result.filePaths[0] ?? null);
 			}),
 		),
+	);
+}
+
+/** Production editor wiring: callers cannot omit or substitute an optional frame hook.
+ * The dirty-state provider is the same process callback used by the main handlers. */
+export function registerEditorLessonHandlers(service: LessonService, isEditorDirty: () => boolean) {
+	if (typeof isEditorDirty !== "function")
+		throw new Error("Editor dirty-state provider is required.");
+	registerLessonHandlers(service, (event) =>
+		editorRangeSessions.capture(event.sender, isEditorDirty),
 	);
 }

@@ -1,3 +1,11 @@
+# Current review29 follow-up — 9 November 2026
+
+Finish only the [review29 authority/GIF follow-up](CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md)
+in the existing feature checkout, validate/commit locally and stop for coordinator
+exact-SHA Claude review/fixes/private push. No new MP4 integration, other worker or
+worker push. Earlier autonomous resumption and revoked schedule remain as recorded;
+main/private-main and all evidence/raw-source/real-lesson/auth limits persist.
+
 # Current ownership prerequisite — 9 November 2026
 
 Coordinator dispatch resumes the autonomous roadmap after accepted/pushed623fa85c.

@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
 	handle: vi.fn(),
 	on: vi.fn(),
 	exportMulti: vi.fn(),
+	exportGif: vi.fn(),
+	gifControls: true,
 	renderFrames: vi.fn(),
 	cancel: vi.fn(() => true),
 }));
@@ -35,6 +37,9 @@ vi.mock("../native-bridge/services/compositorViewService", async () => {
 				super({
 					addon: {
 						exportMulti: state.exportMulti,
+						exportGif: state.exportGif,
+						createGifExportControl: state.gifControls ? () => ({}) : undefined,
+						cancelGifExport: state.gifControls ? state.cancel : undefined,
 						renderFrames: state.renderFrames,
 						createMp4ExportControl: () => ({}),
 						cancelMp4Export: state.cancel,
@@ -71,6 +76,8 @@ beforeEach(() => {
 	state.handle.mockClear();
 	state.on.mockClear();
 	state.exportMulti.mockReset();
+	state.exportGif.mockReset();
+	state.gifControls = true;
 	state.renderFrames.mockReset();
 	state.cancel.mockClear();
 });
@@ -245,4 +252,70 @@ it("a still's project context is rechecked after native rendering and lifecycle 
 	sender.emit("did-start-navigation");
 	finish(null);
 	expect(await pending).toMatchObject({ success: false });
+});
+
+it.each([
+	"exportMulti",
+	"exportGif",
+])("refuses subframe %s before invoking the native service", async (action) => {
+	const invoke = setup(),
+		sender = owner();
+	expect(await invoke(sender, action, { clips: [], exportId: randomUUID() }, {})).toMatchObject({
+		ok: false,
+		error: { code: "INVALID_REQUEST" },
+	});
+	expect(state.exportMulti).not.toHaveBeenCalled();
+	expect(state.exportGif).not.toHaveBeenCalled();
+});
+it("keeps caller-ID GIF cancellation capability mandatory on an actual old-addon service route", async () => {
+	state.gifControls = false;
+	const invoke = setup(),
+		sender = owner();
+	state.exportGif.mockResolvedValue({ ...stats, fileBytes: 100 });
+	const result = await invoke(sender, "exportGif", {
+		clips: [],
+		outPath: "/fixture/id.gif",
+		exportId: randomUUID(),
+	});
+	expect(result).toMatchObject({ ok: false });
+	expect(JSON.stringify(result)).toContain("cancellation is unavailable");
+	expect(state.exportGif).not.toHaveBeenCalled();
+});
+it("legacy GIF without controls holds the shared lease through invalidation and native settlement", async () => {
+	state.gifControls = false;
+	const invoke = setup(),
+		a = owner(),
+		b = owner();
+	let finish!: (value: typeof stats & { fileBytes: number }) => void;
+	state.exportGif.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				finish = resolve;
+			}),
+	);
+	const running = invoke(a, "exportGif", { clips: [], outPath: "/fixture/legacy.gif" });
+	await vi.waitFor(() => expect(state.exportGif).toHaveBeenCalledOnce());
+	a.emit("did-start-navigation");
+	await expect(new CompositorViewService().renderFrames([], "{}", 30, [0], 64)).rejects.toThrow(
+		"already running",
+	);
+	expect(
+		await invoke(b, "exportMulti", {
+			clips: [],
+			outPath: "/fixture/too-early.mp4",
+			exportId: randomUUID(),
+		}),
+	).toMatchObject({ ok: false });
+	expect(state.exportMulti).not.toHaveBeenCalled();
+	expect(state.cancel).not.toHaveBeenCalled();
+	finish({ ...stats, fileBytes: 100 });
+	expect(await running).toMatchObject({ ok: false, error: { code: "CANCELLED" } });
+	state.exportMulti.mockResolvedValueOnce(stats);
+	expect(
+		await invoke(b, "exportMulti", {
+			clips: [],
+			outPath: "/fixture/after.mp4",
+			exportId: randomUUID(),
+		}),
+	).toMatchObject({ ok: true });
 });

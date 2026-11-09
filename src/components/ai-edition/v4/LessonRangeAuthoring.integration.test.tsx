@@ -116,7 +116,9 @@ async function fixture() {
 		...sessions.capture(event.sender, () => useProjectStore.getState().dirty),
 		canReadSource: (p) => allowed && p === source,
 	}));
-	registerLessonHandlers(new LessonService(read, renderFrames));
+	registerLessonHandlers(new LessonService(read, renderFrames), (event) =>
+		sessions.capture(event.sender, () => useProjectStore.getState().dirty),
+	);
 	const invoke = (channel: string, ...args: unknown[]) =>
 		electron.handle.mock.calls.find(([name]) => name === channel)![1](event, ...args);
 	const plan = vi.fn((input: Parameters<NonNullable<LessonApi["lessonPlanRange"]>>[0]) =>

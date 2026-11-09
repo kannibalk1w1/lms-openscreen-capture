@@ -1,3 +1,22 @@
+# Review29 bounded follow-up — 9 November 2026
+
+Actual [review29](CLAUDE_ROADMAP_REVIEW_29_2026-11-09.md) accepts6821c776 with no
+High/Medium. The sole writer implements the [required-authority/GIF follow-up](CLAUDE_ROADMAP_FOLLOWUP_29_2026-11-09.md):
+mandatory production frame authorization/wiring, independent still guards and
+caller-ID/legacy GIF capability/lease tests. Export subframe and synchronous
+invalidation/progress nits are also tested. Private-ID allowance accounting remains
+unchanged; the first unlogged Electron observation remains unreproduced, preserved
+and distinguished from the later logged successful probes.
+
+Final228focused/18files and5858full/439files pass,0skip; both TS, production
+Vite, lint35baseline/docs/i18n/117links pass. Thirteen single-guard controls yield
+12assertion kills and1required-main-provider compile kill, with source restored
+and0timeouts/load failures. Real masked-control Node/N-API GIF proof decodes2frames
+and verifies legacy settlement/capability refusal with source/addon unchanged.
+Exact commands and limits are in the linked report. Exact-SHA coordinator Claude
+follow-up/fixes/private push remain pending. No next MP4 slice starts here; main
+and all prior source/evidence authority limits remain unchanged.
+
 # Shared native-render ownership prerequisite — 9 November 2026
 
 Resumed from clean accepted/pushed623fa85c; the sole implementation writer delivers
