@@ -7,8 +7,14 @@
   closes MP1. MP2 stays open: its further fix `e2e31d32` (see the
   [session handoff](OPUS_SESSION_HANDOFF_2026-11-10.md)) is self-tested and awaits that
   reviewer's recheck. Nothing delivered here is independently accepted yet.
-- **Plan only:** slices 3 to 6 (progress, captions, accessibility acceptance, standalone player),
-  and Loop and the keyboard shortcuts from slice 2. No code exists for them.
+- **Accepted:** MP1, MP2 and DOC1 are closed by the
+  [final continuation review](OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md); the first
+  player is independently accepted.
+- **Delivered, self-tested, not yet reviewed:** `1215af69`, which adds:
+  - the rest of slice 2 (Loop and the keyboard shortcuts);
+  - slice 3 as explicitly saved places (see the update below).
+- **Plan only:** slices 4 to 6 (captions, accessibility acceptance with a person, standalone
+  player). No code exists for them.
 
 Written by the Opus session as sole writer. Each slice starts only after the coordinator gate.
 
@@ -54,6 +60,42 @@ below:
     keys and Tab-reachable buttons are the keyboard path for now.
 - **Launch points.** The editor's "Lesson player" button, which works with no project, and
   File > Open Lesson Player. Both are self-tested in the real app.
+
+## Update: loop, keyboard and saved places (`1215af69`, self-tested)
+
+**Loop and keyboard (rest of slice 2).**
+- A "Loop step video" toggle (`aria-pressed`). It is announced, and kept with the speed across
+  steps.
+- Single-key shortcuts, listed in the player: N/P step, K play/pause, R replay, L loop, [ ] speed.
+  Plan change: plain keys rather than Space and Alt+arrows, because Space activates focused
+  buttons and Alt+arrows collide with browser history keys.
+- Shortcuts never act with Ctrl, Alt or Cmd held, or in fields, the speed list, editable content
+  or the video's own controls. Buttons carry `aria-keyshortcuts`.
+
+**Saved places (slice 3), replacing "Mark step done".**
+- **Buttons:** Save my place, Restore saved place, Clear saved place, and Clear all saved places
+  (asks first).
+- **What is saved:** only the package fingerprint (main's digest of the verified manifest), the
+  step ID, the time, speed and loop. No lesson text, code, paths, names or times of day.
+- **When:** nothing is written on open, play, step change, close, navigation or crash.
+- **Restore:** only in the exact same verified package, so a resealed or rebuilt package
+  restores nothing. The time is clamped to the step, and playback never starts.
+- **Store:**
+  - `userData/lesson-player-progress/progress.json`, separate from the authoring recovery copies.
+  - A private 0700 directory, refused if it is a link. No-follow, bounded (64 KiB) reads and a
+    strict schema.
+  - A 0600 staged write, then fsync and atomic rename.
+  - At most 100 places: a full store refuses new places and never drops one.
+  - An unreadable store is refused, never repaired; only Clear all removes it, and only that
+    file.
+  - Operations are serialized across windows.
+- **IPC:**
+  - Requests are accepted only from the exact player page with the open package's token, and
+    must match a strict schema.
+  - One action per window at a time: a second is busy-refused, never queued.
+  - The ticket (capability plus epoch) is checked after reading and right before writing. So a
+    close, navigation, crash, destroy or new folder during I/O writes nothing and returns
+    nothing.
 
 ## Fixed constraints
 

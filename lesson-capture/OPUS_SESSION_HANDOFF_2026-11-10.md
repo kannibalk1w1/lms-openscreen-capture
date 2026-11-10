@@ -622,3 +622,129 @@ reproductions at `5a304a4b` are the bug-present control.
 - the log of the new tests against `71546046`;
 - the build log;
 - the fixture hashes.
+
+## Follow-up: loop, keyboard shortcuts and explicitly saved places (10 November 2026, evening)
+
+**Status:** self-tested, **not independently reviewed**.
+
+**Coordinator task:** `task_c44def2445a3`, dispatch `ctx_2a225b2f14ad`.
+
+**Base:** root checkpoint `e3c00e0e`, pushed privately. The
+[final continuation review](OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md) accepts
+`e2e31d32`/`1dd36bc8` and closes MP2; MP1 and DOC1 were closed before. The original reviews are
+unchanged.
+
+**Commits:** `1215af69` (the feature), then this documentation commit.
+
+### What a learner gets
+
+- **Loop:** a "Loop step video" toggle (`aria-pressed`), announced, and kept with the speed
+  across steps. Step changes still pause and never autoplay.
+- **Keyboard:** single-key shortcuts, listed on screen with `aria-keyshortcuts` on the
+  controls: N/P step, K play/pause, R replay, L loop, [ ] speed. They never act with Ctrl, Alt or
+  Cmd, or in text fields, the speed list, editable content or the video's own controls. Native
+  controls stay reachable, and focus still moves to the active step heading.
+- **Saved places:** Save my place, Restore saved place, Clear saved place, and Clear all saved
+  places (asks first). A status line says whether the current place is saved.
+  - **When:** nothing is written on open, play, step change, close, navigation or crash.
+  - **What:** the package fingerprint, step ID, time, speed and loop. The fingerprint is main's
+    digest of the verified manifest.
+  - **Restore:** only in that exact verified package, with the time clamped and no autoplay.
+  - **Meaning:** a bookmark, not evidence of learning.
+
+### Privacy and authority
+
+- **Store:**
+  - `userData/lesson-player-progress/progress.json`, separate from the authoring recovery
+    store, which is untouched.
+  - A 0700 directory, refused if it is a link. No-follow, bounded (64 KiB) reads with a strict
+    schema.
+  - A 0600 `wx` staged write, then fsync and atomic rename. No staged file is left behind on
+    failure.
+  - At most 100 places: a full store refuses new places and never prunes.
+  - Corrupt data is refused and never repaired; the explicit Clear all removes the store file
+    only (a link itself, never its target).
+  - Actions are serialized across windows, in one order.
+- **IPC:**
+  - Only from the exact player page and main frame, with the open package's token and a strict
+    schema.
+  - The step must exist, and the time must fit that step's verified video.
+  - One action per window at a time: busy, never queued.
+  - The ticket (capability plus epoch) is taken before any await and checked after reading and
+    right before writing. A close, navigation, crash, destroy or new folder during store I/O ends
+    the action with no write and no place returned.
+  - A save that has already committed is reported as saved.
+  - The preload gains only the four saved-place methods.
+- **Unchanged:** D3(b) scope, v1 contracts, media caps and formats, the Linux gate, unique
+  ephemeral sessions, CSP, network denial, grants, lifetime, the no-new-bytes boundary, and
+  authoring checks.
+
+### Validation
+
+All runs used pinned Node 22.22.1 and npm 10.9.4.
+
+| Check | Result |
+| --- | --- |
+| Both `tsc`; lint (35 baseline warnings); `i18n:check`; `docs:check` | pass |
+| `playerProgress.test.ts` | 11 pass: lazy creation, modes and minimal fields; strict refusals; corrupt, unknown, duplicate and oversized stores refused unchanged, and Clear all as the way out; linked directory or file refused, with the link target intact; full store refuses and never prunes; ticket checks; cross-window order with no resurrection; no staged leftovers |
+| `lessonPlayer.test.ts` | 43 pass, adding: exact-package save, restore and clear; a different (rebuilt) package restores and clears nothing; no writes on open, media, close, navigation or crash; foreign window, subframe, editor, cross-token, unknown and malformed tokens and closed packages refused; strict request refusals; busy without queueing; close, navigation, crash, destroy or new folder during store I/O for save and restore gives cancelled with no write; Clear all removes only the store file |
+| `LessonPlayer.test.tsx` (jsdom) | 15 pass, adding: loop; shortcuts and their exclusions; no automatic saves and an honest saved/not-saved status; restore to step, time, speed and loop without play; clear; clear-all confirmation; plain store errors |
+| Focused set, including the unchanged recovery store | 213 pass / 8 files |
+| Vite build; required foreign-directory startup smoke | pass; `success: true` |
+| Full suite at `1215af69` | **6,411 / 465 files pass, 0 skipped** |
+
+**My mutants: 11, all killed by assertions, sources restored byte for byte:**
+- the save and clear write-time ticket checks;
+- the restore post-read checks (paired);
+- no-follow reads;
+- pruning when full;
+- the per-window busy refusal;
+- the token check;
+- strict requests;
+- the step time bound;
+- the shortcut exclusions for fields and the video, and for modifiers.
+
+Three (busy, field exclusion, modifier exclusion) first failed by timeout or Testing Library
+lookup errors. Their assertions were made decisive and those three were re-run.
+
+### Full-app probe
+
+Production build, real preload, IPC, sessions, protocol, store and `<video>`. Keys are CDP key
+events, not physical keys. Only the folder dialog is stubbed.
+
+| Probe | Result |
+| --- | --- |
+| Open the moved, CLI-verified package | no store directory exists |
+| Play; Loop button; keys `]`, `n` (focus on the step-2 heading), `p`; `n` pressed inside the speed list | loop on, 1.25×, paused at 0, speed list ignored `n`; still no store after all of it |
+| Seek to 1.0, Save my place | a 0600 file with one five-field record and no path |
+| Close the window | nothing written (same mtime) |
+| A new player window, same package, Restore | step 1 at 1.0 s, 1.25×, loop on, **paused** |
+| A real resealed package (same step IDs, different verified inventory), Restore | "No saved place for this package." |
+| Clear saved place, then Restore | "No saved place…"; store `places: []` |
+| After | editor authoring still served; both package copies and both original evidence packages byte-identical |
+
+### Limits
+
+- **Not tested by a person:** no physical keyboard, screen reader (Orca) or real folder picker;
+  no Windows or macOS; no audio. The computer-use pass was not available in this headless
+  environment, so it is not accepted.
+- **Several windows on one package:** the last explicit action wins, in the store's serialized
+  order. A save that had already committed before its window closed stays saved.
+- **Unreadable store:** it stays unreadable until the learner chooses Clear all.
+
+### Next dependencies
+
+- **Captions:** need package v2 acceptance (inventory-listed WebVTT), the transcript-to-step
+  mapping, and author review.
+- **Standalone player:** needs a new guide-contract version and a decision on browser trials
+  over `file://`.
+- **Accessibility acceptance:** needs a person at a real desktop.
+
+### Evidence
+
+`../openscreen-evaluation/opus-player-loop-keys-places-2026-11-10/` holds:
+- the probe results and the store after the probe;
+- the smoke;
+- the mutation scripts and results;
+- the build log;
+- the fixture hashes.

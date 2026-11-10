@@ -82,9 +82,12 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
 - **Player recheck:** the [lifetime-fix recheck](lesson-capture/OFFLINE_PLAYER_LIFETIME_FIX_REVIEW_2026-11-10.md)
   of `5a304a4b` closes MP1 and DOC1. **MP2 remains open at Medium:** an open that waited for an
   earlier released open could survive a later close or cancel.
-- **Self-tested, not independently reviewed:** `e2e31d32` (opens refused at once while an
-  earlier one unwinds; nothing waits) and the documentation commit after it. **MP2 is not
-  closed** until that reviewer rechecks it. The player (`82f69ca0`) is not accepted before then.
+- **Player accepted:** the [final continuation review](lesson-capture/OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md)
+  accepts `e2e31d32`/`1dd36bc8`, closing MP2 with no new findings. The first player and its
+  lifetime fixes are independently accepted. The coordinator pushed checkpoint `e3c00e0e`
+  privately.
+- **Self-tested, not independently reviewed:** `1215af69` (loop, keyboard shortcuts and
+  explicitly saved places) and the documentation commit after it.
 
   Results and limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
@@ -126,7 +129,17 @@ with a real picker, with a screen reader, or on Windows or macOS.
      and Previous/Next.
    - Moving between steps pauses and never autoplays.
    - It is entirely offline.
-   - Nothing is saved: no progress, no history.
+   - Since `1215af69` (self-tested): Loop step video, and documented single-key shortcuts
+     (N/P, K, R, L, [ ]) that never act in fields, the speed list or the video's own controls,
+     or with Ctrl/Alt/Cmd.
+   - Since `1215af69` (self-tested): **Save my place, Restore saved place, Clear saved place and
+     Clear all saved places.**
+     - Only those buttons write or remove anything.
+     - A place is the package fingerprint, step, time, speed and loop, kept privately on this
+       computer.
+     - It restores only in the exact same verified package and never starts playback.
+     - It is a bookmark, not a record of learning.
+     - Nothing else is saved: no history, recent files or tracking.
 
 The Lesson guide routes (draft, save, open, export, plan-range) serve only the main frame of a
 registered editor window. The same-file save goes through a main-held, per-window permission.
@@ -141,7 +154,7 @@ no further permission.
 | Gap | Who it affects | What it needs |
 | --- | --- | --- |
 | Lesson media runs only on Linux (H1) | Every Windows author; Windows is a primary target | Windows hardware for a supervised run (D2) |
-| Learner playback is basic: no saved progress, captions, step shortcuts, troubleshooting or standalone (no-app) player | Learners | The [offline player plan](lesson-capture/OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md) slices 2 to 6; slices 0 and 1 plus minimal controls are delivered, self-tested |
+| Learner playback has no captions, troubleshooting or standalone (no-app) player; keyboard and screen-reader use is untested by a person | Learners | The [offline player plan](lesson-capture/OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md) slices 4 to 6, and a manual pass; loop, shortcuts and explicitly saved places are delivered (self-tested) |
 | A reload or renderer crash loses unsaved Lesson guide work (L42-2) | Authors | Owner decision on automatic recovery (D1); until then the manual-recovery promise stands |
 | Audio is never verified in lesson outputs | Narrated lessons | Audio receipt design; real audio acceptance |
 | No GIF or standalone PNG step outputs; video is capped at 1280 px | Slide authors | Owner decision (D4); the accepted contracts are unchanged |
@@ -154,12 +167,13 @@ no further permission.
 
 ### Next work, in order
 
-1. The reviewer rechecks the MP2 fix `e2e31d32`, then the coordinator decides on a push.
+1. An independent review of `1215af69` (loop, keyboard, saved places), then the coordinator's
+   push decision.
 2. The owner answers the remaining decisions below (D3 is decided).
 3. A manual learner pass of the player on real hardware: a real folder picker, keyboard only,
    and a screen reader (Orca). This is the evidence the automated probes cannot give.
-4. Player slices 3 to 5: explicit-click progress, captions (needs package v2 acceptance), and
-   accessibility acceptance.
+4. Player captions (need package v2 acceptance) and accessibility acceptance with a person. A
+   standalone player outside the app needs its own guide-contract decision.
 5. A Windows run (H1) and a manual pilot of the specification's Enemy sequence, when hardware
    and a person are available.
 6. Small usability work: name the refused dependency kind, and guide authors away from the
