@@ -606,4 +606,15 @@ describe("review 0777440c follow-up", () => {
 			sameCheckpoint: false,
 		});
 	});
+	it("requires the same adapter instance as well as session for the same take", () => {
+		const source = take([enemy(0)]);
+		const otherInstance = source
+			.split(`"instanceId":"${"a".repeat(32)}"`)
+			.join(`"instanceId":"${"d".repeat(32)}"`);
+		expect(otherInstance).not.toBe(source);
+		expect(compareGodotCheckpointToReference(source, 1, otherInstance, 1).relation).toEqual({
+			sameTake: false,
+			sameCheckpoint: false,
+		});
+	});
 });

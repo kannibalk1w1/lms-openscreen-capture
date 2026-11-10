@@ -3,6 +3,7 @@ import {
 	compareGodotSceneCheckpoints,
 	listGodotSceneCheckpoints,
 	MAX_SCENE_JOURNAL_BYTES,
+	readGodotCheckpointSnapshot,
 } from "../../src/lib/applicationIntegrations/godotScene";
 import { compareGodotCheckpointToReference } from "../../src/lib/applicationIntegrations/godotSceneReference";
 import {
@@ -21,6 +22,12 @@ export class GodotCheckpointFileError extends Error {
 			| "capture-file-changed"
 			| "reference-file-changed"
 			| "candidate-file-changed"
+			| "reference-file-unavailable"
+			| "candidate-file-unavailable"
+			| "reference-file-invalid"
+			| "candidate-file-invalid"
+			| "reference-checkpoint-invalid"
+			| "candidate-checkpoint-invalid"
 			| "checkpoint-invalid",
 	) {
 		super(code);
@@ -118,17 +125,48 @@ export function compareGodotReferenceFile(
 	if (!parsed.success) throw new GodotCheckpointFileError("invalid-request");
 	const request = parsed.data;
 	assertCurrent();
-	// Each side is one bounded snapshot; only these exact bytes are fingerprinted and compared.
-	const referenceBytes = snapshot(request.referencePath);
+	// Each side is one bounded snapshot; only these exact bytes are fingerprinted, decoded
+	// and compared. Failures name the side but never carry anything read from either file.
+	const side = (
+		which: "reference" | "candidate",
+		journalPath: string,
+		sha256: string,
+		recordSequence: number,
+	) => {
+		let bytes: Uint8Array;
+		try {
+			bytes = readSelectedFileSnapshot(journalPath, MAX_SCENE_JOURNAL_BYTES).bytes;
+		} catch {
+			throw new GodotCheckpointFileError(`${which}-file-unavailable`);
+		}
+		if (digest(bytes) !== sha256) throw new GodotCheckpointFileError(`${which}-file-changed`);
+		let source: string;
+		try {
+			source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+		} catch {
+			throw new GodotCheckpointFileError(`${which}-file-invalid`);
+		}
+		try {
+			readGodotCheckpointSnapshot(source, recordSequence);
+		} catch {
+			throw new GodotCheckpointFileError(`${which}-checkpoint-invalid`);
+		}
+		return source;
+	};
+	const reference = side(
+		"reference",
+		request.referencePath,
+		request.referenceSha256,
+		request.referenceRecordSequence,
+	);
 	assertCurrent();
-	const candidateBytes = snapshot(request.candidatePath);
+	const candidate = side(
+		"candidate",
+		request.candidatePath,
+		request.candidateSha256,
+		request.candidateRecordSequence,
+	);
 	assertCurrent();
-	if (digest(referenceBytes) !== request.referenceSha256)
-		throw new GodotCheckpointFileError("reference-file-changed");
-	if (digest(candidateBytes) !== request.candidateSha256)
-		throw new GodotCheckpointFileError("candidate-file-changed");
-	const reference = text(referenceBytes),
-		candidate = text(candidateBytes);
 	let comparison;
 	try {
 		comparison = compareGodotCheckpointToReference(

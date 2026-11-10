@@ -174,6 +174,8 @@ Usage:
                             Read-only sampled endpoint comparison within one original take
   openscreen lesson compare-godot-reference <reference.jsonl> --reference-record <record> --reference-sha256 <hash> --candidate <candidate.jsonl> --candidate-record <record> --candidate-sha256 <hash> [--tolerance <0-1>] [--json]
                             Advisory cross-take comparison by node path; exact unless a tolerance is given
+                            (tolerance applies to transform values only; comparing a take with itself
+                            is a consistency check, not independent confirmation)
   openscreen lesson inspect-capture <capture.json|journal.jsonl> [--json] [--offset <n>] [--limit <n>]
                             Inspect one selected capture; returns bounded labels and raw SHA-256, never payloads
   openscreen lesson import-capture <capture.json|journal.jsonl> --out <new-lesson.json> --title <text> --sha256 <inspect-hash> --observation <id> [--observation <id> ...] [--json]
@@ -761,9 +763,11 @@ function parseLessonCommand(args: string[], cwd: string): CliCommand {
 		const record = (value: string | undefined) =>
 			value !== undefined && /^\d{1,4}$/.test(value) ? Number(value) : NaN;
 		const tolerance = values["--tolerance"];
+		// Plain decimal or exponent notation; the value must then lie in 0..1.
 		if (
 			tolerance !== undefined &&
-			!/^(?:0|1|0?\.\d{1,12}|\d(?:\.\d{1,12})?e-\d{1,2})$/.test(tolerance)
+			(!/^\+?(?:\d{1,12}(?:\.\d{0,12})?|\.\d{1,12})(?:[eE][+-]?\d{1,3})?$/.test(tolerance) ||
+				!(Number(tolerance) >= 0 && Number(tolerance) <= 1))
 		)
 			throw new Error("Choose a tolerance between 0 and 1");
 		const candidate = values["--candidate"];

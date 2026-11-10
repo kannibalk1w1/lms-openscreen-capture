@@ -99,7 +99,7 @@ describe("compareGodotReferenceFile", () => {
 		} catch (error) {
 			message = JSON.stringify({ ...(error as object), message: (error as Error).message });
 		}
-		expect(message).toContain("capture-file-unavailable");
+		expect(message).toContain("candidate-file-unavailable");
 		expect(message).not.toContain("3D baseline");
 		expect(message).not.toContain(referenceSha256);
 	});
@@ -115,12 +115,13 @@ describe("compareGodotReferenceFile", () => {
 		};
 		expect(code({ referenceSha256: candidateSha256 })).toBe("reference-file-changed");
 		expect(code({ candidateSha256: referenceSha256 })).toBe("candidate-file-changed");
-		expect(code({ candidateRecordSequence: 0 })).toBe("checkpoint-invalid");
+		expect(code({ candidateRecordSequence: 0 })).toBe("candidate-checkpoint-invalid");
+		expect(code({ referenceRecordSequence: 0 })).toBe("reference-checkpoint-invalid");
 		expect(code({ tolerance: 2 })).toBe("invalid-request");
 		expect(code({ candidatePath: "relative.jsonl" })).toBe("invalid-request");
 		expect(code({ extra: true })).toBe("invalid-request");
 		expect(code({ candidatePath: path.join(root, "missing.jsonl") })).toBe(
-			"capture-file-unavailable",
+			"candidate-file-unavailable",
 		);
 	});
 
@@ -237,12 +238,25 @@ describe("CLI compare-godot-reference", () => {
 		const output: string[] = [];
 		expect(await runLessonCommand(command, (value) => output.push(value))).toBe(0);
 		expect(JSON.parse(output.pop()!).result).toEqual(compareGodotReferenceFile(request()));
+		for (const [text, value] of [
+			["1.0", 1],
+			["1E-3", 0.001],
+			["1e+0", 1],
+			["+0.1", 0.1],
+			[".5", 0.5],
+			["0", 0],
+		] as const)
+			expect(parse(...args(["--tolerance", text]))).toMatchObject({
+				request: { tolerance: value },
+			});
 		const tolerant = parse(...args(["--tolerance", "1e-4"]));
 		expect(tolerant).toMatchObject({ request: { tolerance: 0.0001 } });
 	});
 
 	it.each([
 		[["--tolerance", "2"]],
+		[["--tolerance", "5e-0"]],
+		[["--tolerance", "1e+1"]],
 		[["--tolerance", "-0.1"]],
 		[["--tolerance", "NaN"]],
 		[["--tolerance", "0x1"]],
@@ -272,5 +286,58 @@ describe("CLI compare-godot-reference", () => {
 		const line = output.join("");
 		expect(line).toContain("candidate-file-changed");
 		expect(line).not.toContain(root);
+	});
+});
+
+describe("review 87cc7dac follow-up", () => {
+	it.each([
+		3, 4,
+	])("stops at currency check %i (after the second read / before returning)", (failAt) => {
+		const read = vi.spyOn(selectedFile, "readSelectedFileSnapshot");
+		let calls = 0;
+		expect(() =>
+			compareGodotReferenceFile(request(), () => {
+				if (++calls === failAt) throw new Error("revoked");
+			}),
+		).toThrow("revoked");
+		expect(read).toHaveBeenCalledTimes(2);
+		expect(calls).toBe(failAt);
+	});
+
+	it("rejects a candidate rewritten after inspection, before reading anything further", async () => {
+		await fs.appendFile(candidatePath, "\n");
+		expect(() => compareGodotReferenceFile(request())).toThrow("candidate-file-changed");
+		await fs.appendFile(referencePath, "\n");
+		const read = vi.spyOn(selectedFile, "readSelectedFileSnapshot");
+		expect(() => compareGodotReferenceFile(request())).toThrow("reference-file-changed");
+		// A stale reference is rejected before the candidate is read.
+		expect(read).toHaveBeenCalledTimes(1);
+	});
+
+	it("names the failing side for invalid bytes", async () => {
+		await fs.writeFile(candidatePath, Buffer.from([0xff, 0xfe]));
+		const candidateSha = await sha(candidatePath);
+		expect(() => compareGodotReferenceFile(request({ candidateSha256: candidateSha }))).toThrow(
+			"candidate-file-invalid",
+		);
+	});
+
+	it("returns only a fixed code through MCP when the second source fails", async () => {
+		const server = new McpServer({ name: "godot-reference-second", version: "0" });
+		registerLessonTools(server, { transport: "stdio", editsAllowed: () => true });
+		const client = new Client({ name: "test", version: "0" });
+		const [a, b] = InMemoryTransport.createLinkedPair();
+		await Promise.all([server.connect(a), client.connect(b)]);
+		try {
+			const result = await client.callTool({
+				name: "compareGodotReferenceFile",
+				arguments: request({ candidatePath: path.join(root, "missing.jsonl") }),
+			});
+			expect(result.isError).toBe(true);
+			expect(result.content).toEqual([{ type: "text", text: "candidate-file-unavailable" }]);
+		} finally {
+			await client.close();
+			await server.close();
+		}
 	});
 });

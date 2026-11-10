@@ -176,6 +176,30 @@ Validation:
 
 Evidence: `../openscreen-evaluation/godot-reference-comparison-2026-11-10/`.
 
+## File-tool review
+
+[Independent review of `87cc7dac`](CLAUDE_GODOT_REFERENCE_FILE_TOOLS_REVIEW_87CC7DAC_2026-11-10.md):
+**accepted with Lows**. All eight coordinator gates are met; there is no false agree, no
+read or disclosure without consent, no partial disclosure and no unbound identity. The
+follow-up commit addresses:
+
+- L1: tests for the currency checks after the second read and before return.
+- L2: the CLI tolerance accepts plain decimal or exponent notation (`1.0`, `1E-3`,
+  `1e+0`, `+0.1`, `.5`) and then requires 0–1, with its own message.
+- N2: a same-session, different-instance test.
+- N3: side-specific codes (`reference-`/`candidate-` `file-unavailable`, `file-changed`,
+  `file-invalid`, `checkpoint-invalid`). Each side is hashed immediately after its own
+  read, so a stale reference is rejected before the candidate is read.
+- N4: CLI help and MCP description wording on tolerance scope and self-comparison.
+- N5: a file rewritten after inspection, invalid bytes, and MCP second-source failure
+  returning only a fixed code.
+- N1 is retained, as documented above.
+
+Mutants M4/M5 (currency checks) and M7 (instance identity) are now killed. Production CLI
+(relative cwd) + MCP rerun 15/15 and startup smoke pass. Full suite: 6,647 pass. One
+environmental failure was `diskSpaceCheck.test.ts`: `/tmp` (tmpfs) was 98% full from this
+run's review snapshots. After removing those, it passes 5/5. Awaiting recheck.
+
 ## Next
 
 Independent review of the file-tool commit; then return to the remaining roadmap (project
