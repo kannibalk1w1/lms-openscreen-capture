@@ -1,3 +1,27 @@
+# Accepted first offline learner player — 10 November 2026
+
+The [independent no-wait review](OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md)
+accepts exact1dd36bc818a2fc5662958451dda4645e24645b89, implementation
+ e2e31d32a30105a5a728efe3a753834066f31de2. MP2 CLOSED, no new findings;
+MP1/DOC1 were closed by the [prior review](OFFLINE_PLAYER_LIFETIME_FIX_REVIEW_2026-11-10.md).
+Independent188committed focused plus15own regressions, both TS, lint/Vite,
+real foreign-cwd CLI/SDKstdio startup,45-frame package verification and22actual
+production records pass;6assertion controls plus pre-fix10failure control.
+Worker full6383/464 at e2e31d32 is separate evidence. All tracked/evidence/package
+manifests remain unchanged. Old requests are busy-refused until actual prior
+settlement, fresh opens work; release serves no new bytes, already-buffered
+Chromium bytes remain the documented limit.
+
+D3(b) delivered within reviewed Linux read-only scope: open a chosen verified
+package with no video project, read steps/code/JPEG, play/seek/replay/speed and
+previous/next without cross-step autoplay. Authoring checks unchanged. No saved
+progress, loop, captions, standalone browser player, physical picker/screen-reader/
+audio/Windows acceptance yet. Coordinator owns private checkpoint push; Opus
+continues sole implementation only after this review gate. Main staysfd2775e2,
+Fable stopped, source/evidence/userreport preserved. Manual-only recovery remains.
+
+## Historical player prerequisite checkpoint
+
 # Accepted Opus lifetime checkpoint and approved player scope — 10 November 2026
 
 Actual [independent follow-up](OPUS_LIFETIME_FIX_INDEPENDENT_REVIEW_2026-11-10.md)

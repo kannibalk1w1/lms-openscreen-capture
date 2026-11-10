@@ -177,6 +177,17 @@ no further permission.
 | D6 | Package verification depth (M3) | (a) Freeze the current layer. (b) State a threat model and simplify at the next format version. |
 | D7 | Same-file save sets the file to mode 0600 and replaces the inode | (a) Keep it private, as now. (b) Preserve the original mode; hard links still break. |
 
+### Latest player review disposition
+
+The first read-only player and L1 correction are independently accepted through
+`1dd36bc8` / `e2e31d32`: MP1 and MP2 are closed with no new findings. The
+[final continuation review](lesson-capture/OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md)
+records actual production video/protocol and cancellation evidence. The player
+busy-refuses opens until older work settles; it does not queue requests that could
+survive release. This is Linux DOM/CDP/stubbed-picker evidence, not physical,
+screen-reader, audio or other-platform acceptance. Next: loop/keyboard usability
+and explicitly saved learner progress; captions and standalone output remain later.
+
 ## Evidence and review ledger
 
 Audit baseline is `249a09da`, after first timing milestone `ffc34ca4`. The latter
