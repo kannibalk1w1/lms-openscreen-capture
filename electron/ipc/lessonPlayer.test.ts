@@ -11,6 +11,7 @@ import { validateRangeVideo } from "../lesson/encodedVideo";
 import { createLessonPackage } from "../lesson/package";
 import { fakePackageVideo, packageFixture } from "../lesson/package.test-support";
 import { openSelectedLessonPackage } from "../lesson/packageOpen";
+import { PlayerProgressStore } from "../lesson/playerProgress";
 import {
 	LessonPlayerOwners,
 	MAX_PLAYER_WINDOWS,
@@ -24,6 +25,7 @@ vi.mock("../lesson/encodedVideo", () => ({ validateRangeVideo: vi.fn() }));
 
 const PLAYER = "file:///app/dist/lesson-player.html";
 let root: string, moved: string, owners: LessonPlayerOwners;
+const progressDir = () => path.join(root, "user-data", "lesson-player-progress");
 let pick: Mock<(event: IpcMainInvokeEvent) => Promise<string | null>>,
 	openWindow: Mock<() => void>,
 	inspect: Mock<typeof openSelectedLessonPackage>;
@@ -105,6 +107,7 @@ beforeEach(async () => {
 		openWindow,
 		pickDirectory: pick,
 		inspect,
+		progress: new PlayerProgressStore(progressDir()),
 	});
 });
 afterEach(() => fs.rm(root, { recursive: true, force: true }));
@@ -491,4 +494,243 @@ it.each([
 	expect(signal!.aborted).toBe(true);
 	held.release();
 	expect(await pending).toEqual({ success: false, code: "lesson-package-cancelled" });
+});
+
+// ---- Saved places: explicit learner actions, through production registration and a real store.
+const call = (name: string, event: unknown, ...args: unknown[]) =>
+	[...host.handle.mock.calls]
+		.reverse()
+		.find(([value]: unknown[]) => value === `lesson-player:${name}`)![1](
+			event,
+			...args,
+		) as Promise<{
+		success: boolean;
+		code?: string;
+		result?: Record<string, unknown>;
+	}>;
+const openView = async (p: ReturnType<typeof player>) =>
+	((await route("open")(p.event)) as { result: LessonPlayerView }).result;
+const storeFile = () => path.join(progressDir(), "progress.json");
+const progressFiles = async () => (await fs.readdir(progressDir()).catch(() => [])).sort();
+
+it("saves, restores and clears a place only on explicit requests, bound to the exact package", async () => {
+	const p = player(),
+		view = await openView(p),
+		step = view.steps[0];
+	expect(await call("place-restore", p.event, view.token)).toEqual({
+		success: true,
+		result: { status: "none" },
+	});
+	const place = { stepId: step.id, timeSec: 0.75, speed: 1.25, loop: true };
+	expect(await call("place-save", p.event, view.token, place)).toEqual({
+		success: true,
+		result: { status: "saved" },
+	});
+	const stored = JSON.parse(await fs.readFile(storeFile(), "utf8"));
+	expect(stored.places).toHaveLength(1);
+	expect(Object.keys(stored.places[0]).sort()).toEqual([
+		"fingerprint",
+		"loop",
+		"speed",
+		"stepId",
+		"timeSec",
+	]);
+	// Main supplies the fingerprint; no path, text or code is stored.
+	const raw = await fs.readFile(storeFile(), "utf8");
+	expect(raw).not.toContain(root);
+	expect(raw).not.toContain("Public selected instructions");
+	// A new window opening the same verified package restores the same place.
+	const q = player(),
+		again = await openView(q);
+	expect(await call("place-restore", q.event, again.token)).toEqual({
+		success: true,
+		result: { status: "restored", place },
+	});
+	expect(await call("place-clear", q.event, again.token)).toEqual({
+		success: true,
+		result: { status: "cleared", removed: true },
+	});
+	expect(await call("place-restore", p.event, view.token)).toEqual({
+		success: true,
+		result: { status: "none" },
+	});
+});
+
+it("restores nothing for a different package, and clears only the authorized package's place", async () => {
+	const p = player(),
+		view = await openView(p);
+	await call("place-save", p.event, view.token, {
+		stepId: view.steps[0].id,
+		timeSec: 1,
+		speed: 1,
+		loop: false,
+	});
+	// A different package (a resealed or rebuilt one has a different verified inventory).
+	const other = path.join(root, "other");
+	await fs.mkdir(other);
+	const f = await packageFixture(other);
+	const created = await createLessonPackage(f.request, { assertCurrent: () => undefined });
+	if (created.status !== "packaged") throw new Error("fixture package");
+	const q = player();
+	pick.mockResolvedValueOnce(created.path);
+	const otherView = await openView(q);
+	expect(await call("place-restore", q.event, otherView.token)).toEqual({
+		success: true,
+		result: { status: "none" },
+	});
+	expect(await call("place-clear", q.event, otherView.token)).toEqual({
+		success: true,
+		result: { status: "cleared", removed: false },
+	});
+	expect(JSON.parse(await fs.readFile(storeFile(), "utf8")).places).toHaveLength(1);
+});
+
+it("writes nothing on open, play, step change, close, navigation or crash", async () => {
+	const p = player(),
+		view = await openView(p);
+	await media(p.owner, view.steps[0].video!.src);
+	await route("close")(p.event);
+	const q = player();
+	await openView(q);
+	q.navigate();
+	const r = player();
+	await openView(r);
+	r.crash();
+	expect(await progressFiles()).toEqual([]);
+	await expect(fs.stat(progressDir())).rejects.toThrow();
+});
+
+it("refuses saved-place actions from any other window, frame, token or closed package", async () => {
+	const p = player(),
+		other = player(),
+		view = await openView(p),
+		otherView = await openView(other);
+	const editor = contents("file:///app/dist/index.html?windowType=editor");
+	editorRangeSessions.register(editor.value, editor.value.getURL());
+	const place = { stepId: view.steps[0].id, timeSec: 0, speed: 1, loop: false };
+	const refused = { success: false, code: "lesson-player-unavailable" };
+	for (const [event, token] of [
+		[editor.event, view.token],
+		[{ ...p.event, senderFrame: {} }, view.token],
+		[other.event, view.token],
+		[p.event, otherView.token],
+		[p.event, randomUUID()],
+		[p.event, "not-a-token"],
+		[undefined, view.token],
+	] as const) {
+		expect(await call("place-save", event, token, place)).toEqual(refused);
+		expect(await call("place-restore", event, token)).toEqual(refused);
+		expect(await call("place-clear", event, token)).toEqual(refused);
+	}
+	expect(await call("place-clear-all", editor.event)).toEqual(refused);
+	await route("close")(p.event);
+	expect(await call("place-save", p.event, view.token, place)).toEqual(refused);
+	expect(await progressFiles()).toEqual([]);
+});
+
+it("refuses untrusted place requests strictly, before any write", async () => {
+	const p = player(),
+		view = await openView(p),
+		step = view.steps[0];
+	const refused = { success: false, code: "lesson-player-unavailable" };
+	for (const bad of [
+		{ stepId: randomUUID(), timeSec: 0, speed: 1, loop: false },
+		{ stepId: step.id, timeSec: step.video!.durationSec + 5, speed: 1, loop: false },
+		{ stepId: step.id, timeSec: -1, speed: 1, loop: false },
+		{ stepId: step.id, timeSec: 0, speed: 3, loop: false },
+		{ stepId: step.id, timeSec: 0, speed: 1, loop: "yes" },
+		{ stepId: step.id, timeSec: 0, speed: 1, loop: false, path: "/etc/passwd" },
+		null,
+	])
+		expect(await call("place-save", p.event, view.token, bad)).toEqual(refused);
+	expect(await progressFiles()).toEqual([]);
+});
+
+it("refuses a second action on the same window while one is running, without queueing it", async () => {
+	const p = player(),
+		view = await openView(p);
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const realLstat = fs.lstat.bind(fs);
+	const spy = vi.spyOn(fs, "lstat").mockImplementationOnce(async (...args) => {
+		await held;
+		return realLstat(...args);
+	});
+	const place = { stepId: view.steps[0].id, timeSec: 0, speed: 1, loop: false };
+	const first = call("place-save", p.event, view.token, place);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	// Refused at once, not queued behind the running action.
+	expect(
+		await Promise.race([
+			call("place-restore", p.event, view.token),
+			new Promise((resolve) => setTimeout(() => resolve("still-waiting"), 200)),
+		]),
+	).toEqual({ success: false, code: "lesson-player-busy" });
+	release();
+	expect(await first).toEqual({ success: true, result: { status: "saved" } });
+	spy.mockRestore();
+});
+
+it.each([
+	"close",
+	"navigate",
+	"crash",
+	"destroy",
+	"new folder",
+])("a %s while a save or restore is reading the store ends it: no write and no place returned", async (end) => {
+	for (const action of ["place-save", "place-restore"] as const) {
+		const p = player(),
+			view = await openView(p);
+		const place = { stepId: view.steps[0].id, timeSec: 1, speed: 1.5, loop: true };
+		if (action === "place-restore")
+			expect((await call("place-save", p.event, view.token, place)).success).toBe(true);
+		const before = await fs.readFile(storeFile(), "utf8").catch(() => null);
+		let release!: () => void;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const realLstat = fs.lstat.bind(fs);
+		const spy = vi.spyOn(fs, "lstat").mockImplementationOnce(async (...args) => {
+			await held;
+			return realLstat(...args);
+		});
+		const pending = call(
+			action,
+			p.event,
+			view.token,
+			...(action === "place-save" ? [{ ...place, timeSec: 0.5 }] : []),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		if (end === "close") await route("close")(p.event);
+		if (end === "navigate") p.navigate();
+		if (end === "crash") p.crash();
+		if (end === "destroy") p.destroy();
+		if (end === "new folder") await openView(p);
+		release();
+		expect(await pending, `${end} during ${action}`).toEqual({
+			success: false,
+			code: "lesson-progress-cancelled",
+		});
+		spy.mockRestore();
+		expect(await fs.readFile(storeFile(), "utf8").catch(() => null)).toBe(before);
+	}
+});
+
+it("Clear all is an explicit player action that removes only the saved-places file", async () => {
+	const p = player(),
+		view = await openView(p);
+	await call("place-save", p.event, view.token, {
+		stepId: view.steps[0].id,
+		timeSec: 0,
+		speed: 1,
+		loop: false,
+	});
+	await fs.writeFile(path.join(progressDir(), "unrelated.txt"), "keep");
+	expect(await call("place-clear-all", p.event)).toEqual({
+		success: true,
+		result: { status: "cleared-all" },
+	});
+	expect(await progressFiles()).toEqual(["unrelated.txt"]);
 });

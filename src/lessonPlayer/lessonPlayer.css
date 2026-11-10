@@ -98,3 +98,24 @@ body {
 .player [role="alert"] {
 	color: #ffb4a8;
 }
+.player .shortcuts {
+	margin: 0;
+}
+.player .shortcuts div {
+	display: flex;
+	gap: 8px;
+	margin: 2px 0;
+}
+.player .shortcuts dd {
+	margin: 0;
+}
+.player kbd {
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	padding: 0 4px;
+	font-family: ui-monospace, monospace;
+}
+.player button[aria-pressed="true"] {
+	border-color: var(--accent);
+	font-weight: 600;
+}

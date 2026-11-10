@@ -3,19 +3,22 @@ import { lstatSync } from "node:fs";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { ipcMain } from "electron";
+import { z } from "zod";
 import {
+	LESSON_PLAYER_SPEEDS,
 	type LessonPlayerCode,
 	type LessonPlayerView,
 	lessonPlayerMediaUrl,
 } from "../../src/lib/lesson/player";
 import { LessonPackageError } from "../lesson/package";
-import { identity } from "../lesson/packageIO";
+import { digest, identity } from "../lesson/packageIO";
 import { type InspectedPackage, openSelectedLessonPackage } from "../lesson/packageOpen";
 import {
 	type PlayerMediaCapability,
 	type PlayerMediaFile,
 	servePlayerMedia,
 } from "../lesson/playerMedia";
+import { PlayerProgressError, type PlayerProgressStore } from "../lesson/playerProgress";
 
 /** The webContents surface a player owner needs; a real Electron WebContents satisfies it. */
 export interface PlayerContents {
@@ -47,7 +50,15 @@ export class LessonPlayerOwner {
 	private epoch = 0;
 	private operation = 0;
 	private pending?: AbortController;
-	private capability?: PlayerMediaCapability & { abort: AbortController };
+	private capability?: PlayerMediaCapability & {
+		abort: AbortController;
+		/** The verified manifest's digest: binds a saved place to this exact package inventory. */
+		fingerprint: string;
+		/** Every step, with the longest time a saved place may hold for it (0 without a video). */
+		steps: ReadonlyMap<string, number>;
+	};
+	/** One saved-place action at a time per window; a second is refused, never queued. */
+	progressBusy = false;
 	ended = false;
 	constructor(
 		readonly contents: PlayerContents,
@@ -88,6 +99,24 @@ export class LessonPlayerOwner {
 			event.senderFrame === this.contents.mainFrame &&
 			canonicalURL(this.contents.getURL()) === this.url
 		);
+	}
+	/**
+	 * A ticket for one saved-place action on the package this window has open now, taken before any
+	 * await. It stays current only while the same capability and lifetime epoch do.
+	 */
+	progressTicket(token: string) {
+		const capability = this.capability;
+		if (!capability || capability.token !== token)
+			throw new PlayerError("lesson-player-unavailable");
+		const epoch = this.epoch;
+		return {
+			fingerprint: capability.fingerprint,
+			steps: capability.steps,
+			assertCurrent: () => {
+				if (this.capability !== capability || this.epoch !== epoch)
+					throw new PlayerError("lesson-progress-cancelled");
+			},
+		};
 	}
 	/** Media requests from this owner's own session only. */
 	serve(request: Request) {
@@ -141,6 +170,13 @@ export class LessonPlayerOwner {
 				revoked = new AbortController();
 			this.capability = {
 				token,
+				fingerprint: digest(JSON.stringify(inspected.manifest)),
+				steps: new Map(
+					inspected.lesson.steps.map((step) => [
+						step.id,
+						inspected.manifest.videos.find((video) => video.stepId === step.id)?.durationSec ?? 0,
+					]),
+				),
 				videos,
 				abort: revoked,
 				signal: revoked.signal,
@@ -168,6 +204,7 @@ export function playerView(token: string, inspected: InspectedPackage): LessonPl
 	const videos = new Map(manifest.videos.map((video) => [video.stepId, video]));
 	return {
 		status: "opened",
+		token,
 		title: lesson.title,
 		...(lesson.lessonRef ? { lessonRef: lesson.lessonRef } : {}),
 		steps: lesson.steps.map((step) => {
@@ -247,6 +284,8 @@ export function registerLessonPlayerHandlers(deps: {
 	openWindow: () => void;
 	pickDirectory: (event: IpcMainInvokeEvent) => Promise<string | null>;
 	inspect?: typeof openSelectedLessonPackage;
+	/** The learner's explicitly saved places; absent means saved places are unavailable. */
+	progress?: PlayerProgressStore;
 }) {
 	const inspect = deps.inspect ?? openSelectedLessonPackage;
 	const ownerOf = (event: IpcMainInvokeEvent) => {
@@ -283,4 +322,104 @@ export function registerLessonPlayerHandlers(deps: {
 	ipcMain.handle("lesson-player:close", (event) => {
 		ownerOf(event)?.release();
 	});
+
+	// Saved places: explicit learner actions only. Each needs the exact player page, the token of the
+	// package open there now, and a strict request; one action per window at a time.
+	const tokenSchema = z.string().uuid();
+	const placeSchema = z
+		.object({
+			stepId: z.string().uuid(),
+			timeSec: z.number().finite().min(0).max(120),
+			speed: z
+				.number()
+				.refine((value) => (LESSON_PLAYER_SPEEDS as readonly number[]).includes(value)),
+			loop: z.boolean(),
+		})
+		.strict();
+	const progressRoute =
+		<T>(
+			run: (owner: LessonPlayerOwner, store: PlayerProgressStore, ...args: unknown[]) => Promise<T>,
+		) =>
+		async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+			const owner = ownerOf(event);
+			if (!owner) return { success: false, code: "lesson-player-unavailable" };
+			if (!deps.progress) return { success: false, code: "lesson-progress-unavailable" };
+			if (owner.progressBusy) return { success: false, code: "lesson-player-busy" };
+			owner.progressBusy = true;
+			try {
+				return { success: true, result: await run(owner, deps.progress, ...args) };
+			} catch (error) {
+				return {
+					success: false,
+					code:
+						error instanceof PlayerProgressError
+							? error.code
+							: error instanceof PlayerError
+								? error.code
+								: "lesson-progress-unavailable",
+				};
+			} finally {
+				owner.progressBusy = false;
+			}
+		};
+	const ticketFor = (owner: LessonPlayerOwner, token: unknown) => {
+		const parsed = tokenSchema.safeParse(token);
+		if (!parsed.success) throw new PlayerError("lesson-player-unavailable");
+		return owner.progressTicket(parsed.data);
+	};
+	ipcMain.handle(
+		"lesson-player:place-save",
+		progressRoute(async (owner, store, token, input) => {
+			const ticket = ticketFor(owner, token);
+			const place = placeSchema.safeParse(input);
+			if (!place.success) throw new PlayerError("lesson-player-unavailable");
+			const limit = ticket.steps.get(place.data.stepId);
+			if (limit === undefined || place.data.timeSec > limit + 0.5)
+				throw new PlayerError("lesson-player-unavailable");
+			await store.save(
+				{
+					fingerprint: ticket.fingerprint,
+					...place.data,
+					timeSec: Math.round(Math.min(place.data.timeSec, limit) * 1000) / 1000,
+				},
+				ticket.assertCurrent,
+			);
+			// Already committed when this returns: reported honestly even if the window moved on since.
+			return { status: "saved" as const };
+		}),
+	);
+	ipcMain.handle(
+		"lesson-player:place-restore",
+		progressRoute(async (owner, store, token) => {
+			const ticket = ticketFor(owner, token);
+			const saved = await store.get(ticket.fingerprint, ticket.assertCurrent);
+			ticket.assertCurrent();
+			const limit = saved ? ticket.steps.get(saved.stepId) : undefined;
+			if (!saved || limit === undefined) return { status: "none" as const };
+			return {
+				status: "restored" as const,
+				place: {
+					stepId: saved.stepId,
+					timeSec: Math.min(saved.timeSec, limit),
+					speed: saved.speed,
+					loop: saved.loop,
+				},
+			};
+		}),
+	);
+	ipcMain.handle(
+		"lesson-player:place-clear",
+		progressRoute(async (owner, store, token) => {
+			const ticket = ticketFor(owner, token);
+			const removed = await store.clear(ticket.fingerprint, ticket.assertCurrent);
+			return { status: "cleared" as const, removed };
+		}),
+	);
+	ipcMain.handle(
+		"lesson-player:place-clear-all",
+		progressRoute(async (_owner, store) => {
+			await store.clearAll(() => undefined);
+			return { status: "cleared-all" as const };
+		}),
+	);
 }

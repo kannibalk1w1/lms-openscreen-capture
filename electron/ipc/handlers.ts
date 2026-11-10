@@ -77,6 +77,7 @@ import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
+import { PlayerProgressStore } from "../lesson/playerProgress";
 import { createLessonPlayerWindow } from "../lessonPlayerWindow";
 import {
 	DEFAULT_RECORDINGS_DIR,
@@ -5113,6 +5114,8 @@ export function registerIpcHandlers(
 	// Read-only lesson player: launched only from the editor; its own window owns its package.
 	registerLessonPlayerHandlers({
 		owners: lessonPlayerOwners,
+		// Learner-saved places, only on explicit Save/Clear; separate from authoring recovery copies.
+		progress: new PlayerProgressStore(path.join(app.getPath("userData"), "lesson-player-progress")),
 		isEditorFrame: (event) => editorRangeSessions.isEditorPage(event.sender),
 		openWindow: () => {
 			createLessonPlayerWindow();

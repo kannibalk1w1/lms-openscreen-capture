@@ -546,8 +546,33 @@
 				"invalid": "This folder is not a complete, unchanged lesson package, so nothing from it is shown.",
 				"cancelled": "Opening was cancelled.",
 				"unsupported": "Lesson packages can only be played on Linux for now.",
-				"toolUnavailable": "The video checking tool is not available, so the package cannot be opened."
-			}
+				"toolUnavailable": "The video checking tool is not available, so the package cannot be opened.",
+				"progressUnavailable": "Saved places can't be read or written on this computer right now. Nothing was changed. If this continues, Clear all saved places starts them afresh.",
+				"progressFull": "Saved places are full. Clear a saved place you no longer need, or clear all saved places, then save again.",
+				"progressCancelled": "The package was closed, so that saved-place action was not done."
+			},
+			"loop": "Loop step video",
+			"loopOn": "Loop on: this step's video repeats.",
+			"loopOff": "Loop off.",
+			"speedNow": "Playback speed {{speed}}×.",
+			"playPause": "Play or pause the step video",
+			"speedKeys": "Slower or faster playback",
+			"shortcuts": "Keyboard shortcuts",
+			"shortcutsScope": "Single keys, with no Ctrl, Alt or Cmd. They do nothing while you type in a field, use the speed list, or use the video's own controls.",
+			"place": "Saved place",
+			"placeScope": "Saved only when you press Save, and only on this computer: the step, video time, speed and loop for this exact package. It is a bookmark, not a record of learning.",
+			"save": "Save my place",
+			"restore": "Restore saved place",
+			"clearPlace": "Clear saved place",
+			"clearAll": "Clear all saved places",
+			"clearAllConfirm": "Clear every saved place for every lesson package on this computer? This cannot be undone.",
+			"placeSaved": "Place saved: step {{number}} at {{time}}.",
+			"placeRestored": "Restored: step {{number}} at {{time}}. Press play when ready.",
+			"placeNone": "No saved place for this package.",
+			"placeCleared": "Saved place cleared for this package.",
+			"placeAllCleared": "All saved places cleared.",
+			"placeIsSaved": "This place is saved.",
+			"placeNotSaved": "Your place is not saved."
 		}
 	}
 }

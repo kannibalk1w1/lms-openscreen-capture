@@ -8,6 +8,7 @@ import { LessonPlayer } from "./LessonPlayer";
 const token = "11111111-1111-4111-8111-111111111111";
 const view: LessonPlayerView = {
 	status: "opened",
+	token,
 	title: "Make a player move",
 	steps: [
 		{
@@ -221,4 +222,166 @@ it("hides Close package while another package is being opened; Cancel is the onl
 	await act(async () => finish({ success: true, result: { status: "cancelled" } }));
 	expect(screen.getByRole("button", { name: "Close package" })).toBeTruthy();
 	expect(bridge.close).not.toHaveBeenCalled();
+});
+
+const key = (target: Element, value: string, extra: Partial<KeyboardEventInit> = {}) =>
+	fireEvent.keyDown(target, { key: value, ...extra });
+
+it("loops the step video on request, announces it, and keeps loop and speed for later steps", async () => {
+	show(api());
+	await openPackage();
+	const loop = screen.getByRole("button", { name: "Loop step video" });
+	expect(loop.getAttribute("aria-pressed")).toBe("false");
+	fireEvent.click(loop);
+	expect(loop.getAttribute("aria-pressed")).toBe("true");
+	expect(videoElement().loop).toBe(true);
+	expect(screen.getByText("Loop on: this step's video repeats.")).toBeTruthy();
+	fireEvent.change(screen.getByLabelText(/Playback speed/), { target: { value: "1.25" } });
+	expect(screen.getByText("Playback speed 1.25×.")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Next step" }));
+	const next = videoElement();
+	fireEvent(next, new Event("loadedmetadata"));
+	expect(next.loop).toBe(true);
+	expect(next.playbackRate).toBe(1.25);
+	expect(play).not.toHaveBeenCalled();
+});
+
+it("offers documented single-key shortcuts that act from the step, never from fields, the video or with modifiers", async () => {
+	show(api());
+	await openPackage();
+	expect(screen.getByRole("heading", { name: "Keyboard shortcuts" })).toBeTruthy();
+	const heading = screen.getByRole("heading", { name: "Open the script" });
+	key(heading, "l");
+	expect(videoElement().loop).toBe(true);
+	key(heading, "]");
+	expect(videoElement().playbackRate).toBe(1.25);
+	key(heading, "[");
+	key(heading, "[");
+	expect(videoElement().playbackRate).toBe(0.75);
+	key(heading, "k");
+	expect(play).toHaveBeenCalledTimes(1);
+	key(heading, "r");
+	expect(play).toHaveBeenCalledTimes(2);
+	// Ignored: inside the speed list, on the video's own controls, and with Ctrl/Alt/Meta.
+	key(screen.getByLabelText(/Playback speed/), "n");
+	key(videoElement(), "n");
+	key(heading, "n", { ctrlKey: true });
+	key(heading, "n", { altKey: true });
+	key(heading, "n", { metaKey: true });
+	expect(screen.queryByText("Step 1 of 3")).not.toBeNull();
+	expect(screen.queryByText("Step 2 of 3")).toBeNull();
+	key(heading, "N");
+	expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+	expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Run the game" }));
+	expect(play).toHaveBeenCalledTimes(2);
+	key(document.activeElement!, "p");
+	expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+	// Shortcuts also work while a button has focus (letters do not press buttons).
+	const loopButton = screen.getByRole("button", { name: "Loop step video" });
+	const wasLooping = loopButton.getAttribute("aria-pressed");
+	key(loopButton, "l");
+	expect(loopButton.getAttribute("aria-pressed")).toBe(wasLooping === "true" ? "false" : "true");
+	expect(loopButton.getAttribute("aria-keyshortcuts")).toBe("L");
+});
+
+it("never saves a place on its own: only Save writes, and the status says whether the place is saved", async () => {
+	const savePlace = vi.fn(async () => ({
+		success: true as const,
+		result: { status: "saved" as const },
+	}));
+	const bridge = api({
+		savePlace,
+		restorePlace: vi.fn(),
+		clearPlace: vi.fn(),
+		clearAllPlaces: vi.fn(),
+	});
+	show(bridge);
+	await openPackage();
+	expect(screen.getByText("Your place is not saved.")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Next step" }));
+	fireEvent.click(screen.getByRole("button", { name: "Previous step" }));
+	key(screen.getByRole("heading", { name: "Open the script" }), "l");
+	expect(savePlace).not.toHaveBeenCalled();
+	const video = videoElement();
+	video.currentTime = 0.8;
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Save my place" }));
+	});
+	expect(savePlace).toHaveBeenCalledWith(view.token, {
+		stepId: view.steps[0].id,
+		timeSec: 0.8,
+		speed: 1,
+		loop: true,
+	});
+	expect(screen.getByText("Place saved: step 1 at 0:00.")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Loop step video" }));
+	expect(screen.getByText("Your place is not saved.")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Close package" }));
+	expect(savePlace).toHaveBeenCalledTimes(1);
+	expect(bridge.restorePlace).not.toHaveBeenCalled();
+});
+
+it("restores a saved place to its step, speed, loop and time without starting playback", async () => {
+	const restorePlace = vi.fn(async () => ({
+		success: true as const,
+		result: {
+			status: "restored" as const,
+			place: { stepId: view.steps[1].id, timeSec: 1.2, speed: 0.5, loop: true },
+		},
+	}));
+	show(api({ savePlace: vi.fn(), restorePlace, clearPlace: vi.fn(), clearAllPlaces: vi.fn() }));
+	await openPackage();
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Restore saved place" }));
+	});
+	expect(restorePlace).toHaveBeenCalledWith(view.token);
+	expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+	expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Run the game" }));
+	const video = videoElement();
+	Object.defineProperty(video, "duration", { value: 2, configurable: true });
+	fireEvent(video, new Event("loadedmetadata"));
+	expect(video.currentTime).toBe(1.2);
+	expect(video.playbackRate).toBe(0.5);
+	expect(video.loop).toBe(true);
+	expect(play).not.toHaveBeenCalled();
+	expect(screen.getByText("Restored: step 2 at 0:01. Press play when ready.")).toBeTruthy();
+});
+
+it("clears this package's place, asks before clearing all, and shows store errors plainly", async () => {
+	const clearPlace = vi.fn(async () => ({
+		success: true as const,
+		result: { status: "cleared" as const, removed: true },
+	}));
+	const clearAllPlaces = vi.fn(async () => ({
+		success: true as const,
+		result: { status: "cleared-all" as const },
+	}));
+	const restorePlace = vi.fn(async () => ({
+		success: false as const,
+		code: "lesson-progress-unavailable" as const,
+	}));
+	const confirm = vi.fn(() => false);
+	vi.stubGlobal("confirm", confirm);
+	show(api({ savePlace: vi.fn(), restorePlace, clearPlace, clearAllPlaces }));
+	await openPackage();
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Clear saved place" }));
+	});
+	expect(clearPlace).toHaveBeenCalledWith(view.token);
+	expect(screen.getByText("Saved place cleared for this package.")).toBeTruthy();
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Clear all saved places" }));
+	});
+	expect(confirm).toHaveBeenCalledTimes(1);
+	expect(clearAllPlaces).not.toHaveBeenCalled();
+	confirm.mockReturnValue(true);
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Clear all saved places" }));
+	});
+	expect(clearAllPlaces).toHaveBeenCalledTimes(1);
+	await act(async () => {
+		fireEvent.click(screen.getByRole("button", { name: "Restore saved place" }));
+	});
+	expect(screen.getByRole("alert").textContent).toMatch(/can't be read or written/);
+	vi.unstubAllGlobals();
 });
