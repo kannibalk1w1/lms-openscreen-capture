@@ -22,6 +22,11 @@ import { illustrateLessonStepFile, type LessonFrameRenderer } from "../lesson/fi
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import {
+	compareGodotCheckpointsFile,
+	GodotCheckpointFileError,
+	inspectGodotCheckpointsFile,
+} from "../lesson/godotCheckpointFile";
+import {
 	createLessonPackage,
 	LessonPackageError,
 	lessonPackageMessages,
@@ -41,6 +46,24 @@ export async function runLessonCommand(
 	} = {},
 ): Promise<number> {
 	try {
+		if (
+			command.action === "inspect-godot-checkpoints" ||
+			command.action === "compare-godot-checkpoints"
+		) {
+			const assertCurrent = () => options.signal?.throwIfAborted();
+			const result =
+				command.action === "inspect-godot-checkpoints"
+					? inspectGodotCheckpointsFile(command.request, assertCurrent)
+					: compareGodotCheckpointsFile(command.request, assertCurrent);
+			out(
+				JSON.stringify(
+					command.json ? { event: "done", result } : result,
+					null,
+					command.json ? undefined : 2,
+				) + "\n",
+			);
+			return 0;
+		}
 		if (command.action === "inspect-capture" || command.action === "import-capture") {
 			const result =
 				command.action === "inspect-capture"
@@ -184,7 +207,8 @@ export async function runLessonCommand(
 		const error =
 			failure instanceof LessonPackageError ||
 			failure instanceof LessonFileRangeError ||
-			failure instanceof ApplicationCaptureFileError
+			failure instanceof ApplicationCaptureFileError ||
+			failure instanceof GodotCheckpointFileError
 				? failure.code
 				: // Fixed codes only, such as a trimmed time; still no paths, payloads or raw errors.
 					command.action === "illustrate" && failure instanceof LessonOperationError

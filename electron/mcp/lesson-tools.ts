@@ -41,6 +41,7 @@ import {
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
+import { registerGodotCheckpointTools } from "./godot-checkpoint-tools";
 import { registerLessonPackageTools } from "./package-tools";
 
 export function registerLessonTools(
@@ -383,4 +384,5 @@ export function registerLessonTools(
 			}
 		},
 	);
+	registerGodotCheckpointTools(server, transport, editsAllowed);
 }

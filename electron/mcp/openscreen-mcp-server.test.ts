@@ -345,6 +345,8 @@ describe("the MCP tool surface", () => {
 			"illustrateLessonStep",
 			"inspectApplicationCaptureFile",
 			"draftLessonFromApplicationCapture",
+			"inspectGodotCheckpointsFile",
+			"compareGodotCheckpointsFile",
 		]);
 		for (const tool of tools.slice(1, 1 + OPENSCREEN_TOOL_NAMES.length)) {
 			expect(tool.description).toBe(TOOL_DESCRIPTIONS[tool.name]);

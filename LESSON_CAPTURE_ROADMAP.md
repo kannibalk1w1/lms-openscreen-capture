@@ -29,9 +29,10 @@ automatic clock synchronization, project checkpoint comparison/restoration and
 run-result verification remain open. [Selected-file CLI/MCP parity](lesson-capture/APPLICATION_CAPTURE_PARITY_2026-11-10.md)
 is [accepted by Claude](lesson-capture/CLAUDE_APPLICATION_CAPTURE_PARITY_REVIEW_BDA9F8D2_2026-11-10.md).
 [Within-take authored checkpoint comparison](lesson-capture/GODOT_CHECKPOINT_COMPARISON_2026-11-10.md)
-now has read-only review UI and real Windows frontend coverage, pending independent
-review. Next: original-file marker listing and fingerprint-bound comparison through
-read-only CLI/MCP tools. Earlier checkpoint/review entries below
+has [Claude acceptance](lesson-capture/CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW_5055A279_2026-11-10.md).
+[Read-only original-file marker listing and fingerprint-bound comparison through CLI/MCP](lesson-capture/GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md)
+are locally validated and awaiting review. Application-project checkpoints/restoration,
+retakes, broader editor/runtime diagnostics and physical acceptance remain open. Earlier checkpoint/review entries below
 retain their historical scope.
 
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).

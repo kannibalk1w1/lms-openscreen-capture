@@ -225,3 +225,24 @@ uses its existing filesystem ACLs. Fixed failure codes include
 `capture-file-unavailable`, `capture-file-invalid`, `capture-file-changed`,
 `capture-observation-invalid` and `lesson-file-operation-failed`; raw parser/file
 errors and payloads are omitted. See [implementation and exact validation](lesson-capture/APPLICATION_CAPTURE_PARITY_2026-11-10.md).
+
+## Original Godot checkpoint file tools
+
+```sh
+openscreen lesson inspect-godot-checkpoints ./scene.jsonl --offset 0 --limit 200 --json
+openscreen lesson compare-godot-checkpoints ./scene.jsonl --from 1 --to 6 --sha256 <inspection-hash> --json
+```
+
+Use the original raw journal. Inspection returns paginated authored marker record
+IDs/labels/source times and raw SHA-256; legacy v1 has zero markers. Comparison
+requires that exact fingerprint and two distinct raw record IDs, in your chosen
+direction. It returns sampled endpoint identities/counts/changed field names with
+an unmapped clock. No resources are loaded and no files are written. Numeric CLI
+options accept decimal digits only; duplicate/unknown flags are refused.
+
+MCP `inspectGodotCheckpointsFile({journalPath, offset?, limit?})` and
+`compareGodotCheckpointsFile({journalPath, fromRecordSequence, toRecordSequence,
+sha256})` require absolute server-local paths. Both are read-only; HTTP requires
+MCP edits before arbitrary-path reads and rechecks consent before returning data.
+Stdio uses explicit-launch read authority. Labels remain authored content, not
+completion proof. [Contracts, limits and validation](lesson-capture/GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md).

@@ -1,9 +1,28 @@
+# Godot checkpoint file tools awaiting review — 10 November 2026
+
+Claude [accepted 5055a279](CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW_5055A279_2026-11-10.md)
+with no findings. Root implemented original raw-file marker listing and exact-hash
+comparison via read-only CLI/MCP, supported by cheaper-worker service/test sketches.
+[Exact scope and evidence](GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md): 6,529 tests / 481 files,
+55 focused tests / 6 files, both TypeScript configs, Vite/lint35/i18n15/docs37, real production startup,
+15 real CLI/MCP parity checks and16 Node checks each on Linux/WinBoat Windows pass.
+No writes/project/resource loading, clock mapping or Windows Electron/native claim.
+
+Weekly meter 69% at 20:03 UTC, target roughly75%; player parked, main fd2775e2 and
+private remote unchanged. New v2 fixture is real disposable Windows Godot output.
+Review pending. A cheaper worker is preparing the next bounded capture slice only
+in /tmp/godot-spatial-capture-prototype: explicit Node3D transforms, with strict raw
+versioning and unchanged generic capture format. Not implemented in source yet.
+Remaining: application-project checkpoints/restore, retake handoff,
+broader editor/runtime diagnostics and physical acceptance. Source next steps should
+stay inside the owner's Godot capture priority and utilisation cap.
+
 # Godot checkpoint comparison awaiting review — 10 November 2026
 
 Claude [accepted bda9f8d2 capture parity](CLAUDE_APPLICATION_CAPTURE_PARITY_REVIEW_BDA9F8D2_2026-11-10.md)
 with no findings. Root integrated cheaper workers' pure comparison and review UI:
 [explicit From/To authored markers in one raw take](GODOT_CHECKPOINT_COMPARISON_2026-11-10.md).
-6,512 tests/478 files and61 final focused checks, bothTS, final Vite/lint35,
+6,512 tests/478 files and61 final focused checks, both TypeScript configs, final Vite/lint35,
 i18n15/docs37 and real headless startup pass. Real Linux/WinBoat Node each20checks;
 actual Windows Edge frontend16checks with only final saveIPC stubbed. No physical,
 packaged Windows Electron, restore/run/outcome claims. Old results/raw source clear

@@ -12,7 +12,7 @@ The same tools are served over two transports, by two different processes:
 | Edits, recording, export | Off until the user turns on **MCP edits** | Always allowed |
 | Project open in the editor | Edited live through the editor, one undo step per call | The same while the app runs: the call is forwarded to it. With no app answering, refused ([the marker](#the-open-in-editor-marker)) |
 | Other projects | Read from and saved to their file, a checkpoint first | Same |
-| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject`; explicit lesson tools `queryLessonFile`, `exportLessonGuide`, `confirmLessonRangeFile`, `createLessonFile`, `addLessonSteps`, `updateLessonStep`, `removeLessonStep`, `moveLessonStep`, `illustrateLessonStep`, `inspectApplicationCaptureFile`, `draftLessonFromApplicationCapture` | The same |
+| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject`; explicit lesson tools `queryLessonFile`, `exportLessonGuide`, `confirmLessonRangeFile`, `createLessonFile`, `addLessonSteps`, `updateLessonStep`, `removeLessonStep`, `moveLessonStep`, `illustrateLessonStep`, `inspectApplicationCaptureFile`, `draftLessonFromApplicationCapture`, `inspectGodotCheckpointsFile`, `compareGodotCheckpointsFile` | The same |
 | A take | Recorded by the app's recording bar, as its Record button records; the editor opens it ([below](#the-media-tools)) | Recorded by a hidden runner of its own process, and made a project there |
 | Checkpoints | In the app's memory, shared with forwarded `openscreen mcp` calls, lost when the app quits | In the app's while it runs; otherwise in this process's, lost when it exits, which it does when the client disconnects |
 
@@ -280,3 +280,10 @@ again before creating the file; SDK cancellation is checked at those boundaries.
 The original source is untouched. No resource paths are loaded, no provider starts,
 and independent application timestamps stay unmapped. Both tools reuse the shared
 file service; [command contracts and limits](../../LESSON_CAPTURE_COMMANDS.md#application-capture-inspection-and-selected-drafts).
+
+`inspectGodotCheckpointsFile` and `compareGodotCheckpointsFile` add read-only access
+to explicit original Godot journals. Listing returns marker IDs and raw SHA-256;
+comparison requires that fingerprint and two distinct marker record IDs. HTTP
+permission gates precede reads and returning data; stdio keeps explicit-launch
+read authority. No project/resource file is loaded and no file is written. Results
+are sampled endpoint observations, with an unmapped clock. See [file-tool scope](../../lesson-capture/GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md).

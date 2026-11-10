@@ -10,6 +10,7 @@ import {
 // unit-tested under plain vitest.
 
 import path from "node:path";
+import type { z } from "zod";
 import {
 	CAPTION_WORDS_PER_LINE_MAX,
 	CAPTION_WORDS_PER_LINE_MIN,
@@ -53,8 +54,20 @@ import {
 	type ConfirmLessonFileRangeRequest,
 	confirmLessonFileRangeSchema,
 } from "../lesson/fileRangeContracts";
+import {
+	compareGodotCheckpointsFileSchema,
+	inspectGodotCheckpointsFileSchema,
+} from "../lesson/godotCheckpointContracts";
 
 export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
+	| {
+			action: "inspect-godot-checkpoints";
+			request: z.infer<typeof inspectGodotCheckpointsFileSchema>;
+	  }
+	| {
+			action: "compare-godot-checkpoints";
+			request: z.infer<typeof compareGodotCheckpointsFileSchema>;
+	  }
 	| { action: "package"; request: CreateLessonPackageRequest }
 	| { action: "verify-package"; directory: string }
 	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
@@ -147,6 +160,10 @@ Usage:
   openscreen captions <project.openscreen>           Transcribe (on-device Whisper) and turn captions on
                      [--min-words <1-12>] [--max-words <1-12>]
   openscreen info <project.openscreen> [--json]      Inspect a project file
+  openscreen lesson inspect-godot-checkpoints <journal.jsonl> [--offset <n>] [--limit <n>] [--json]
+                            List authored raw marker records and exact source SHA-256
+  openscreen lesson compare-godot-checkpoints <journal.jsonl> --from <record> --to <record> --sha256 <inspection-hash> [--json]
+                            Read-only sampled endpoint comparison within one original take
   openscreen lesson inspect-capture <capture.json|journal.jsonl> [--json] [--offset <n>] [--limit <n>]
                             Inspect one selected capture; returns bounded labels and raw SHA-256, never payloads
   openscreen lesson import-capture <capture.json|journal.jsonl> --out <new-lesson.json> --title <text> --sha256 <inspect-hash> --observation <id> [--observation <id> ...] [--json]
@@ -663,6 +680,49 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+	if (action === "inspect-godot-checkpoints" || action === "compare-godot-checkpoints") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit raw Godot journal");
+		const journalPath = resolvePath(file, cwd),
+			values: Record<string, string> = {};
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			const allowed =
+				action === "inspect-godot-checkpoints"
+					? ["--offset", "--limit"]
+					: ["--from", "--to", "--sha256"];
+			if (!allowed.includes(flag) || flag in values)
+				throw new Error("Unexpected Godot checkpoint option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		const number = (value: string | undefined, fallback?: number) =>
+			value === undefined ? fallback : /^\d{1,4}$/.test(value) ? Number(value) : NaN;
+		if (action === "inspect-godot-checkpoints") {
+			const result = inspectGodotCheckpointsFileSchema.safeParse({
+				journalPath,
+				offset: number(values["--offset"], 0),
+				limit: number(values["--limit"], 200),
+			});
+			if (!result.success) throw new Error("Choose a valid checkpoint offset/limit");
+			return { kind: "lesson", action, manifestPath: journalPath, request: result.data, json };
+		}
+		const result = compareGodotCheckpointsFileSchema.safeParse({
+			journalPath,
+			fromRecordSequence: number(values["--from"]),
+			toRecordSequence: number(values["--to"]),
+			sha256: values["--sha256"],
+		});
+		if (!result.success)
+			throw new Error("Choose two distinct checkpoint records and the inspected SHA-256");
+		return { kind: "lesson", action, manifestPath: journalPath, request: result.data, json };
+	}
+
 	if (action === "inspect-capture" || action === "import-capture") {
 		if (!file || file.startsWith("-"))
 			throw new Error("Choose one explicit application capture file");

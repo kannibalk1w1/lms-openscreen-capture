@@ -1,0 +1,102 @@
+import { createHash } from "node:crypto";
+import {
+	compareGodotSceneCheckpoints,
+	listGodotSceneCheckpoints,
+	MAX_SCENE_JOURNAL_BYTES,
+} from "../../src/lib/applicationIntegrations/godotScene";
+import {
+	compareGodotCheckpointsFileSchema,
+	inspectGodotCheckpointsFileSchema,
+} from "./godotCheckpointContracts";
+import { readSelectedFileSnapshot } from "./selectedFile";
+
+export class GodotCheckpointFileError extends Error {
+	constructor(
+		readonly code:
+			| "invalid-request"
+			| "capture-file-unavailable"
+			| "capture-file-invalid"
+			| "capture-file-changed"
+			| "checkpoint-invalid",
+	) {
+		super(code);
+	}
+}
+function snapshot(journalPath: string) {
+	try {
+		return readSelectedFileSnapshot(journalPath, MAX_SCENE_JOURNAL_BYTES).bytes;
+	} catch {
+		throw new GodotCheckpointFileError("capture-file-unavailable");
+	}
+}
+const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+function text(bytes: Uint8Array) {
+	try {
+		return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+	} catch {
+		throw new GodotCheckpointFileError("capture-file-invalid");
+	}
+}
+/** Read-only metadata from one explicit raw journal; no resource paths are loaded. */
+export function inspectGodotCheckpointsFile(
+	input: unknown,
+	assertCurrent: () => void = () => undefined,
+) {
+	const parsed = inspectGodotCheckpointsFileSchema.safeParse(input);
+	if (!parsed.success) throw new GodotCheckpointFileError("invalid-request");
+	const request = parsed.data;
+	assertCurrent();
+	const bytes = snapshot(request.journalPath),
+		source = text(bytes);
+	let checkpoints;
+	try {
+		checkpoints = listGodotSceneCheckpoints(source);
+	} catch {
+		throw new GodotCheckpointFileError("capture-file-invalid");
+	}
+	assertCurrent();
+	return {
+		format: "openscreen-godot-checkpoint-inspection" as const,
+		version: 1 as const,
+		sha256: digest(bytes),
+		adapterId: "godot-scene" as const,
+		clock: "unmapped" as const,
+		checkpointCount: checkpoints.length,
+		checkpoints: checkpoints.slice(request.offset, request.offset + request.limit),
+		nextOffset:
+			request.offset + request.limit < checkpoints.length ? request.offset + request.limit : null,
+	};
+}
+/** Fingerprint-bound endpoint comparison; no files are created or changed. */
+export function compareGodotCheckpointsFile(
+	input: unknown,
+	assertCurrent: () => void = () => undefined,
+) {
+	const parsed = compareGodotCheckpointsFileSchema.safeParse(input);
+	if (!parsed.success) throw new GodotCheckpointFileError("invalid-request");
+	const request = parsed.data;
+	assertCurrent();
+	const bytes = snapshot(request.journalPath),
+		sha256 = digest(bytes);
+	if (sha256 !== request.sha256) throw new GodotCheckpointFileError("capture-file-changed");
+	const source = text(bytes);
+	let comparison;
+	try {
+		comparison = compareGodotSceneCheckpoints(
+			source,
+			request.fromRecordSequence,
+			request.toRecordSequence,
+		);
+	} catch {
+		throw new GodotCheckpointFileError("checkpoint-invalid");
+	}
+	assertCurrent();
+	return {
+		format: "openscreen-godot-checkpoint-comparison" as const,
+		version: 1 as const,
+		sha256,
+		adapterId: "godot-scene" as const,
+		clock: "unmapped" as const,
+		comparison,
+	};
+}
