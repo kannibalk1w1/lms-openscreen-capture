@@ -64,7 +64,7 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
 
 - **Main** is `fd2775e2`, unchanged.
 - **Private feature branch** `lesson-capture/input-boundaries` was pushed by the coordinator
-  at `139b9046`.
+  at `139b9046`; subsequent Opus integration/lifetime work is accepted as described below and the coordinator owns its checkpoint push.
 - **Independently reviewed:** everything through review 41 and its follow-up. Fable's 13 slices
   were reviewed in the [independent review](lesson-capture/FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md),
   which found M42-1; the [follow-up review](lesson-capture/M42_FIX_INDEPENDENT_FOLLOWUP_REVIEW_2026-11-10.md)

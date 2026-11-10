@@ -1,3 +1,31 @@
+# Accepted Opus lifetime checkpoint and approved player scope — 10 November 2026
+
+Actual [independent follow-up](OPUS_LIFETIME_FIX_INDEPENDENT_REVIEW_2026-11-10.md)
+accepts exact3e3785da0dde7ac7e908624b0d0624890e928cf2, implementation
+0c73895bbcc7eb90ba0571167c4d0344ef3248db, against51e46e44. R1/R2 CLOSED;
+no new High/Medium. Independent178committed focused tests plus8own passing
+regressions, both TS,Vite,real foreign-cwd CLI/SDKstdio startup and4actual-app
+cases pass;6assertion controls and1semantic DOM control support closure.
+Worker full6321/461 belongs to0c73895b. Source/evidence/addon/report manifests
+remain unchanged. New LowL1: stale new-copy request can still show a picker after
+async image validation, but writes/grants nothing; fix in next narrow slice.
+
+User explicitly approved D3(b) on10November: project-free read-only inspection/
+playback for explicitly picked packages. Create/copy/reseal retain existing
+project-bound authoring checks. No automatic recovery, Windows enablement or
+media-contract changes were approved. Player plan is still plan-only: slice0
+owner-bound project-free capability, then slice1 bounded media access. P1/P2 are
+addressed by unique per-owner ephemeral sessions, exclusive frames, final buffered
+identity checks, aggregate budgets and owned-resource revocation.
+
+Coordinator saves/pushes accepted work, then Opus continues as sole writer on
+LowL1 and authorized player prerequisites. Fable stopped; main staysfd2775e2.
+Preserve every original report/rawsource/userreport. Exact pending decisions and
+broader physical/audio/platform limits remain in current roadmap; no review count
+or mocked picker proof extends to real hardware.
+
+## Historical Opus takeover checkpoint
+
 # Opus takeover and accepted illustration fix — 10 November 2026
 
 The user explicitly requested Fable write a handover and Opus pick up and act.
