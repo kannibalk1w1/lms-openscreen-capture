@@ -41,7 +41,8 @@ Each state carries `connections` (sorted, unique, at most 256) and `excludedConn
 - **Counted, not described** (`excludedConnections`): persistent connections into an
   observed node whose source is outside the observed set (a non-owned/instanced node, a
   resource, another object), whose callable is custom other than an exact method bind
-  (`unbind`, `bind().unbind()`, a lambda created by the target, bound or not), or whose
+  (`unbind`, `bind().unbind()`, a lambda created by the target, bound or not, and nested
+  binds such as `bind(1).bind(2)`, which do not equal a single rebuilt bind), or whose
   names are unsupported.
 - **Not seen**: connections from an observed node to an unobserved target (only incoming
   connections of observed nodes are enumerated), and non-persistent runtime connections.
@@ -117,4 +118,8 @@ lambda recorded as a method), F4 (`bind().unbind()` recorded), L1/L2 test gaps, 
 The follow-up commit: F1 shortened label segments plus a maximal-name import test; F2 cap
 256 and keyed sort (11 ms measured); F3/F4 exact-bind equality and zero unbound
 arguments, both as real probe canaries; L1 identity tests for every key field; L2 real
-limit take (a GDScript mutation removing the equality guard fails the real probe; removing the unbound-count guard survives because equality already rejects `bind().unbind()` — kept as defence in depth); N1/N4 documented above; N2 producer cap; N3 messages. Awaiting recheck.
+limit take (a GDScript mutation removing the equality guard fails the real probe; removing the unbound-count guard survives because equality already rejects `bind().unbind()` — kept as defence in depth); N1/N4 documented above; N2 producer cap; N3 messages. The [recheck of `e5521683`](CLAUDE_GODOT_SIGNAL_CONNECTIONS_RECHECK_E5521683_2026-11-10.md)
+**accepts it with Lows**: L1 (nested binds are counted, not recorded) is now documented
+above; N1 label shortening now works on code points; N2 — the decoder cap of 256 refuses
+any v5 journal from the unreleased `e0786f0f` build with more than 256 connections. The
+only such journals are this run's probe evidence, all far below that.

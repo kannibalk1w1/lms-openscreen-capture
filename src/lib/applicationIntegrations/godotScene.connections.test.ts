@@ -209,3 +209,14 @@ describe("rejects malformed, out-of-scope or cross-version connections", () => {
 		).toThrow(/signal connections/);
 	});
 });
+
+it("shortens labels on code points, never splitting an emoji", () => {
+	const emoji = { ...sceneNode("2", `${"a".repeat(46)}😀😀😀`, "1") };
+	const nodes = [root, emoji, hitbox];
+	const journal = parseGodotSceneJournal(
+		sceneSource(take([state([], 0, nodes), state([timeout], 0, nodes)])),
+	);
+	const label = journal.observations[0].label;
+	expect(label).toContain(`${"a".repeat(46)}😀…`);
+	expect(label).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+});
