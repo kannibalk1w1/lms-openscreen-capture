@@ -1,3 +1,14 @@
+# Godot capture and WinBoat follow-up — 10 November 2026
+
+The owner requested continued Godot capture, Windows testing through WinBoat and
+reuse for other programs. Root's [Windows/reuse report](GODOT_CAPTURE_WINDOWS_REUSE_2026-11-10.md)
+records signal-assisted scoped sampling, the application-neutral offline format,
+shared review/drafts, real Linux and WinBoat Windows 11 editor/API probes, cross-OS
+reopen and 6,443 passing tests. [Adapter contract](APPLICATION_CAPTURE_CONTRACT.md).
+No real MCreator/Roblox adapter or physical Windows/video capture acceptance is
+claimed. Local checkpoint only; not independently reviewed/pushed. Player parked.
+Next: explicit application-neutral recording association with pause/gap handling.
+
 # Current owner direction — deeper Godot integration, 10 November 2026
 
 The learner-player proof of concept is parked. Root Codex owns implementation;

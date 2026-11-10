@@ -85,6 +85,12 @@ See [scope, workflow and exact evidence](../../LESSON_CAPTURE_CLOCK_BRIDGE.md).
 The same addon now has a separate **Capture scene actions** control. It starts
 off and asks for current-scene permission and a new journal file. Review its
 bounded hierarchy/selection/2D transform/resource observations in **Lesson guide →
-Godot scene observations**, then turn explicitly selected observations into draft
+Application capture observations**, then turn explicitly selected observations into draft
 steps. Typing and read-only clock capture remain independent. See the
 [workflow, privacy, evidence and limits](../../LESSON_CAPTURE_GODOT_SCENES.md).
+
+Scene observations now use editor signals plus 250 ms fallback polling. Only the
+allowlisted current-scene state is sampled, with a 50 ms minimum interval between
+signal-requested samples. Sampling observers disconnect on stop/disable/scope
+change. Godot 4.7.1 real editor/API probes pass on Linux and WinBoat Windows 11;
+see [exact Windows coverage](../../lesson-capture/GODOT_CAPTURE_WINDOWS_REUSE_2026-11-10.md).

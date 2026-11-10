@@ -4,7 +4,9 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
-const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "godot-scene-probe-"));
+const fixture = fs.mkdtempSync(
+	path.join(process.env.OPENSCREEN_SCENE_PROBE_TMP || os.tmpdir(), "godot-scene-probe-"),
+);
 fs.cpSync(path.join(root, "integrations/godot-typing/addons"), path.join(fixture, "addons"), {
 	recursive: true,
 });
@@ -70,6 +72,11 @@ for (const canary of [
 	if (journal.includes(canary)) throw new Error(`Out-of-scope content: ${canary}`);
 }
 const records = journal.trim().split("\n").map(JSON.parse);
+if (
+	!records.some((entry) => entry.trigger === "selection" && entry.atMs < 250) ||
+	!records.some((entry) => entry.trigger === "inspector")
+)
+	throw new Error("Missing rapid selection/Inspector sampling evidence");
 if (records.at(-1).reason !== "scene-changed") throw new Error("Missing scope-change footer");
 const disabled = fs
 	.readFileSync(path.join(fixture, "disable.jsonl"), "utf8")
@@ -97,14 +104,15 @@ for (const name of ["record-limit.jsonl", "byte-limit.jsonl"]) {
 }
 
 // Exercise the production decoder offline, after Godot has exited.
-const decoderPath = path.join(fixture, "decoder.cjs");
-require("esbuild").buildSync({
-	entryPoints: [path.join(root, "src/lib/applicationIntegrations/godotScene.ts")],
-	bundle: true,
-	platform: "node",
-	format: "cjs",
-	outfile: decoderPath,
-});
+const decoderPath = process.env.OPENSCREEN_SCENE_DECODER || path.join(fixture, "decoder.cjs");
+if (!process.env.OPENSCREEN_SCENE_DECODER)
+	require("esbuild").buildSync({
+		entryPoints: [path.join(root, "scripts/godot-scene-probe-decoder.ts")],
+		bundle: true,
+		platform: "node",
+		format: "cjs",
+		outfile: decoderPath,
+	});
 const { parseGodotSceneJournal } = require(decoderPath);
 const decoded = parseGodotSceneJournal(journal);
 const kinds = new Set(decoded.observations.map((entry) => entry.type));
@@ -135,3 +143,40 @@ fs.writeFileSync(path.join(fixture, "offline-review.json"), JSON.stringify(decod
 console.log(
 	`OFFLINE_DECODER_PASSED: ${decoded.observations.length} observations; both limited journals and disable journal valid; incomplete journal rejected`,
 );
+async function provePortableAuthoring() {
+	const {
+		godotSceneCapture,
+		parseApplicationCapture,
+		appendApplicationDrafts,
+		newLesson,
+		parseLesson,
+	} = require(decoderPath);
+	const normalized = godotSceneCapture(decoded);
+	const reopenedCapture = parseApplicationCapture(JSON.stringify(normalized));
+	const chosen = reopenedCapture.observations.find((entry) => entry.type === "node-changed");
+	if (!chosen) throw new Error("Missing draft observation");
+	const lesson = appendApplicationDrafts(
+		newLesson("Disposable Godot scene proof"),
+		reopenedCapture,
+		[chosen.id],
+	);
+	const reopened = await parseLesson(JSON.stringify(lesson));
+	if (
+		reopened.steps.length !== 1 ||
+		reopened.steps[0].evidence[0].application.adapterId !== "godot-scene" ||
+		reopened.steps[0].evidence[0].clock !== "unmapped"
+	)
+		throw new Error("Offline authoring lost evidence identity");
+	fs.writeFileSync(
+		path.join(fixture, "normalized-capture.json"),
+		JSON.stringify(normalized, null, 2),
+	);
+	fs.writeFileSync(path.join(fixture, "lesson.json"), JSON.stringify(reopened, null, 2));
+	console.log(
+		"PORTABLE_AUTHORING_PASSED: normalized evidence and selected draft lesson reopen without Godot",
+	);
+}
+provePortableAuthoring().catch((error) => {
+	console.error(error);
+	process.exitCode = 1;
+});

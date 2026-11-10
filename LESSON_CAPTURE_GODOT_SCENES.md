@@ -12,8 +12,8 @@ request. Deeper Godot integration is the current priority.
    confirmation and choose a **new** `.jsonl` file. Cancelling leaves capture off.
 3. Demonstrate scene edits. Stop with **Stop scene capture**. Switching/closing the
    scene or disabling the plugin ends the take. Each new take needs explicit start.
-4. In OpenScreen's **Lesson guide**, expand **Godot scene observations** and choose
-   **Import Godot scene journal**. Review the baseline and before/after evidence.
+4. In OpenScreen's **Lesson guide**, expand **Application capture observations** and choose
+   **Import application capture or Godot journal**. Review the baseline and before/after evidence.
 5. Select the observations that matter and choose **Add selected observations as
    draft steps**. Edit their titles/instructions, choose illustrations/media through
    the existing authoring controls, review and save the lesson normally.
@@ -25,8 +25,12 @@ observations work with Godot absent and all live integrations disabled.
 
 ## What the evidence means
 
-The addon samples current-scene state every **250 ms**, deduplicating unchanged
-snapshots. A starting snapshot provides context; it does not assert those nodes
+The addon now samples on public scene-tree/selection/Inspector signals with a
+50 ms minimum spacing, plus **250 ms fallback polling**, deduplicating unchanged
+snapshots. Inspector requests are limited to the current scene and the same
+property allowlist. Observers connect only for an explicitly started take and
+disconnect on stop/scope change/disable/write failure. Signal names are retained as
+`samplingTrigger` context; they do not prove which action caused a state change. A starting snapshot provides context; it does not assert those nodes
 were created during this take. The offline decoder compares later snapshots to
 report nodes appearing/disappearing, names/parents/properties changing and selection
 changes. A separate public editor signal records scene saves. The addon uses the public
@@ -98,10 +102,12 @@ the failure status survives and that its incomplete journal is rejected. The ret
 small journal in `integrations/godot-typing/probes/fixtures/scene.jsonl` is parsed by
 committed tests. The fixture is synthetic, not a recording of a real lesson project.
 
-This is Godot **4.7.1 on Linux**, headless editor/API coverage. The dummy renderer
+The original slice was Godot **4.7.1 on Linux**, headless editor/API coverage.
+The follow-up also passes in WinBoat Windows 11; see the
+[Windows and reuse validation](lesson-capture/GODOT_CAPTURE_WINDOWS_REUSE_2026-11-10.md). The dummy renderer
 reports a thumbnail warning when saving the scene; thumbnail rendering is not
 part of this proof. It does not establish physical Inspector/mouse/picker input,
-Windows/macOS, real screen recording, audio, or accessibility acceptance.
+macOS, real screen recording, audio, or accessibility acceptance.
 
 Next: explicit semantic-to-recording clock association with pause/gap handling,
 then a lesson-oriented Enemy/Sprite2D/asset/scale/save/script/run walkthrough and
@@ -110,3 +116,6 @@ need separate field-level scope and validation. No generated action wording or
 video synchronization should be inferred from the sampled journal alone.
 
 Validation: [6,437 tests, real Godot probe and exact scope](lesson-capture/GODOT_SCENES_VALIDATION_2026-11-10.md).
+
+The shared offline review and draft path now accepts a bounded application-neutral
+format; [adapter recipe and contract](lesson-capture/APPLICATION_CAPTURE_CONTRACT.md).

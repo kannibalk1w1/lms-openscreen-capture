@@ -17,6 +17,8 @@ var _session := ""
 var _instance := Crypto.new().generate_random_bytes(16).hex_encode()
 var _previous := ""
 var _limited := false
+var _pending_trigger := ""
+var _scene_tree: SceneTree
 
 func active() -> bool:
 	return _file != null
@@ -48,9 +50,11 @@ func begin(path: String, root: Node, editor: EditorInterface) -> bool:
 	_sequence = 0
 	_session = "godot-scene-" + Crypto.new().generate_random_bytes(16).hex_encode()
 	_previous = JSON.stringify(state)
+	_pending_trigger = ""
 	_write({"event": "scene-start", "producer": "godot-scene", "scene": _resource_path(root.scene_file_path), "state": state, "intervalMs": INTERVAL_MS})
 	if active():
-		status_changed.emit("Scene capture on · sampled every 250 ms · " + path.get_file())
+		_connect_observers()
+		status_changed.emit("Scene capture on · signals + 250 ms polling · " + path.get_file())
 	return active()
 
 func poll() -> void:
@@ -63,9 +67,11 @@ func poll() -> void:
 	if now - _started >= 86400000:
 		_limited = true
 		stop("limit", false)
-	elif now - _last_poll >= INTERVAL_MS:
+	elif (not _pending_trigger.is_empty() and now - _last_poll >= 50) or now - _last_poll >= INTERVAL_MS:
+		var trigger := _pending_trigger if not _pending_trigger.is_empty() else "poll"
+		_pending_trigger = ""
 		_last_poll = now
-		_sample()
+		_sample(trigger)
 
 func scene_changed(root: Node) -> void:
 	if active() and root != _root:
@@ -73,14 +79,15 @@ func scene_changed(root: Node) -> void:
 
 func saved(path: String) -> void:
 	if active() and is_instance_valid(_root) and _editor.get_edited_scene_root() == _root and _root.scene_file_path == path:
-		_sample()
+		_sample("save")
 		_write({"event": "scene-saved", "scene": _resource_path(path)})
 
 func stop(reason: String = "user-stop", final_sample: bool = true) -> void:
 	if not active():
 		return
+	_disconnect_observers()
 	if final_sample and is_instance_valid(_root) and _editor.get_edited_scene_root() == _root:
-		_sample()
+		_sample("stop")
 	if active():
 		_write({"event": "scene-stop", "reason": reason, "coverage": "limited" if _limited else "sampled"})
 		# A footer write error already emits failure; never replace it with Saved.
@@ -91,7 +98,7 @@ func stop(reason: String = "user-stop", final_sample: bool = true) -> void:
 	_editor = null
 	_previous = ""
 
-func _sample() -> void:
+func _sample(trigger: String = "poll") -> void:
 	var state := _snapshot()
 	if _limited:
 		stop("limit", false)
@@ -99,7 +106,43 @@ func _sample() -> void:
 	var serialized := JSON.stringify(state)
 	if serialized != _previous:
 		_previous = serialized
-		_write({"event": "scene-state", "state": state})
+		_write({"event": "scene-state", "state": state, "trigger": trigger})
+
+func _connect_observers() -> void:
+	_editor.get_selection().selection_changed.connect(_selection_changed)
+	_editor.get_inspector().property_edited.connect(_property_edited)
+	_scene_tree = _root.get_tree()
+	_scene_tree.tree_changed.connect(_tree_changed)
+
+func _disconnect_observers() -> void:
+	if is_instance_valid(_editor):
+		var selection := _editor.get_selection()
+		if selection.selection_changed.is_connected(_selection_changed):
+			selection.selection_changed.disconnect(_selection_changed)
+		var inspector := _editor.get_inspector()
+		if inspector.property_edited.is_connected(_property_edited):
+			inspector.property_edited.disconnect(_property_edited)
+	if is_instance_valid(_scene_tree) and _scene_tree.tree_changed.is_connected(_tree_changed):
+		_scene_tree.tree_changed.disconnect(_tree_changed)
+	_scene_tree = null
+	_pending_trigger = ""
+
+func _selection_changed() -> void:
+	if active():
+		_pending_trigger = "selection"
+
+func _tree_changed() -> void:
+	if active() and _pending_trigger.is_empty():
+		_pending_trigger = "tree"
+
+func _property_edited(property: String) -> void:
+	if not active() or not is_instance_valid(_root):
+		return
+	var target := _editor.get_inspector().get_edited_object()
+	if not target is Node or (target != _root and (target.owner != _root or not _root.is_ancestor_of(target))):
+		return
+	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture"):
+		_pending_trigger = "inspector"
 
 func _snapshot() -> Dictionary:
 	var nodes: Array = []
@@ -171,6 +214,7 @@ func _write(payload: Dictionary) -> void:
 	_file.flush()
 	_sequence += 1
 	if _file.get_error() != OK:
+		_disconnect_observers()
 		_file = null
 		_root = null
 		_editor = null

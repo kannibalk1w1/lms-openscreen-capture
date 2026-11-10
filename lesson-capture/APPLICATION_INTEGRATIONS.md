@@ -129,3 +129,12 @@ continuous clock mapping, checkpoint comparison or semantic CLI/MCP commands. Th
 remain follow-ups. The real disposable Godot editor probe and strict malformed
 import/offline regressions cover this subset; they do not replace the broader
 physical/privacy acceptance matrix above.
+
+## Shared offline capture boundary — 10 November follow-up
+
+[The implemented neutral format and adapter recipe](APPLICATION_CAPTURE_CONTRACT.md)
+now separate Godot decoding from review and draft authoring. Synthetic non-Godot
+evidence uses those same controls without an application installation. Godot
+sampling now also responds to bounded editor signals; observers connect only
+during explicitly started takes. [WinBoat Windows 11 and Linux validation](GODOT_CAPTURE_WINDOWS_REUSE_2026-11-10.md)
+exercise real editor APIs and offline authoring, not physical UI or video capture.

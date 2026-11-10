@@ -137,7 +137,7 @@ func _enter_tree() -> void:
 			if not is_instance_valid(_pending_scene):
 				_scene_status.text = "Open a scene first"
 				return
-			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Samples every 250 ms; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync.\n\nContinue to choose a new journal file." % _pending_scene.name
+			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Uses editor signals plus 250 ms polling; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync.\n\nContinue to choose a new journal file." % _pending_scene.name
 			_scene_confirm.popup_centered(Vector2i(640, 300))
 	)
 	_bar.add_child(_scene_button)

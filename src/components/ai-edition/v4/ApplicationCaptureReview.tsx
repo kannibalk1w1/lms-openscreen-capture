@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useScopedT } from "@/contexts/I18nContext";
 import {
-	type GodotSceneJournal,
-	MAX_SCENE_JOURNAL_BYTES,
-	parseGodotSceneJournal,
-} from "@/lib/applicationIntegrations/godotScene";
-import { appendSceneDrafts } from "@/lib/lesson/sceneDraft";
+	type ApplicationCapture,
+	MAX_APPLICATION_CAPTURE_BYTES,
+} from "@/lib/applicationIntegrations/capture";
+import { importApplicationCapture } from "@/lib/applicationIntegrations/importCapture";
+import { appendApplicationDrafts } from "@/lib/lesson/applicationDraft";
 import type { LessonManifest } from "@/lib/lesson/schema";
 
-export function GodotSceneReview({
+export function ApplicationCaptureReview({
 	lesson,
 	onAppend,
 }: {
@@ -16,7 +16,7 @@ export function GodotSceneReview({
 	onAppend: (next: LessonManifest) => void;
 }) {
 	const t = useScopedT("timeline");
-	const [journal, setJournal] = useState<GodotSceneJournal | null>(null);
+	const [journal, setJournal] = useState<ApplicationCapture | null>(null);
 	const [selected, setSelected] = useState<string[]>([]);
 	const [page, setPage] = useState(0);
 	const [busy, setBusy] = useState(false);
@@ -36,8 +36,8 @@ export function GodotSceneReview({
 		setSelected([]);
 		setMessage("");
 		try {
-			if (file.size > MAX_SCENE_JOURNAL_BYTES) throw new Error("limit");
-			const parsed = parseGodotSceneJournal(await file.text());
+			if (file.size > MAX_APPLICATION_CAPTURE_BYTES) throw new Error("limit");
+			const parsed = importApplicationCapture(await file.text());
 			if (current !== epoch.current) return;
 			setJournal(parsed);
 			setPage(0);
@@ -55,7 +55,7 @@ export function GodotSceneReview({
 				{t("lesson.scene.import")}
 				<input
 					type="file"
-					accept=".jsonl,.ndjson"
+					accept=".json,.jsonl,.ndjson"
 					disabled={busy}
 					onChange={(event) => {
 						const file = event.target.files?.[0];
@@ -71,13 +71,13 @@ export function GodotSceneReview({
 				<>
 					<p>
 						{t("lesson.scene.inventory", {
-							scene: journal.scene,
+							scene: journal.scope,
+							adapter: journal.adapterId,
 							count: journal.observations.length,
-							nodes: journal.baseline.nodes.length,
 							duration: journal.durationMs,
 						})}
 					</p>
-					<p>{t("lesson.scene.unverified")}</p>
+					<p>{t("lesson.scene.unverified", { interval: journal.pollIntervalMs })}</p>
 					{journal.coverage === "limited" && <p role="alert">{t("lesson.scene.limited")}</p>}
 					<details>
 						<summary>{t("lesson.scene.baseline")}</summary>
@@ -106,7 +106,7 @@ export function GodotSceneReview({
 						disabled={!selected.length || selected.length + lesson.steps.length > 200}
 						onClick={() => {
 							try {
-								onAppend(appendSceneDrafts(lesson, journal, selected));
+								onAppend(appendApplicationDrafts(lesson, journal, selected));
 								setSelected([]);
 								setMessage(t("lesson.scene.appended"));
 							} catch {

@@ -18,7 +18,9 @@ Application presets and adapter enablement are separate.
 **Current owner direction — 10 November:** park the learner-player proof of concept
 and prioritize deeper Godot integration. The first [bounded scene-observation
 slice](LESSON_CAPTURE_GODOT_SCENES.md) adds explicit capture, offline review and
-selected evidence-backed lesson drafts. These changes are locally validated,
+selected evidence-backed lesson drafts. A follow-up adds signal-assisted sampling,
+[shared application capture/review/drafting](lesson-capture/APPLICATION_CAPTURE_CONTRACT.md)
+and a real WinBoat Windows 11 editor/API probe. These changes are locally validated,
 not independently reviewed or pushed. Next: explicit semantic/recording clock
 association with pause/gap handling. Earlier checkpoint/review entries below
 retain their historical scope.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type ApplicationCapture, validateApplicationCapture } from "./capture";
 
 type JsonValue = z.infer<ReturnType<typeof z.json>>;
 
@@ -60,7 +61,13 @@ const recordSchema = z.discriminatedUnion("event", [
 			intervalMs: z.literal(250),
 		})
 		.strict(),
-	envelope.extend({ event: z.literal("scene-state"), state: stateSchema }).strict(),
+	envelope
+		.extend({
+			event: z.literal("scene-state"),
+			state: stateSchema,
+			trigger: z.enum(["poll", "selection", "inspector", "tree", "save", "stop"]).optional(),
+		})
+		.strict(),
 	envelope.extend({ event: z.literal("scene-saved"), scene: resourcePath }).strict(),
 	envelope
 		.extend({
@@ -149,7 +156,10 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 				atMs: record.atMs,
 				type,
 				label,
-				payload,
+				payload:
+					record.event === "scene-state" && record.trigger
+						? { ...(payload as Record<string, JsonValue>), samplingTrigger: record.trigger }
+						: payload,
 			});
 		};
 		if (record.event === "scene-state") {
@@ -206,4 +216,23 @@ function describeNodeChange(before: SceneNode, after: SceneNode): string {
 			changes.push(key);
 	}
 	return `Node changed: ${after.name} (${changes.join(", ") || "properties"})`;
+}
+
+/** Adapter-specific scene shape ends here; downstream authoring is application neutral. */
+export function godotSceneCapture(journal: GodotSceneJournal): ApplicationCapture {
+	return validateApplicationCapture({
+		format: "openscreen-application-capture",
+		version: 1,
+		adapterId: journal.adapterId,
+		instanceId: journal.instanceId,
+		sessionId: journal.sessionId,
+		scope: journal.scene,
+		clock: journal.clock,
+		coverage: journal.coverage,
+		stopReason: journal.stopReason,
+		pollIntervalMs: 250,
+		durationMs: journal.durationMs,
+		baseline: journal.baseline,
+		observations: journal.observations,
+	});
 }

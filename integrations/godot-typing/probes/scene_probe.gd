@@ -45,8 +45,19 @@ func _probe() -> void:
 		return
 	var root := editor.get_edited_scene_root()
 	root.set_meta("private", "PRIVATE_METADATA_CANARY")
+	editor.get_selection().clear()
+	await _wait()
 	if not _require(capture.begin("res://scene.jsonl", root, editor), "explicit start"):
 		return
+	# A short-lived selection must reach the signal path before the 250 ms fallback.
+	editor.get_selection().clear()
+	editor.get_selection().add_node(root)
+	await get_tree().create_timer(0.09).timeout
+	await get_tree().process_frame
+	if not _require(capture.get("_sequence") >= 2, "rapid selection signal sampled"):
+		return
+	editor.get_selection().clear()
+	await get_tree().create_timer(0.09).timeout
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite2D"
 	root.add_child(sprite)
@@ -60,6 +71,15 @@ func _probe() -> void:
 	editor.get_selection().clear()
 	editor.get_selection().add_node(sprite)
 	await _wait()
+	editor.edit_node(sprite)
+	await _wait()
+	var prior_sequence: int = capture.get("_sequence")
+	sprite.rotation = 0.125
+	editor.get_inspector().property_edited.emit("rotation")
+	await get_tree().create_timer(0.09).timeout
+	await get_tree().process_frame
+	if not _require(capture.get("_sequence") > prior_sequence, "Inspector signal sampled"):
+		return
 	var holder := Node2D.new()
 	holder.name = "Container"
 	root.add_child(holder)
@@ -74,6 +94,12 @@ func _probe() -> void:
 	editor.open_scene_from_path("res://other.tscn")
 	await _wait()
 	if not _require(not capture.active(), "scene switch stopped capture"):
+		return
+	if not _require(not editor.get_selection().selection_changed.is_connected(capture._selection_changed), "selection observer disconnected"):
+		return
+	if not _require(not editor.get_inspector().property_edited.is_connected(capture._property_edited), "Inspector observer disconnected"):
+		return
+	if not _require(not get_tree().tree_changed.is_connected(capture._tree_changed), "tree observer disconnected"):
 		return
 	var original := FileAccess.get_file_as_string("res://scene.jsonl")
 	if not _require(not capture.begin("res://scene.jsonl", editor.get_edited_scene_root(), editor), "existing file refused"):

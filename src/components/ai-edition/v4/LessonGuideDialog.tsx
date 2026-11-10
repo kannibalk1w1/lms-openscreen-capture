@@ -41,7 +41,7 @@ import {
 	validateLessonImage,
 } from "@/lib/lesson/schema";
 import { setLessonUnsavedWork } from "@/lib/lesson/unsavedWork";
-import { GodotSceneReview } from "./GodotSceneReview";
+import { ApplicationCaptureReview } from "./ApplicationCaptureReview";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
 import { LessonPackagePanel } from "./LessonPackagePanel";
@@ -390,7 +390,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						}}
 					/>
 
-					<GodotSceneReview
+					<ApplicationCaptureReview
 						key={`${projectId}:${lesson.id}`}
 						lesson={lesson}
 						onAppend={(next) => {
