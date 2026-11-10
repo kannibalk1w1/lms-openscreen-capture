@@ -485,3 +485,103 @@ owner, Windows hardware or a person at a real desktop. The one item left on the
 "could continue" list, GIF and PNG step outputs and the 1280 px cap, changes accepted render
 and package contracts and should be designed with a reviewer first. No new usage limit was
 hit after the second one recorded above.
+
+## M42-1 fix (10 November 2026), after the independent review
+
+The reviewer's report is committed unchanged as `672d2c01`
+(`FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md`, SHA256 `2aac5a3d…9b64fe`).
+Fix commit: **`9355933a505c8c57df247174ec8e4b4858c19bec`**. Evidence:
+`../openscreen-evaluation/fable-m42-fix-2026-11-10T0339Z/`. This fix is my own work and awaits the reviewer's
+verification. No other roadmap work was done.
+
+### What the still renderer can read, and what happens to each now
+
+| Input | Where it comes from | Now |
+| --- | --- | --- |
+| Screen source of each clip | `asset.originalPath` → `clip.screenPath` | Must be named in `sourcePaths`, absolute, and not reached through a symlink (unchanged) |
+| Webcam video | `asset.cameraTrack.sourcePath` → `clip.webcamPath` | Refused |
+| Image background | any wallpaper that is not a colour or gradient → `scene.background.path` | Refused, including the app's own bundled wallpapers |
+| Image annotation | `document.annotations` of type image → `imagePath` (a path or a data URI) | Refused |
+| Added audio tracks | `document.audioTracks` → `scene.audioTracks[].path` | Refused |
+| Click sound files | `scene.clickSound.downPath/upPath` | Refused. Main-built scenes do not produce this today; the guard is pinned on the scene |
+| Webcam effect | `scene.webcamEffect` (segmentation model, optional background image) | Refused |
+| Recorded cursor file | `<screen source>.cursor.json`, which the native walk opens by convention | Refused if it exists beside a granted source |
+| Cursor theme sprites, SVG annotation styles | app-bundled assets chosen by a theme or style ID | Allowed, as in range export; not user files |
+| Custom cursors | inline PNG data URLs in the project | Allowed; no file |
+| Text annotation fonts | a family name mapped to shipped fonts | Allowed; no path |
+
+### How
+
+- `electron/lesson/renderDependencies.ts` (new) holds the one predicate. `prepareLessonRangeMedia`
+  now calls it instead of its inline copy, so range export and illustration share one rule;
+  range export's behaviour is unchanged.
+- `electron/lesson/fileIllustrate.ts`, in order: the existing pinned reads of the selected lesson
+  and project; build the clip list and scene from those bytes; **refuse by kind**; check every
+  screen source against the grant; canonical check and cursor-file check on granted sources
+  only; then render through a wrapper that re-checks the exact native arguments (granted
+  screens only, no other dependency) immediately before the native call.
+- Nothing is granted implicitly, relinked, substituted or stripped. Destination, consent
+  before file access, cancellation, connection lifetime and native ownership are untouched.
+  The editor's own "Illustrate from current saved playhead" and ordinary rendering are
+  unchanged.
+- New fixed code `illustration-unsupported`. The CLI prints it with a fixed `detail` sentence;
+  MCP returns `illustration-unsupported: <the same sentence>`. Neither names a path.
+- L42-1: `electron/ipc/lesson.test.ts` pins that no file grant is issued when the file on disk
+  differs from the lesson the window was given (K6). The sender check for the unsaved-work
+  flag moved, unchanged in behaviour, into `electron/lesson/unsavedWorkFlag.ts` with a test (K11).
+- L42-2: the reload/crash loss of Lesson guide work is now stated in the roadmap's current
+  status paragraph. No autosave was added.
+
+### Commands and results
+
+| Check | Result |
+| --- | --- |
+| `npx vitest --run electron/lesson electron/cli electron/mcp electron/ipc/lesson.test.ts electron/ipc/lessonRangeExport.test.ts src/lib/lesson` | 834 tests / 53 files pass, 0 skipped |
+| New cases: service 14 (6 single dependencies, 2 combinations, kind inventory, ordering, 2 renderer-boundary cases; 2 existing fixtures given a plain background), CLI 7, MCP 8, K6 1, K11 1 | all pass |
+| Full suite, `npm run test -- --maxWorkers=4` | 6,290 tests / 460 files pass, 0 skipped |
+| `npx tsc --noEmit`; `npx tsc -p tsconfig.test.json --noEmit`; `npm run lint`; `npm run i18n:check`; `npm run docs:check` | pass; pass; 35 baseline; pass; OK |
+| `npx vite build`; required startup smoke from a foreign cwd with hints cleared | pass; `success: true` |
+| 14 single-guard controls in a fresh `git archive` snapshot plus working files, SHA-checked restore (`controls/controls.json`, `controls.py`) | **14 killed by assertions**, none by a compile error: each of the six dependency kinds on its own; refusal before the grant check; the boundary's dependency check; the boundary's screen-grant check; the cursor-file check; range export's use of the predicate; K6; K11 sender; K11 destroyed editor |
+
+### Real proof on the final build (`real-proof/`)
+
+Production build whose `main.js` hash is in `build-hashes.txt`, run from a foreign working
+directory under Xvfb with no decoder or `APP_ROOT` hint. Only `screen.mp4` was granted. The
+canaries were real files: a solid red `private/SECRET_BG.jpg`, `private/SECRET_CAMERA.mp4` and a
+red `private/SECRET_NOTE.png`.
+
+| Route | Project | Result |
+| --- | --- | --- |
+| CLI `lesson illustrate` | image background; webcam; image annotation; all three | `illustration-unsupported` with the fixed detail, four times; no output file |
+| CLI | screen-only, white background, 1:1 | saved; 640×640 JPEG whose corner pixel is (255, 255, 255) |
+| stdio MCP `illustrateLessonStep` | the same five projects | the same four refusals with no output, and one saved lesson |
+| Inputs | lesson, five projects, source and three canaries | every SHA256 unchanged after all runs |
+
+**Refusal before reading.** A small inotify watcher (`watch.py`) recorded file opens and reads
+in the work directory and `private/` during a real CLI run (`file-access-watch.log`). During
+the refused all-three run only `lesson.json` and the project file were opened; `screen.mp4` and
+every file under `private/` were not. During the allowed screen-only run `screen.mp4` was opened
+and read, which shows the watcher sees renderer reads.
+
+**Two things I got wrong on the way and corrected.**
+- I first recorded access times as evidence. `/tmp` is mounted `noatime`, so they prove
+  nothing; the inotify log replaces them. The atime files are kept and should be ignored.
+- The proof clip's own picture contains red, so "red pixels in the frame" is not a canary
+  test. The background corner pixel is the discriminator, as in the reviewer's reproduction.
+- A cleanup glob in my driver failed, so the first watched screen-only run hit its own
+  leftover output file and reported `lesson-file-operation-failed`; the log keeps that run and
+  the clean rerun that follows it.
+
+### Limits
+
+- Headless illustration now refuses projects with the **default bundled wallpaper**, because
+  any image background is refused. That matches range export. A new project made in the
+  editor therefore needs a colour or gradient background before `illustrate` or
+  `export-range` will accept it.
+- The refusal names the supported subset, not which dependency was found.
+- Linux, Xvfb, software rendering, a synthetic clip. The GUI illustration path was not changed
+  and not re-tested.
+- The two review nits (file mode after same-file save; unique step IDs in the GUI package
+  request) are not addressed, as instructed.
+
+Stopped here for the reviewer. No other work was started.
