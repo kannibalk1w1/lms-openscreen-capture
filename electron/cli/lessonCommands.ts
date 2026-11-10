@@ -23,6 +23,7 @@ import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import {
 	compareGodotCheckpointsFile,
+	compareGodotReferenceFile,
 	GodotCheckpointFileError,
 	inspectGodotCheckpointsFile,
 } from "../lesson/godotCheckpointFile";
@@ -48,13 +49,16 @@ export async function runLessonCommand(
 	try {
 		if (
 			command.action === "inspect-godot-checkpoints" ||
-			command.action === "compare-godot-checkpoints"
+			command.action === "compare-godot-checkpoints" ||
+			command.action === "compare-godot-reference"
 		) {
 			const assertCurrent = () => options.signal?.throwIfAborted();
 			const result =
 				command.action === "inspect-godot-checkpoints"
 					? inspectGodotCheckpointsFile(command.request, assertCurrent)
-					: compareGodotCheckpointsFile(command.request, assertCurrent);
+					: command.action === "compare-godot-checkpoints"
+						? compareGodotCheckpointsFile(command.request, assertCurrent)
+						: compareGodotReferenceFile(command.request, assertCurrent);
 			out(
 				JSON.stringify(
 					command.json ? { event: "done", result } : result,

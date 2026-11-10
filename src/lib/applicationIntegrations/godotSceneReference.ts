@@ -37,6 +37,19 @@ const FIELDS = [
 	"rotation3",
 	"scale3",
 ] as const;
+/**
+ * The only fields an explicit tolerance applies to: continuous transform properties.
+ * Names, types, resource paths, visibility, path identity, connection flags and counts are
+ * always compared exactly.
+ */
+const CONTINUOUS = new Set<string>([
+	"position",
+	"rotation",
+	"scale",
+	"position3",
+	"rotation3",
+	"scale3",
+]);
 /** v1/v2 journals never recorded Node3D transforms or Node3D visibility. */
 const LEGACY_UNRECORDED = ["visible", "position3", "rotation3", "scale3"] as const;
 type Field = (typeof FIELDS)[number] | "name";
@@ -79,7 +92,19 @@ export type GodotReferenceComparison = {
 	kind: "advisory-sampled-state-comparison";
 	reference: GodotReferenceSource;
 	candidate: GodotReferenceSource;
-	numbers: { mode: "exact" } | { mode: "absolute-tolerance"; tolerance: number };
+	/** Tolerance, when given, applies only to continuous transform properties. */
+	numbers:
+		| { mode: "exact" }
+		| {
+				mode: "absolute-tolerance";
+				tolerance: number;
+				appliesTo: "continuous-transform-properties";
+		  };
+	/**
+	 * Same take (same session and adapter instance) or even the same checkpoint record.
+	 * Agreement then is a consistency check of one recording, not independent confirmation.
+	 */
+	relation: { sameTake: boolean; sameCheckpoint: boolean };
 	outcome: "sampled-fields-agree" | "sampled-fields-differ" | "partial-no-observed-difference";
 	unknowns: Unknown[];
 	counts: {
@@ -263,7 +288,11 @@ export function compareGodotCheckpointToReference(
 		const fields = compared.filter(
 			(field) =>
 				!unobservable.has(field) &&
-				!sameValue(fieldValue(node, field), fieldValue(other, field), tolerance),
+				!sameValue(
+					fieldValue(node, field),
+					fieldValue(other, field),
+					CONTINUOUS.has(field) ? tolerance : 0,
+				),
 		);
 		const unobservedFields = compared.filter((field) => unobservable.has(field));
 		if (unobservedFields.length) unknowns.add("node3d-fields-unobserved");
@@ -345,7 +374,19 @@ export function compareGodotCheckpointToReference(
 		kind: "advisory-sampled-state-comparison",
 		reference: describe(reference),
 		candidate: describe(candidate),
-		numbers: tolerance === 0 ? { mode: "exact" } : { mode: "absolute-tolerance", tolerance },
+		numbers:
+			tolerance === 0
+				? { mode: "exact" }
+				: { mode: "absolute-tolerance", tolerance, appliesTo: "continuous-transform-properties" },
+		relation: {
+			sameTake:
+				reference.sessionId === candidate.sessionId &&
+				reference.instanceId === candidate.instanceId,
+			sameCheckpoint:
+				reference.sessionId === candidate.sessionId &&
+				reference.instanceId === candidate.instanceId &&
+				reference.checkpoint.recordSequence === candidate.checkpoint.recordSequence,
+		},
 		outcome: differs
 			? "sampled-fields-differ"
 			: unknowns.size

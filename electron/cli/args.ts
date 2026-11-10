@@ -56,6 +56,7 @@ import {
 } from "../lesson/fileRangeContracts";
 import {
 	compareGodotCheckpointsFileSchema,
+	compareGodotReferenceFileSchema,
 	inspectGodotCheckpointsFileSchema,
 } from "../lesson/godotCheckpointContracts";
 
@@ -67,6 +68,13 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| {
 			action: "compare-godot-checkpoints";
 			request: z.infer<typeof compareGodotCheckpointsFileSchema>;
+	  }
+	| {
+			kind: "lesson";
+			action: "compare-godot-reference";
+			manifestPath: string;
+			request: z.infer<typeof compareGodotReferenceFileSchema>;
+			json: boolean;
 	  }
 	| { action: "package"; request: CreateLessonPackageRequest }
 	| { action: "verify-package"; directory: string }
@@ -164,6 +172,8 @@ Usage:
                             List authored raw marker records and exact source SHA-256
   openscreen lesson compare-godot-checkpoints <journal.jsonl> --from <record> --to <record> --sha256 <inspection-hash> [--json]
                             Read-only sampled endpoint comparison within one original take
+  openscreen lesson compare-godot-reference <reference.jsonl> --reference-record <record> --reference-sha256 <hash> --candidate <candidate.jsonl> --candidate-record <record> --candidate-sha256 <hash> [--tolerance <0-1>] [--json]
+                            Advisory cross-take comparison by node path; exact unless a tolerance is given
   openscreen lesson inspect-capture <capture.json|journal.jsonl> [--json] [--offset <n>] [--limit <n>]
                             Inspect one selected capture; returns bounded labels and raw SHA-256, never payloads
   openscreen lesson import-capture <capture.json|journal.jsonl> --out <new-lesson.json> --title <text> --sha256 <inspect-hash> --observation <id> [--observation <id> ...] [--json]
@@ -721,6 +731,60 @@ function parseLessonCommand(args: string[], cwd: string): CliCommand {
 		if (!result.success)
 			throw new Error("Choose two distinct checkpoint records and the inspected SHA-256");
 		return { kind: "lesson", action, manifestPath: journalPath, request: result.data, json };
+	}
+
+	if (action === "compare-godot-reference") {
+		if (!file || file.startsWith("-"))
+			throw new Error("Choose an explicit reference Godot journal");
+		const values: Record<string, string> = {};
+		let json = false;
+		const allowed = [
+			"--reference-record",
+			"--reference-sha256",
+			"--candidate",
+			"--candidate-record",
+			"--candidate-sha256",
+			"--tolerance",
+		];
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (!allowed.includes(flag) || flag in values)
+				throw new Error("Unexpected Godot reference option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		const record = (value: string | undefined) =>
+			value !== undefined && /^\d{1,4}$/.test(value) ? Number(value) : NaN;
+		const tolerance = values["--tolerance"];
+		if (
+			tolerance !== undefined &&
+			!/^(?:0|1|0?\.\d{1,12}|\d(?:\.\d{1,12})?e-\d{1,2})$/.test(tolerance)
+		)
+			throw new Error("Choose a tolerance between 0 and 1");
+		const candidate = values["--candidate"];
+		const referencePath = resolvePath(file, cwd);
+		const result = compareGodotReferenceFileSchema.safeParse({
+			referencePath,
+			referenceSha256: values["--reference-sha256"],
+			referenceRecordSequence: record(values["--reference-record"]),
+			candidatePath:
+				candidate === undefined || candidate.startsWith("-")
+					? undefined
+					: resolvePath(candidate, cwd),
+			candidateSha256: values["--candidate-sha256"],
+			candidateRecordSequence: record(values["--candidate-record"]),
+			...(tolerance === undefined ? {} : { tolerance: Number(tolerance) }),
+		});
+		if (!result.success)
+			throw new Error(
+				"Choose both explicit journals, their checkpoint records and inspected SHA-256 hashes",
+			);
+		return { kind: "lesson", action, manifestPath: referencePath, request: result.data, json };
 	}
 
 	if (action === "inspect-capture" || action === "import-capture") {

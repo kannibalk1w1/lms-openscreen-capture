@@ -1,10 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
 	compareGodotCheckpointsFileSchema,
+	compareGodotReferenceFileSchema,
 	inspectGodotCheckpointsFileSchema,
 } from "../lesson/godotCheckpointContracts";
 import {
 	compareGodotCheckpointsFile,
+	compareGodotReferenceFile,
 	GodotCheckpointFileError,
 	inspectGodotCheckpointsFile,
 } from "../lesson/godotCheckpointFile";
@@ -56,6 +58,31 @@ export function registerGodotCheckpointTools(
 			if (transport === "http" && !editsAllowed()) return failure(refused);
 			try {
 				const result = compareGodotCheckpointsFile(args, () => {
+					extra.signal.throwIfAborted();
+					if (transport === "http" && !editsAllowed()) throw new Error("consent_required");
+				});
+				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+			} catch (error) {
+				if (transport === "http" && !editsAllowed()) return failure(refused);
+				if (extra.signal.aborted) return failure("cancelled");
+				return failure(
+					error instanceof GodotCheckpointFileError ? error.code : "capture-file-operation-failed",
+				);
+			}
+		},
+	);
+	server.registerTool(
+		"compareGodotReferenceFile",
+		{
+			description:
+				"Advisory read-only comparison of one authored marker RECORD in a candidate original Godot scene journal against one in a reference journal (for example a retake against an earlier take; the same file is allowed). Each journal is bound to the exact raw SHA-256 from its own inspection. Nodes match by root-relative path only, never by session IDs; renamed/reparented nodes are unmatched paths. Numbers are exact unless an explicit tolerance (0-1) is given; resource paths compare as text and are never loaded. Outcome agree/differ/partial with unknowns (limited coverage, fields or connections a version could not record). Not expected-state verification, grading, runtime or render proof. No writes. HTTP requires MCP edits before reads; stdio uses explicit launch authority.",
+			inputSchema: compareGodotReferenceFileSchema,
+			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+		},
+		(args: unknown, extra) => {
+			if (transport === "http" && !editsAllowed()) return failure(refused);
+			try {
+				const result = compareGodotReferenceFile(args, () => {
 					extra.signal.throwIfAborted();
 					if (transport === "http" && !editsAllowed()) throw new Error("consent_required");
 				});

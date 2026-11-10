@@ -108,7 +108,11 @@ it("compares numbers exactly unless an explicit tolerance is given", () => {
 	]);
 	const loose = compare(reference, nearly, { tolerance: 0.001 });
 	expect(loose.counts.differing).toBe(0);
-	expect(loose.numbers).toEqual({ mode: "absolute-tolerance", tolerance: 0.001 });
+	expect(loose.numbers).toEqual({
+		mode: "absolute-tolerance",
+		tolerance: 0.001,
+		appliesTo: "continuous-transform-properties",
+	});
 	for (const bad of [-1, 2, Number.NaN, Number.POSITIVE_INFINITY])
 		expect(() => compare(reference, reference, { tolerance: bad })).toThrow(/tolerance/);
 });
@@ -542,5 +546,64 @@ describe("review 0777440c follow-up", () => {
 		);
 		expect(result.truncated).toEqual(["connectionsReferenceOnly"]);
 		expect(result.connections).toMatchObject({ candidateOnly: [{ method: "c0" }] });
+	});
+	it("never lets the maximum tolerance soften discrete fields or connection metadata", () => {
+		const v5 = (
+			offset: number,
+			sprite: Record<string, unknown>,
+			extra: Record<string, unknown>,
+		): State => ({
+			...enemy(offset, sprite),
+			connections: [
+				{
+					signal: "renamed",
+					from: String(2 + offset),
+					to: String(1 + offset),
+					method: "_on_renamed",
+					boundArgs: 0,
+					deferred: false,
+					oneShot: false,
+					...extra,
+				},
+			],
+			excludedConnections: 0,
+		});
+		const reference = take([v5(0, {}, {})], { version: 5 });
+		for (const extra of [{ boundArgs: 1 }, { deferred: true }, { oneShot: true }]) {
+			const result = compare(reference, take([v5(100, {}, extra)], { version: 5, session: "c" }), {
+				tolerance: 1,
+			});
+			expect(result.outcome).toBe("sampled-fields-differ");
+			expect(result.counts.connectionsCandidateOnly).toBe(1);
+		}
+		const discrete = compare(
+			reference,
+			take([v5(100, { visible: false, script: null, position: [12.5, 24.5] }, {})], {
+				version: 5,
+				session: "c",
+			}),
+			{ tolerance: 1 },
+		);
+		expect(discrete.differing).toEqual([{ path: ["Sprite2D"], fields: ["script", "visible"] }]);
+		const typed = v5(100, {}, {});
+		typed.nodes[1] = { ...typed.nodes[1], type: "AnimatedSprite2D" };
+		expect(
+			compare(reference, take([typed], { version: 5, session: "c" }), { tolerance: 1 }).differing,
+		).toEqual([{ path: ["Sprite2D"], fields: ["type"] }]);
+	});
+	it("labels same-take and same-checkpoint comparisons as not independent", () => {
+		const source = take([enemy(0), enemy(0)]);
+		expect(compareGodotCheckpointToReference(source, 1, source, 1).relation).toEqual({
+			sameTake: true,
+			sameCheckpoint: true,
+		});
+		expect(compareGodotCheckpointToReference(source, 1, source, 3).relation).toEqual({
+			sameTake: true,
+			sameCheckpoint: false,
+		});
+		expect(compare(source, take([enemy(100)], { session: "c" })).relation).toEqual({
+			sameTake: false,
+			sameCheckpoint: false,
+		});
 	});
 });

@@ -113,8 +113,70 @@ could yield a false `agree`. The follow-up commit:
 Mutants for the new guards are killed: version gate, position gate, prefix, row cap,
 partial, row detail, ambiguity and interned-key separator. The [recheck of `eff20dc1`](CLAUDE_GODOT_REFERENCE_COMPARISON_RECHECK_EFF20DC1_2026-11-10.md) **accepts** it with nits R-N1 (legacy candidate side), R-N2 (snapshot sequence) and R-N3 (independent connection-list truncation), all closed with mutation-checked tests in the next commit.
 
+## Library additions for the file tools
+
+- Tolerance now applies **only** to continuous transform properties (`position`,
+  `rotation`, `scale`, `position3`, `rotation3`, `scale3`). `numbers` records
+  `appliesTo: "continuous-transform-properties"`. Names, types, resource paths, visibility,
+  path identity, connection flags and bound-argument counts are always exact. A regression
+  test at tolerance 1 shows discrete differences still differ. The guard is currently
+  equivalent: every other node field is a string or boolean, and connections use exact keys.
+  It is kept so that any future numeric discrete field is not softened.
+- `relation: {sameTake, sameCheckpoint}`. Comparing a take with itself, or a checkpoint
+  with itself, is allowed, and agreement then is a consistency check of one recording,
+  **not independent confirmation**.
+
+## CLI and MCP file tools
+
+```
+openscreen lesson compare-godot-reference <reference.jsonl> --reference-record <n> --reference-sha256 <hash>
+    --candidate <candidate.jsonl> --candidate-record <n> --candidate-sha256 <hash> [--tolerance <0-1>] [--json]
+```
+
+MCP tool: `compareGodotReferenceFile` (read-only, non-destructive, closed-world annotations).
+Hashes come from `inspect-godot-checkpoints` / `inspectGodotCheckpointsFile` for each file.
+
+- Both complete descriptors (two absolute paths, two record sequences, two SHA-256 values,
+  optional tolerance) are validated before any read. Relative CLI paths resolve against the
+  CLI cwd. Unknown, repeated or missing options are refused.
+- HTTP MCP refuses without MCP edits before any read and rechecks consent before returning.
+  Stdio keeps explicit launch authority. The caller's currency/cancellation check runs
+  before the first read, between the two reads and before disclosure.
+- Each side is read once as a bounded snapshot (8 MiB). Only those bytes are fingerprinted
+  and compared. A mismatch rejects the whole request with `reference-file-changed` or
+  `candidate-file-changed`: no refresh, relinking, discovery or resource loading. A
+  second-source failure (missing, changed or invalid) returns only a fixed code, with
+  nothing from the first source.
+- Output: `openscreen-godot-reference-comparison` v1, `sameContent` (identical bytes), and
+  the library comparison with each source identity carrying its own `sha256`. All library
+  unknown, partial and truncation reasons and bounds are preserved. Paths are never
+  echoed; source files are never changed.
+
+Validation:
+
+- `electron/lesson/godotReferenceFile.test.ts` (19 tests) covers:
+  - the service on the real Linux and Windows takes, same file, hash binding per side,
+    invalid requests, missing files;
+  - cancellation before and between reads, second-source failure without disclosure,
+    tolerance pass-through;
+  - MCP read-only registration, HTTP denial before reads, revocation before return and
+    service parity;
+  - CLI relative cwd, tolerance syntax, refusals and fixed error codes.
+- Mutants killed: read-between currency check, same-checkpoint relation, `sameContent` and
+  per-side hash binding.
+- Real built Linux Electron run, CLI from the files' own cwd with relative names plus MCP
+  stdio, on the retained real takes: 15/15 checks.
+  - Agreement, and tolerance 1 still differing on paths.
+  - Both wrong-hash codes.
+  - CLI/MCP parity, same-file labelling, MCP fixed error, sources unchanged.
+- `scripts/smoke-headless-startup.cjs` passes.
+- Full suite: 6,639 pass and one fails, the positional tool-list assertion in
+  `applicationCaptureMcp.test.ts`, which the new tool shifted. After fixing it, `electron/mcp`
+  passes 223/223.
+
+Evidence: `../openscreen-evaluation/godot-reference-comparison-2026-11-10/`.
+
 ## Next
 
-Independent review of this immutable commit, then CLI/MCP file tools. Those tools must
-bind **both** explicit sources to inspected SHA-256 hashes and keep the existing
-permission-before-read gates.
+Independent review of the file-tool commit; then return to the remaining roadmap (project
+checkpoint archive/restore, retakes/handoff, physical acceptance).

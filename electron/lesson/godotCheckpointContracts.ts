@@ -22,3 +22,18 @@ export const compareGodotCheckpointsFileSchema = z
 		(value) => value.fromRecordSequence !== value.toRecordSequence,
 		"Choose distinct checkpoint records",
 	);
+
+const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+/** Two explicit raw journals (possibly the same file), each bound to its inspected hash. */
+export const compareGodotReferenceFileSchema = z
+	.object({
+		referencePath: journalPath,
+		referenceSha256: sha256,
+		referenceRecordSequence: sequence,
+		candidatePath: journalPath,
+		candidateSha256: sha256,
+		candidateRecordSequence: sequence,
+		/** Absolute numeric tolerance; omitted means exact comparison. */
+		tolerance: z.number().finite().min(0).max(1).optional(),
+	})
+	.strict();
