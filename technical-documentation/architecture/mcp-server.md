@@ -12,7 +12,7 @@ The same tools are served over two transports, by two different processes:
 | Edits, recording, export | Off until the user turns on **MCP edits** | Always allowed |
 | Project open in the editor | Edited live through the editor, one undo step per call | The same while the app runs: the call is forwarded to it. With no app answering, refused ([the marker](#the-open-in-editor-marker)) |
 | Other projects | Read from and saved to their file, a checkpoint first | Same |
-| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject`; explicit lesson tools `queryLessonFile`, `exportLessonGuide`, `confirmLessonRangeFile`, `createLessonFile`, `addLessonSteps`, `updateLessonStep`, `removeLessonStep`, `moveLessonStep`, `illustrateLessonStep` | The same |
+| Tools | `listProjects`, the agent's tools, `transcribe`, the project tools (`setProjectInfo`, `importMedia`, `removeMedia`), the checkpoint tools, and the media tools: `listSources`, `startRecording`, `stopRecording`, `setPointerTrack`, `exportVideo`, `exportAudio`, `getFrames`, `createProject`; explicit lesson tools `queryLessonFile`, `exportLessonGuide`, `confirmLessonRangeFile`, `createLessonFile`, `addLessonSteps`, `updateLessonStep`, `removeLessonStep`, `moveLessonStep`, `illustrateLessonStep`, `inspectApplicationCaptureFile`, `draftLessonFromApplicationCapture` | The same |
 | A take | Recorded by the app's recording bar, as its Record button records; the editor opens it ([below](#the-media-tools)) | Recorded by a hidden runner of its own process, and made a project there |
 | Checkpoints | In the app's memory, shared with forwarded `openscreen mcp` calls, lost when the app quits | In the app's while it runs; otherwise in this process's, lost when it exits, which it does when the client disconnects |
 
@@ -268,3 +268,15 @@ no automatic relinking, migration or discovery. Query stays redacted. Request/st
 disconnects abort the appropriate new file-work lifetime; stdio drains that work
 before exit. This tool does not render video or create timing/decode receipts.
 See [the bounded prerequisite and remaining native export plan](../../lesson-capture/HEADLESS_RANGE_CONFIRMATION_2026-11-09.md).
+
+## Selected application capture files
+
+`inspectApplicationCaptureFile` reads one explicit normalized capture or Godot scene
+journal and returns paginated labels/IDs and the raw SHA-256, without baseline or
+payloads. HTTP requires MCP edits before reads; stdio uses explicit-launch authority.
+`draftLessonFromApplicationCapture` requires 1–200 explicit IDs, that exact inspected
+hash and a new absolute output path. Write consent is checked before reads and
+again before creating the file; SDK cancellation is checked at those boundaries.
+The original source is untouched. No resource paths are loaded, no provider starts,
+and independent application timestamps stay unmapped. Both tools reuse the shared
+file service; [command contracts and limits](../../LESSON_CAPTURE_COMMANDS.md#application-capture-inspection-and-selected-drafts).

@@ -27,6 +27,12 @@ import {
 } from "../../src/lib/exporter/types";
 import { type LessonQuery, lessonQuerySchema } from "../../src/lib/lesson/review";
 import {
+	type DraftApplicationCaptureFileRequest,
+	draftApplicationCaptureFileSchema,
+	type InspectApplicationCaptureFileRequest,
+	inspectApplicationCaptureFileSchema,
+} from "../lesson/applicationCaptureContracts";
+import {
 	type AddLessonStepsFileRequest,
 	addLessonStepsFileSchema,
 	type CreateLessonFileRequest,
@@ -53,6 +59,8 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "verify-package"; directory: string }
 	| { action: "confirm-range"; request: ConfirmLessonFileRangeRequest }
 	| { action: "export-range"; request: ExportLessonRangeFileRequest }
+	| { action: "inspect-capture"; request: InspectApplicationCaptureFileRequest }
+	| { action: "import-capture"; request: DraftApplicationCaptureFileRequest }
 	| { action: "new"; request: CreateLessonFileRequest }
 	| { action: "add-step"; request: AddLessonStepsFileRequest }
 	| { action: "illustrate"; request: IllustrateLessonStepFileRequest }
@@ -139,6 +147,10 @@ Usage:
   openscreen captions <project.openscreen>           Transcribe (on-device Whisper) and turn captions on
                      [--min-words <1-12>] [--max-words <1-12>]
   openscreen info <project.openscreen> [--json]      Inspect a project file
+  openscreen lesson inspect-capture <capture.json|journal.jsonl> [--json] [--offset <n>] [--limit <n>]
+                            Inspect one selected capture; returns bounded labels and raw SHA-256, never payloads
+  openscreen lesson import-capture <capture.json|journal.jsonl> --out <new-lesson.json> --title <text> --sha256 <inspect-hash> --observation <id> [--observation <id> ...] [--json]
+                            Create a new draft lesson from selected observations; source stays unchanged
   openscreen lesson new <new-lesson.json> --title <text> [--lesson-ref <LMS lesson label>] [--json]
                             Create a new empty editable lesson; never replaces a file
   openscreen lesson add-step <lesson.json> --title <text> [--instructions <text>] [--slide-ref <LMS slide label>]
@@ -651,6 +663,58 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+	if (action === "inspect-capture" || action === "import-capture") {
+		if (!file || file.startsWith("-"))
+			throw new Error("Choose one explicit application capture file");
+		const capturePath = resolvePath(file, cwd),
+			values: Record<string, string> = {},
+			observationIds: string[] = [];
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (action === "import-capture" && flag === "--observation") {
+				const [id, next] = takeValue(args, i, flag);
+				i = next;
+				observationIds.push(id);
+				continue;
+			}
+			const allowed =
+				action === "inspect-capture" ? ["--offset", "--limit"] : ["--out", "--title", "--sha256"];
+			if (!allowed.includes(flag) || flag in values)
+				throw new Error("Unexpected application capture option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		if (action === "inspect-capture") {
+			const parsed = inspectApplicationCaptureFileSchema.safeParse({
+				capturePath,
+				offset: Number(values["--offset"] ?? 0),
+				limit: Number(values["--limit"] ?? 200),
+			});
+			if (!parsed.success)
+				throw new Error(
+					"lesson inspect-capture accepts an explicit capture and a bounded offset/limit",
+				);
+			return { kind: "lesson", action, manifestPath: capturePath, request: parsed.data, json };
+		}
+		const parsed = draftApplicationCaptureFileSchema.safeParse({
+			capturePath,
+			outputPath: values["--out"] === undefined ? undefined : resolvePath(values["--out"], cwd),
+			title: values["--title"],
+			sha256: values["--sha256"],
+			observationIds,
+		});
+		if (!parsed.success)
+			throw new Error(
+				"lesson import-capture requires --out, --title, --sha256 and 1–200 unique --observation IDs",
+			);
+		return { kind: "lesson", action, manifestPath: capturePath, request: parsed.data, json };
+	}
 
 	if (action === "illustrate") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");

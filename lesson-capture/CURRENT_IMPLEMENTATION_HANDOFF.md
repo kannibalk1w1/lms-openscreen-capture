@@ -1,3 +1,22 @@
+# Application capture CLI/MCP parity awaiting review — 10 November 2026
+
+Claude [accepted d4682b4f and closed C1](CLAUDE_GODOT_CHECKPOINT_RECHECK_D4682B4F_2026-11-10.md),
+including an exhaustive Unicode scalar-value comparison with zero mismatches.
+Root integrated the cheaper worker's selected-file application capture prototype:
+[inspection and selected draft creation through CLI/MCP](APPLICATION_CAPTURE_PARITY_2026-11-10.md).
+6,499 tests/475 files, 150 focused tests/7 files, both TypeScript configs, Vite,
+lint (35 baseline warnings), i18n15/docs37, real production Linux startup and
+11 real CLI/MCP parity checks pass. Shared file-service Node probes pass27checks
+on each of Linux and WinBoat Windows11. No Windows Electron/native claim.
+Source fingerprints/explicit IDs/new output paths and existing MCP consent guard
+file work; a final pre-write check covers consent revocation/cancellation.
+Independent review pending. Main fd2775e2 unchanged; no push. Weekly meter63%
+at19:23 UTC, target roughly75%. Player remains parked.
+
+Next: a cheaper worker is prototyping pure within-take Godot checkpoint-state
+comparison only under /tmp/godot-checkpoint-comparison-prototype. It is not yet
+integrated into source. Project restoration/run verification remain later work.
+
 # Marker Unicode correction awaiting recheck — 10 November 2026
 
 Claude reviewed 9e9883dc and requested C1: Godot accepted Unicode-only blank marker

@@ -4,6 +4,11 @@ import {
 	rangeExportToolUnavailableMessage,
 } from "../../src/lib/lesson/api";
 import {
+	ApplicationCaptureFileError,
+	draftApplicationCaptureFile,
+	inspectApplicationCaptureFile,
+} from "../lesson/applicationCaptureFile";
+import {
 	addLessonStepsFile,
 	createLessonFile,
 	exportLessonFile,
@@ -36,6 +41,20 @@ export async function runLessonCommand(
 	} = {},
 ): Promise<number> {
 	try {
+		if (command.action === "inspect-capture" || command.action === "import-capture") {
+			const result =
+				command.action === "inspect-capture"
+					? inspectApplicationCaptureFile(command.request)
+					: await draftApplicationCaptureFile(command.request);
+			out(
+				JSON.stringify(
+					command.json ? { event: "done", result } : result,
+					null,
+					command.json ? undefined : 2,
+				) + "\n",
+			);
+			return 0;
+		}
 		if (command.action === "package" || command.action === "verify-package") {
 			if (!options.lifecycle) throw new LessonPackageError("lesson-package-unsupported");
 			const lifecycle = options.lifecycle,
@@ -163,7 +182,9 @@ export async function runLessonCommand(
 	} catch (failure) {
 		// Never echo imported payloads, private file paths, source data or raw parser/OS errors.
 		const error =
-			failure instanceof LessonPackageError || failure instanceof LessonFileRangeError
+			failure instanceof LessonPackageError ||
+			failure instanceof LessonFileRangeError ||
+			failure instanceof ApplicationCaptureFileError
 				? failure.code
 				: // Fixed codes only, such as a trimmed time; still no paths, payloads or raw errors.
 					command.action === "illustrate" && failure instanceof LessonOperationError

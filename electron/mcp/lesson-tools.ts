@@ -5,6 +5,15 @@ import {
 	rangeExportToolUnavailableMessage,
 } from "../../src/lib/lesson/api";
 import {
+	draftApplicationCaptureFileSchema,
+	inspectApplicationCaptureFileSchema,
+} from "../lesson/applicationCaptureContracts";
+import {
+	ApplicationCaptureFileError,
+	draftApplicationCaptureFile,
+	inspectApplicationCaptureFile,
+} from "../lesson/applicationCaptureFile";
+import {
 	addLessonStepsFile,
 	createLessonFile,
 	exportLessonFile,
@@ -301,6 +310,75 @@ export function registerLessonTools(
 					return failure(`illustration-unsupported: ${illustrationUnsupportedMessage}`);
 				return failure(
 					error instanceof LessonOperationError ? error.code : "lesson-file-operation-failed",
+				);
+			}
+		},
+	);
+	server.registerTool(
+		"inspectApplicationCaptureFile",
+		{
+			description:
+				"Inspect one explicitly selected application capture or Godot JSONL file. Returns paginated observation IDs, times, types, labels, coverage and raw SHA-256 only; no payload or baseline. No discovery, provider loading, project access, media grant or file modification. HTTP requires MCP edits permission before reading; stdio uses explicit launch authority.",
+			inputSchema: inspectApplicationCaptureFileSchema,
+			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+		},
+		(args: unknown) => {
+			if (transport === "http" && !editsAllowed())
+				return failure(
+					"consent_required: Enable MCP edits to inspect a selected application capture.",
+				);
+			try {
+				return {
+					content: [
+						{ type: "text" as const, text: JSON.stringify(inspectApplicationCaptureFile(args)) },
+					],
+				};
+			} catch (error) {
+				return failure(
+					error instanceof ApplicationCaptureFileError
+						? error.code
+						: "capture-file-operation-failed",
+				);
+			}
+		},
+	);
+	server.registerTool(
+		"draftLessonFromApplicationCapture",
+		{
+			description:
+				"Create a NEW editable draft lesson from 1–200 explicitly selected observations in one selected capture, bound to the exact raw SHA-256 returned by inspection. Preserves selected evidence and its unmapped clock; baseline and unselected payloads are omitted. Original capture remains unchanged. Explicit absolute source/output paths; output must not exist. No timing calibration, project/media access, rendering or source grants. Requires MCP edits before any file read.",
+			inputSchema: draftApplicationCaptureFileSchema,
+			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+		},
+		async (args: unknown, extra) => {
+			if (!editsAllowed())
+				return failure(
+					"consent_required: Enable MCP edits to create a lesson from application observations.",
+				);
+			try {
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify(
+								await draftApplicationCaptureFile(args, () => {
+									extra.signal.throwIfAborted();
+									if (!editsAllowed()) throw new Error("consent_required");
+								}),
+							),
+						},
+					],
+				};
+			} catch (error) {
+				if (!editsAllowed())
+					return failure(
+						"consent_required: Enable MCP edits to create a lesson from application observations.",
+					);
+				if (extra.signal.aborted) return failure("cancelled");
+				return failure(
+					error instanceof ApplicationCaptureFileError
+						? error.code
+						: "lesson-file-operation-failed",
 				);
 			}
 		},

@@ -187,3 +187,41 @@ replaced), the selected lesson file left unchanged, and fixed error text.
 set. No command can mark a step reviewed. The MCP tools need MCP edits on both transports.
 Evidence, counts and limits are in
 [the session handoff](lesson-capture/FABLE_SESSION_HANDOFF_2026-11-09.md).
+
+## Application capture inspection and selected drafts
+
+CLI accepts one explicit normalized application capture JSON file or a raw Godot
+scene JSONL journal (legacy v1 or checkpoint v2):
+
+```sh
+openscreen lesson inspect-capture ./scene.jsonl --offset 0 --limit 200 --json
+openscreen lesson import-capture ./scene.jsonl --out ./new-lesson.json --title "Enemy setup" --sha256 <inspection-sha256> --observation <id> --observation <another-id> --json
+```
+
+Inspection returns bounded metadata, raw source SHA-256 and up to 200 observation
+IDs/times/types/labels per page, with `nextOffset`. It omits baseline and payloads;
+labels and scene scope are still content. Offset is 0–10,000 and limit 1–200.
+Each page fingerprints the file it actually read. Draft creation requires the
+exact inspected hash and 1–200 unique selected IDs. It preserves selected evidence
+and its independent unmapped clock in a NEW editable lesson, without copying the
+baseline/unselected payloads or granting project/media access. Relative CLI paths
+resolve from the caller's current directory. Duplicate singleton flags, unknown
+options and ambiguous selections are refused.
+
+MCP exposes `inspectApplicationCaptureFile({capturePath, offset?, limit?})` and
+`draftLessonFromApplicationCapture({capturePath, outputPath, title, sha256,
+observationIds})`. Paths are absolute and server-local. HTTP inspection requires
+MCP edits before file reads; stdio retains explicit-launch read authority. Draft
+creation requires existing write permission before reads and again immediately
+before output creation, and checks SDK cancellation. This adds no server enablement,
+authentication, source grant, live adapter collection or calibration import.
+
+Both paths share the selected-file snapshot reader, strict offline decoder and
+lesson authoring service. Captures are bounded to 8 MiB; invalid UTF-8, malformed or
+truncated journals and symbolic-link inputs are refused. Import rechecks the raw
+fingerprint and IDs. Output uses existing exclusive `wx` creation, never replacement;
+it is not a crash-atomic temp/rename protocol. POSIX output mode is 0600; Windows
+uses its existing filesystem ACLs. Fixed failure codes include
+`capture-file-unavailable`, `capture-file-invalid`, `capture-file-changed`,
+`capture-observation-invalid` and `lesson-file-operation-failed`; raw parser/file
+errors and payloads are omitted. See [implementation and exact validation](lesson-capture/APPLICATION_CAPTURE_PARITY_2026-11-10.md).

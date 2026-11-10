@@ -24,10 +24,11 @@ and a real WinBoat Windows 11 editor/API probe. [Manual calibration and selected
 now also have real Windows browser component coverage and [Claude acceptance](lesson-capture/CLAUDE_APPLICATION_CALIBRATION_REVIEW_EEFEC646_2026-11-10.md).
 [Authored Godot checkpoint markers](lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md)
 add selected milestone annotations, with real Linux and WinBoat editor/API coverage;
-the marker slice awaits independent review. Native/physical recording acceptance,
+the [marker correction is accepted](lesson-capture/CLAUDE_GODOT_CHECKPOINT_RECHECK_D4682B4F_2026-11-10.md). Native/physical recording acceptance,
 automatic clock synchronization, project checkpoint comparison/restoration and
-run-result verification remain open. Next: selected-file CLI/MCP parity for offline
-application capture review and draft creation. Earlier checkpoint/review entries below
+run-result verification remain open. [Selected-file CLI/MCP parity](lesson-capture/APPLICATION_CAPTURE_PARITY_2026-11-10.md)
+now adds capture inspection and explicitly selected draft creation, pending review.
+Next: bounded comparison of two authored Godot checkpoint states within one take. Earlier checkpoint/review entries below
 retain their historical scope.
 
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).
