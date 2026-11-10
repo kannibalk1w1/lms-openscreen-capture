@@ -510,4 +510,37 @@ describe("review 0777440c follow-up", () => {
 		expect(result.referenceOnly).toEqual([{ path: ["c12", "x"], type: "Node2D" }]);
 		expect(result.candidateOnly).toEqual([{ path: ["c1", "2x"], type: "Node2D" }]);
 	});
+	it("treats a legacy candidate like a legacy reference", () => {
+		const result = compare(take([plain(0)]), take([plain(100)], { version: 2, session: "c" }));
+		expect(result.outcome).toBe("partial-no-observed-difference");
+		expect(result.partiallyCompared.map((row) => row.path)).toEqual([[], ["Thing"]]);
+	});
+	it("keeps each checkpoint's snapshot sequence in the source identity", () => {
+		const source = take([enemy(0), enemy(0, { visible: false })]);
+		const result = compareGodotCheckpointToReference(source, 1, source, 3);
+		expect(result.reference.checkpoint.snapshotSequence).toBe(0);
+		expect(result.candidate.checkpoint.snapshotSequence).toBe(2);
+	});
+	it("truncates the two connection lists independently", () => {
+		const v5 = (offset: number, methods: string[]): State => ({
+			...enemy(offset),
+			connections: methods.map((method) => ({
+				signal: "renamed",
+				from: String(2 + offset),
+				to: String(1 + offset),
+				method,
+				boundArgs: 0,
+				deferred: false,
+				oneShot: false,
+			})),
+			excludedConnections: 0,
+		});
+		const many = Array.from({ length: 220 }, (_, i) => `r${i}`);
+		const result = compare(
+			take([v5(0, many)], { version: 5 }),
+			take([v5(100, ["c0"])], { version: 5, session: "c" }),
+		);
+		expect(result.truncated).toEqual(["connectionsReferenceOnly"]);
+		expect(result.connections).toMatchObject({ candidateOnly: [{ method: "c0" }] });
+	});
 });

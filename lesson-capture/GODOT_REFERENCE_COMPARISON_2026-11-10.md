@@ -111,7 +111,7 @@ could yield a false `agree`. The follow-up commit:
 - N2: `snapshotSequence`, the scene-path note and clean-prefix, per-list `truncated`.
 
 Mutants for the new guards are killed: version gate, position gate, prefix, row cap,
-partial, row detail, ambiguity and interned-key separator. Awaiting recheck.
+partial, row detail, ambiguity and interned-key separator. The [recheck of `eff20dc1`](CLAUDE_GODOT_REFERENCE_COMPARISON_RECHECK_EFF20DC1_2026-11-10.md) **accepts** it with nits R-N1 (legacy candidate side), R-N2 (snapshot sequence) and R-N3 (independent connection-list truncation), all closed with mutation-checked tests in the next commit.
 
 ## Next
 

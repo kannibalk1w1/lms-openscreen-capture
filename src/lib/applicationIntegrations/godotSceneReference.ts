@@ -67,7 +67,13 @@ type ConnectionDetail = {
 	oneShot: boolean;
 };
 type ConnectionRow = { from: Path; to: Path } & ConnectionDetail;
-type Lists = "referenceOnly" | "candidateOnly" | "differing" | "partiallyCompared" | "connections";
+type Lists =
+	| "referenceOnly"
+	| "candidateOnly"
+	| "differing"
+	| "partiallyCompared"
+	| "connectionsReferenceOnly"
+	| "connectionsCandidateOnly";
 
 export type GodotReferenceComparison = {
 	kind: "advisory-sampled-state-comparison";
@@ -302,12 +308,12 @@ export function compareGodotCheckpointToReference(
 		for (const [key, value] of want)
 			if (!have.has(key)) {
 				counts.connectionsReferenceOnly++;
-				keep("connections", referenceRows, () => expand(value));
+				keep("connectionsReferenceOnly", referenceRows, () => expand(value));
 			}
 		for (const [key, value] of have)
 			if (!want.has(key)) {
 				counts.connectionsCandidateOnly++;
-				keep("connections", candidateRows, () => expand(value));
+				keep("connectionsCandidateOnly", candidateRows, () => expand(value));
 			}
 		const partial = excluded.reference > 0 || excluded.candidate > 0;
 		if (partial) unknowns.add("connections-partially-recorded");
