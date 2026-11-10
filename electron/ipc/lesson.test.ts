@@ -320,7 +320,7 @@ it.each([
 	"destroyed",
 	"render-process-gone",
 	"did-start-navigation",
-])("a window's file permission ends with its page context on %s, including a save still in flight", async (lifecycle) => {
+])("a window's file permission ends with its page context on %s, and a save still in flight is refused before it replaces anything", async (lifecycle) => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-file-lifecycle-"));
 	electron.getPath.mockReturnValue(root);
 	electron.handle.mockClear();
@@ -343,23 +343,25 @@ it.each([
 	try {
 		electron.open.mockResolvedValue({ canceled: false, filePaths: [target] });
 		const token = (await route("open")(editor)).result.file.token;
-		// The context ends while a save is being written: the write keeps its own outcome only.
+		const before = await fs.readFile(target, "utf8");
+		// The context ends while the save is still validating: nothing is replaced and no success
+		// is certified.
 		const pending = route("save-current")(editor, {
 			token,
 			lesson: { ...lesson, revision: 1, title: "In flight" },
 		});
 		editor.sender.emit(lifecycle);
-		const finished = await pending;
-		expect(finished).toMatchObject({ success: true, result: { status: "saved" } });
 		const refused = { success: false, code: "lesson-file-unavailable" };
-		for (const reuse of [token, finished.result.file.token])
-			expect(
-				await route("save-current")(editor, {
-					token: reuse,
-					lesson: { ...lesson, revision: 2, title: "After the context ended" },
-				}),
-			).toEqual(refused);
-		expect(JSON.parse(await fs.readFile(target, "utf8")).title).toBe("In flight");
+		expect(await pending).toEqual(refused);
+		expect(await fs.readFile(target, "utf8")).toBe(before);
+		expect((await fs.readdir(root)).filter((name) => name.includes(".partial"))).toEqual([]);
+		expect(
+			await route("save-current")(editor, {
+				token,
+				lesson: { ...lesson, revision: 2, title: "After the context ended" },
+			}),
+		).toEqual(refused);
+		expect(await fs.readFile(target, "utf8")).toBe(before);
 		// A fresh explicit open in the same window is the only way back to an update permission.
 		const again = await route("open")(editor);
 		expect(

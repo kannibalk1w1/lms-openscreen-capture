@@ -745,3 +745,32 @@ it("keeps unsaved lesson work marked while the guide is hidden, and clears the m
 	unmount();
 	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(false);
 });
+it("a same-file save that committed as the window's context ended is shown saved, with no further same-file permission", async () => {
+	const handle = { token: crypto.randomUUID(), path: "/chosen/lesson.json" };
+	const lessonSaveCurrent = vi.fn<NonNullable<LessonApi["lessonSaveCurrent"]>>(async () => ({
+		success: true as const,
+		result: { status: "saved" as const, path: handle.path },
+	}));
+	vi.stubGlobal("electronAPI", {
+		lessonOpen: vi.fn(async () => ({
+			success: true as const,
+			result: { status: "opened" as const, lesson: fileLesson(), file: handle },
+		})),
+		lessonSaveCurrent,
+	});
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await screen.findByText("All lesson changes are saved in: /chosen/lesson.json");
+	fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Committed" } });
+	const sameFile = () =>
+		screen.getByRole("button", { name: "Save changes to the opened file" }) as HTMLButtonElement;
+	fireEvent.click(sameFile());
+	await screen.findByText("Saved to the same file: /chosen/lesson.json");
+	expect((screen.getByLabelText("Instructions") as HTMLTextAreaElement).value).toBe("Committed");
+	// Saved, so not unsaved; but nothing more can be written to that file without a fresh open.
+	expect(screen.queryByText(/Unsaved lesson changes/)).toBeNull();
+	fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Later" } });
+	await screen.findByText("Unsaved lesson changes. This lesson has not been saved to a file.");
+	expect(sameFile().disabled).toBe(true);
+	expect(lessonSaveCurrent).toHaveBeenCalledTimes(1);
+});

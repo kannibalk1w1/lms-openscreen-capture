@@ -59,11 +59,13 @@ export interface LessonApi {
 			{ status: "saved"; path: string; file?: LessonFileHandle } | { status: "cancelled" }
 		>
 	>;
-	/** Update the file main last opened or saved for this window; the renderer names no path. */
+	/** Update the file main last opened or saved for this window; the renderer names no path.
+	 * `file` is absent when the save committed just as this window's page context ended: the bytes
+	 * are saved, but no further update permission exists. */
 	lessonSaveCurrent?: (input: {
 		token: string;
 		lesson: LessonManifest;
-	}) => Promise<LessonResult<{ status: "saved"; path: string; file: LessonFileHandle }>>;
+	}) => Promise<LessonResult<{ status: "saved"; path: string; file?: LessonFileHandle }>>;
 	lessonOpen?: () => Promise<
 		LessonResult<
 			| { status: "opened"; lesson: LessonManifest; file?: LessonFileHandle }

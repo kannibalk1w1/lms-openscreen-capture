@@ -360,7 +360,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										throw new LessonOperationError(result.code);
 									}
 									setBaseline(lesson);
-									setFile(result.result.file);
+									setFile(result.result.file ?? null);
 									setNotice(t("lesson.savedCurrent", { path: result.result.path }));
 								})
 							}

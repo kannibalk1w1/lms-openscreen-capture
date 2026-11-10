@@ -52,11 +52,22 @@ export async function grantLessonFile(
 		return null;
 	}
 }
-/** Atomic private replacement of the granted file only while it is still exactly what was last read. */
+/**
+ * Atomic private replacement of the granted file only while it is still exactly what was last read
+ * and the caller's permission context is still current. `isCurrent` is checked before any write and
+ * again in the same synchronous turn as the rename, so an invalidation before the commit leaves the
+ * original bytes in place. `currentAtCommit` reports whether it still held just after the commit:
+ * when it did not, the bytes were already replaced and the caller must not issue a new permission.
+ */
 export async function replaceLessonFile(
 	grant: LessonFileGrant,
 	input: unknown,
-): Promise<LessonFileGrant> {
+	isCurrent: () => boolean,
+): Promise<{ grant: LessonFileGrant; currentAtCommit: boolean }> {
+	const assertCurrent = () => {
+		if (!isCurrent()) throw new LessonOperationError("lesson-file-unavailable");
+	};
+	assertCurrent();
 	const lesson = await validateLesson(input);
 	// A different or older lesson must not overwrite the opened file's later content.
 	if (lesson.id !== grant.lessonId || lesson.revision < grant.revision)
@@ -72,6 +83,7 @@ export async function replaceLessonFile(
 		}
 		throw new LessonOperationError("lesson-file-changed");
 	};
+	assertCurrent();
 	assertUnchanged();
 	const stage = path.join(
 		path.dirname(grant.target),
@@ -92,7 +104,9 @@ export async function replaceLessonFile(
 		const written = readSelectedFileSnapshot(stage, MAX_LESSON_BYTES);
 		if (!written.bytes.equals(bytes)) throw new LessonOperationError("lesson-operation-failed");
 		await parseLesson(written.bytes.toString("utf8"));
-		// One turn: the target is still the granted content and the stage is still ours, then replace.
+		// One turn: the permission is current, the target is still the granted content and the stage
+		// is still ours, then replace. No await may come between these checks and the rename.
+		assertCurrent();
 		assertUnchanged();
 		if (readSelectedFileSnapshot(stage, MAX_LESSON_BYTES).identity !== written.identity)
 			throw new LessonOperationError("lesson-operation-failed");
@@ -107,5 +121,8 @@ export async function replaceLessonFile(
 	}
 	const after = readSelectedFileSnapshot(grant.target, MAX_LESSON_BYTES);
 	if (!after.bytes.equals(bytes)) throw new LessonOperationError("lesson-file-changed");
-	return { ...grant, identity: after.identity, sha256: digest(bytes), revision: lesson.revision };
+	return {
+		grant: { ...grant, identity: after.identity, sha256: digest(bytes), revision: lesson.revision },
+		currentAtCommit: isCurrent(),
+	};
 }

@@ -107,50 +107,84 @@ export function registerLessonHandlers(
 	);
 	// One update permission per window, for the file its user last explicitly opened or saved.
 	type Owner = NonNullable<IpcMainInvokeEvent["sender"]>;
-	const files = new WeakMap<Owner, { grant?: LessonFileGrant; saving: boolean }>();
+	interface FileState {
+		grant?: LessonFileGrant;
+		saving: boolean;
+		/** Bumped by every navigation, crash or close: anything begun before it is stale. */
+		epoch: number;
+		/** Bumped by every explicit open or new-copy save: an older one can no longer grant. */
+		operation: number;
+	}
+	const files = new WeakMap<Owner, FileState>();
+	// Created, with its lifetime listeners, before any picker or read is awaited, so a navigation,
+	// crash or close while one is pending is always seen.
 	const fileState = (event: IpcMainInvokeEvent | undefined) => {
 		const owner = event?.sender;
 		if (!owner || event.senderFrame !== owner.mainFrame) return null;
 		let state = files.get(owner);
 		if (!state) {
-			const created: { grant?: LessonFileGrant; saving: boolean } = { saving: false };
+			const created: FileState = { saving: false, epoch: 0, operation: 0 };
 			state = created;
 			files.set(owner, created);
 			for (const name of ["destroyed", "render-process-gone", "did-start-navigation"] as const)
 				(owner as unknown as { on(name: string, listener: () => void): void }).on(name, () => {
 					created.grant = undefined;
+					created.epoch++;
 				});
 		}
 		return state;
 	};
+	/** The asking window is still the same registered editor page, in its main frame. */
+	const samePage = (event: IpcMainInvokeEvent, state: FileState, epoch: number) =>
+		state.epoch === epoch &&
+		!event.sender.isDestroyed() &&
+		event.senderFrame === event.sender.mainFrame &&
+		isEditorFrame(event);
+	/** Starts an explicit open or new-copy save; true only while it is the window's latest one. */
+	const beginFileOperation = (event: IpcMainInvokeEvent) => {
+		const state = fileState(event);
+		if (!state) throw new LessonOperationError("lesson-operation-failed");
+		const epoch = state.epoch,
+			operation = ++state.operation;
+		const current = () => state.operation === operation && samePage(event, state, epoch);
+		const assertCurrent = () => {
+			if (!current()) throw new LessonOperationError("lesson-operation-failed");
+		};
+		return { state, assertCurrent };
+	};
+	/** Grants the file only to a still-current operation, and only for exactly the lesson it holds. */
 	const remember = async (
-		event: IpcMainInvokeEvent | undefined,
+		operation: ReturnType<typeof beginFileOperation>,
 		target: string,
 		lesson: unknown,
 	) => {
-		const state = fileState(event);
-		if (!state) return undefined;
-		state.grant = undefined;
+		operation.assertCurrent();
+		operation.state.grant = undefined;
 		const granted = await grantLessonFile(target);
+		operation.assertCurrent();
 		// Only when the file on disk is exactly the lesson this window now holds.
 		if (!granted || JSON.stringify(granted.lesson) !== JSON.stringify(lesson)) return undefined;
-		state.grant = granted.grant;
+		operation.state.grant = granted.grant;
 		return { token: granted.grant.token, path: target };
 	};
 	ipcMain.handle(
 		"lesson:save",
 		editorOnly((event, input) =>
 			bounded(async () => {
+				const operation = beginFileOperation(event);
 				const saved = await service.saveEditable(input, async () => {
 					const result = await saveDialog(event, {
 						title: "Save a new editable lesson",
 						defaultPath: path.join(app.getPath("documents"), "lesson.openscreen-lesson.json"),
 						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
 					});
+					// Nothing is written for a page that has gone or been superseded meanwhile.
+					operation.assertCurrent();
 					return result.canceled ? null : (result.filePath ?? null);
 				});
 				if (saved.status !== "saved") return saved;
-				const file = await remember(event, saved.path, saved.lesson);
+				// The new copy exists either way; a page that changed since only gets no update permission.
+				const file = await remember(operation, saved.path, saved.lesson).catch(() => undefined);
 				return { status: saved.status, path: saved.path, ...(file ? { file } : {}) };
 			}),
 		),
@@ -160,17 +194,31 @@ export function registerLessonHandlers(
 			const state = fileState(event),
 				request = z.object({ token: z.string().uuid(), lesson: z.unknown() }).strict().parse(input),
 				grant = state?.grant;
-			if (!state || !grant || grant.token !== request.token || state.saving)
+			if (
+				!state ||
+				!grant ||
+				grant.token !== request.token ||
+				state.saving ||
+				!samePage(event, state, state.epoch)
+			)
 				throw new LessonOperationError("lesson-file-unavailable");
+			const epoch = state.epoch;
+			// Current only while this window keeps the same page and this exact permission.
+			const current = () => state.grant === grant && samePage(event, state, epoch);
 			state.saving = true;
 			try {
-				const next = await replaceLessonFile(grant, request.lesson);
-				// A navigation or a newer open during the write keeps its own outcome.
-				if (state.grant === grant) state.grant = next;
+				const replaced = await replaceLessonFile(grant, request.lesson, current);
+				if (!replaced.currentAtCommit) {
+					// Committed just before the context ended: the bytes are saved, but no permission
+					// survives into the new context.
+					if (state.grant === grant) state.grant = undefined;
+					return { status: "saved" as const, path: grant.target };
+				}
+				state.grant = replaced.grant;
 				return {
 					status: "saved" as const,
-					path: next.target,
-					file: { token: next.token, path: next.target },
+					path: replaced.grant.target,
+					file: { token: replaced.grant.token, path: replaced.grant.target },
 				};
 			} catch (error) {
 				// A changed or missing file can never be updated through this permission again.
@@ -185,16 +233,19 @@ export function registerLessonHandlers(
 		"lesson:open",
 		editorOnly((event) =>
 			bounded(async () => {
+				const operation = beginFileOperation(event);
 				const opened = await service.openEditable(async () => {
 					const result = await openDialog(event, {
 						title: "Open editable lesson",
 						properties: ["openFile"],
 						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
 					});
+					// The file is not read for a page that has gone or been superseded meanwhile.
+					operation.assertCurrent();
 					return result.canceled ? null : (result.filePaths[0] ?? null);
 				});
 				if (opened.status !== "opened") return opened;
-				const file = await remember(event, opened.path, opened.lesson);
+				const file = await remember(operation, opened.path, opened.lesson);
 				return { status: opened.status, lesson: opened.lesson, ...(file ? { file } : {}) };
 			}),
 		),
