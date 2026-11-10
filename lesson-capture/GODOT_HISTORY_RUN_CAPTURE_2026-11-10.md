@@ -30,11 +30,14 @@ recorded without its path; run results, output and errors are not captured).
 - `scene-history` — written when the scene history's `{version, actionIndex, action}`
   changes. It is checked once per sampling turn (signal-requested, at least 50 ms apart,
   or the 250 ms fallback), so one transition is written once, and a history-triggered
-  scene sample (`trigger: "history"`) follows it. `history: {available: false}` means the
+  scene sample (`trigger: "history"`) follows it. That trigger is only a hint: a history
+  signal also fires for merged or global actions, so a `history`-triggered sample can
+  appear without a preceding history record. `history: {available: false}` means the
   take had no scene history (e.g. the scene root mapped only to global history); no
   history records are then accepted.
 - `scene-run` — written when the polled run state changes: `stopped`, `playing` +
-  `current-scene` + its `res://` path, or `playing` + `other-scene` with **no path**.
+  `current-scene` + its `res://` path (the decoder accepts only the header scene or a
+  path this take observed being saved), or `playing` + `other-scene` with **no path**.
 - Action names are bounded to 200 UTF-16 code units with no control characters and
   non-blank content, otherwise recorded as `unsupported-action-name`. They are the
   editor's own (locale-dependent) labels, e.g. "Rename Node"; plugins may put any text there.
@@ -97,4 +100,16 @@ packaged Electron or native capture is claimed.
 
 ## Review
 
-Awaiting an independent Claude review of the immutable source commit.
+[Independent Claude review of `1372a9c2`](CLAUDE_GODOT_HISTORY_RUN_REVIEW_1372A9C2_2026-11-10.md):
+**accepted with Lows**, no High/Medium; all seven coordinator gates pass. The follow-up
+commit addresses them:
+
+- L1: the decoder now refuses a `current-scene` run path other than the header scene or
+  a path saved during the take (header and record).
+- L2: tests now kill the three surviving mutants (v1–v3 header context gate, unchanged
+  record after the observation cap, history becoming unavailable as the last record).
+- L3: the consent dialog now wraps (`dialog_autowrap`) in a taller popup.
+- N2: documented above. N1 (invisible formatting characters in labels) is retained,
+  matching the existing checkpoint-label rule.
+
+The follow-up awaits a focused recheck.

@@ -142,7 +142,7 @@ func _enter_tree() -> void:
 				_scene_status.text = "Open a scene first"
 				return
 			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D and Node3D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Uses editor signals plus 250 ms polling; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync. Also records this scene's own editor undo-history position and action names (labels such as \"Rename Node\" may contain node names; global and other-scene history are excluded), and whether the editor reports a run of this scene (another scene's run is recorded without its path; run results, output and errors are not captured). You may also add authored checkpoint labels; labels are your annotations, not automatic milestones or proof of a saved/running project.\n\nContinue to choose a new journal file." % _pending_scene.name
-			_scene_confirm.popup_centered(Vector2i(640, 300))
+			_scene_confirm.popup_centered(Vector2i(640, 420))
 	)
 	_bar.add_child(_scene_button)
 	_checkpoint_button = Button.new()
@@ -187,6 +187,8 @@ func _enter_tree() -> void:
 	)
 	_scene_confirm = ConfirmationDialog.new()
 	_scene_confirm.title = "Allow scene observations for this take"
+	# The consent text is long; wrap it inside the fixed popup width.
+	_scene_confirm.dialog_autowrap = true
 	_scene_confirm.confirmed.connect(func():
 		_scene_picker.current_file = "scene-%d.jsonl" % Time.get_unix_time_from_system()
 		_scene_picker.popup_centered_ratio(0.65)

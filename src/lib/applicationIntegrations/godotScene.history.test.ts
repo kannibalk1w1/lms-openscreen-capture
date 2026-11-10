@@ -263,3 +263,79 @@ it("keeps checkpoint listing and comparison working in v4 takes with context rec
 	);
 	expect(comparison.counts.removed).toBe(1);
 });
+
+describe("review 1372a9c2 follow-up guards", () => {
+	const playing = (scene: string) => ({ state: "playing", scope: "current-scene", scene });
+
+	it("refuses a current-scene run path that is not the captured scene", () => {
+		const records = historyTake();
+		records[6] = { ...records[6], run: playing("res://main.tscn") };
+		expect(() => parseGodotSceneJournal(sceneSource(records))).toThrow(
+			/outside the captured scene/,
+		);
+		const header = historyTake().filter(
+			(record) => record.event !== "scene-run" && record.event !== "scene-history",
+		);
+		header[0] = { ...header[0], run: playing("res://main.tscn") };
+		expect(() => parseGodotSceneJournal(sceneSource(v4(header)))).toThrow(
+			/outside the captured scene/,
+		);
+		header[0] = { ...header[0], run: playing("res://enemy.tscn") };
+		expect(parseGodotSceneJournal(sceneSource(v4(header))).baseline).toMatchObject({
+			run: playing("res://enemy.tscn"),
+		});
+	});
+
+	it("accepts a run of a path this take observed being saved (Save As)", () => {
+		const records = historyTake();
+		const footer = records.pop() as Record<string, unknown>;
+		records.push({ event: "scene-run", run: playing("res://renamed.tscn") }, footer);
+		expect(() => parseGodotSceneJournal(sceneSource(v4(records)))).toThrow(/outside/);
+		records.splice(records.length - 2, 0, { event: "scene-saved", scene: "res://renamed.tscn" });
+		const journal = parseGodotSceneJournal(sceneSource(v4(records)));
+		expect(journal.observations.at(-1)?.label).toBe("Editor run observed: res://renamed.tscn");
+	});
+
+	it.each([1, 2, 3])("refuses v4 header context alone in a schema v%i journal", (version) => {
+		const records: Record<string, unknown>[] = sceneRecords().map((record) => ({
+			...record,
+			schemaVersion: version,
+		}));
+		records[0] = { ...records[0], history: startHistory, run: stopped };
+		expect(() => parseGodotSceneJournal(sceneSource(records))).toThrow(
+			/exactly scene journal schema v4/,
+		);
+	});
+
+	it("refuses history becoming unavailable as the last history record", () => {
+		const records = historyTake();
+		records[5] = { ...records[5], history: { available: false } };
+		expect(() => parseGodotSceneJournal(sceneSource(records))).toThrow(/Invalid scene history/);
+	});
+
+	it("validates a schema-valid but unchanged context record after the observation cap", () => {
+		const [start, ...rest] = historyTake();
+		const footer = rest.pop() as Record<string, unknown>;
+		const root = sceneNode("1");
+		const nodes = Array.from({ length: 300 }, (_, i) => sceneNode(String(i + 2), `N${i}`, "1"));
+		const build = (tail: Record<string, unknown>[]) => {
+			const records: Record<string, unknown>[] = [start];
+			for (let i = 0; i < 40; i++)
+				records.push({
+					event: "scene-state",
+					state: { nodes: i % 2 ? [root] : [root, ...nodes], selected: [] },
+				});
+			return sceneSource(v4([...records, ...tail, footer]));
+		};
+		const capped = parseGodotSceneJournal(
+			build([{ event: "scene-run", run: playing("res://enemy.tscn") }]),
+		);
+		expect(capped.stopReason).toBe("decoder-observation-limit");
+		expect(() => parseGodotSceneJournal(build([{ event: "scene-run", run: stopped }]))).toThrow(
+			/Invalid scene run record/,
+		);
+		expect(() =>
+			parseGodotSceneJournal(build([{ event: "scene-history", history: startHistory }])),
+		).toThrow(/Invalid scene history record/);
+	});
+});

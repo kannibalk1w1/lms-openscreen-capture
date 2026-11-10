@@ -239,6 +239,15 @@ function decodeGodotSceneJournal(text: string): {
 		throw new Error("Editor history/run records require scene journal schema v4");
 	if (first.history && !first.history.available && records.some((r) => r.event === "scene-history"))
 		throw new Error("History records require an available scene history");
+	// A current-scene run must name the captured scene: its header path or a path the
+	// take itself observed being saved (Save As). Any other path is out of scope.
+	const capturedScenes = new Set([first.scene]);
+	if (
+		first.run?.state === "playing" &&
+		first.run.scope === "current-scene" &&
+		first.run.scene !== first.scene
+	)
+		throw new Error("Run path is outside the captured scene");
 	const rootId = first.state.nodes[0].id;
 	const types = new Map(first.state.nodes.map((node) => [node.id, node.type]));
 	let previous = first.state,
@@ -329,6 +338,7 @@ function decodeGodotSceneJournal(text: string): {
 				});
 			previous = record.state;
 		} else if (record.event === "scene-saved") {
+			capturedScenes.add(record.scene);
 			add("scene-saved", "Scene save observed", { scene: record.scene });
 		} else if (record.event === "scene-history" && history?.available) {
 			const after = record.history;
@@ -360,6 +370,12 @@ function decodeGodotSceneJournal(text: string): {
 			const after = record.run;
 			if (JSON.stringify(after) === JSON.stringify(run))
 				throw new Error("Invalid scene run record");
+			if (
+				after.state === "playing" &&
+				after.scope === "current-scene" &&
+				!capturedScenes.has(after.scene)
+			)
+				throw new Error("Run path is outside the captured scene");
 			const label =
 				after.state === "stopped"
 					? "Editor run stop observed"
