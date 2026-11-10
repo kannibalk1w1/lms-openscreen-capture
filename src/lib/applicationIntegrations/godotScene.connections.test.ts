@@ -217,6 +217,24 @@ it("shortens labels on code points, never splitting an emoji", () => {
 		sceneSource(take([state([], 0, nodes), state([timeout], 0, nodes)])),
 	);
 	const label = journal.observations[0].label;
-	expect(label).toContain(`${"a".repeat(46)}😀…`);
+	expect(label).toContain(`${"a".repeat(46)}…`);
 	expect(label).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+});
+
+it("keeps worst-case astral names within the shared UTF-16 label limit", () => {
+	const astral = (id: string) => sceneNode(id, "😀".repeat(100), "1");
+	const nodes = [root, astral("2"), astral("3")];
+	const wide = { ...timeout, signal: "s".repeat(100), method: "m".repeat(100) };
+	const journal = parseGodotSceneJournal(
+		sceneSource(take([state([], 0, nodes), state([wide], 0, nodes), state([], 0, nodes)])),
+	);
+	const capture = godotSceneCapture(journal);
+	for (const { label } of capture.observations) {
+		expect(label.length).toBeLessThanOrEqual(300);
+		expect(label).not.toMatch(
+			/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+		);
+		expect(label).toContain(`${"😀".repeat(23)}…`);
+	}
+	expect(capture.observations).toHaveLength(2);
 });

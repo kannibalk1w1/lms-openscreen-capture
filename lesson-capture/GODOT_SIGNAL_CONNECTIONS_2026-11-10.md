@@ -123,3 +123,11 @@ limit take (a GDScript mutation removing the equality guard fails the real probe
 above; N1 label shortening now works on code points; N2 — the decoder cap of 256 refuses
 any v5 journal from the unreleased `e0786f0f` build with more than 256 connections. The
 only such journals are this run's probe evidence, all far below that.
+
+### Recheck disposition ledger
+
+| Item | Disposition |
+| --- | --- |
+| Recheck L1 (nested binds counted, not recorded) | Intentionally kept; documented in "Counted, not described". |
+| Recheck N1 (emoji split in labels) | Fixed in `abc342ad`. A coordinator-requested worst-case test then showed that 48-code-point segments can reach 95 UTF-16 units, so 200-emoji node names could again exceed the 300-unit label limit. Fixed in the next commit: segments are cut at ≤48 UTF-16 units on code-point boundaries. The test covers 100-emoji names on both endpoints plus 100-character signal and method names; the `abc342ad` expression fails it. |
+| Recheck N2 (cap refuses older >256 journals) | Intentionally kept; documented above. |

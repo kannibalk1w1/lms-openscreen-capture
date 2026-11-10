@@ -239,9 +239,15 @@ function connectionKey(connection: SceneConnection): string {
 // Labels stay within the shared 300-character observation label; the payload keeps the
 // full names and session node IDs (node names need not be unique).
 function shortName(value: string): string {
-	// Code points, so an astral character (e.g. emoji) is never split.
-	const points = Array.from(value);
-	return points.length > 48 ? `${points.slice(0, 47).join("")}…` : value;
+	// At most 48 UTF-16 units (the unit the shared label limit counts), cutting only at
+	// code-point boundaries so an astral character (e.g. emoji) is never split.
+	if (value.length <= 48) return value;
+	let short = "";
+	for (const point of value) {
+		if (short.length + point.length > 47) break;
+		short += point;
+	}
+	return `${short}…`;
 }
 function describeConnection(connection: SceneConnection, state: SceneState): string {
 	const name = (id: string) => shortName(state.nodes.find((node) => node.id === id)?.name ?? id);
