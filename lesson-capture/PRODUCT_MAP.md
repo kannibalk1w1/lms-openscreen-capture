@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture product map
 
-Updated 9 November 2026 (review26 accepts bounded Linux source identity; editor confirmation/follow-up accepted through review28; shared render ownership accepted by review29; authority/GIF follow-up accepted by review30; selected-step MP4 editor slice accepted by review31; narrow follow-up accepted by review32; headless confirmation prerequisite accepted by review33; filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; session-capability tests accepted by review40; media-preserving GUI reseal reviewed at41 with M41-1 corrected pending follow-up). **Record once. Produce multiple editable teaching resources.**
+Updated 10 November 2026. **Record once. Produce multiple editable teaching resources.**
 This is the expanded fork backlog, not an upstream release announcement. Entry point:
 [current roadmap](../LESSON_CAPTURE_ROADMAP.md). Architecture and audit:
 [ARCHITECTURE.md](ARCHITECTURE.md), [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md).
@@ -14,33 +14,13 @@ adapter disabled and Godot absent. Use the three levels and
 deep adapter; Blockbench, Unity, Unreal Engine, MCreator, Roblox Studio and other
 desktop/web tools are generic capture subjects. No other adapters are requested now.
 
-[Review35](CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) found unpackaged decoder lookup
-failed from non-root client directories. [M35-1/L35-1 follow-up](CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
-adds stable resolution and actionable tool errors, with real non-root CLI/stdio
-native proofs and independent authority/wiring controls, now accepted through
-review36 and pushed atf0eacc95. Earlier root-only proof accounts retain
-their historical limits.
-
-[Review36](CLAUDE_ROADMAP_REVIEW_36_2026-11-09.md) closesM35-1/L35-1 and accepts
-the headless MP4 checkpoint pushed atf0eacc95. [Portable package v1](PORTABLE_LESSON_PACKAGE_2026-11-09.md)
-now supplies bounded explicit CLI/MCP selected derived guide/lesson/JPEG policy and
-validated MP4 packaging/verification, including moved-source reopen. Native projects,
-raw evidence/history and full course/player semantics remain outside this scope;
-Review38 accepts the privacy follow-up and coordinator checkpointb0463121 is pushed.
-[Verified GUI inspection/static new-copy](VERIFIED_PACKAGE_OPEN_2026-11-09.md) is now
-accepted within scope by review39; its [narrow capability-test follow-up](CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
-is accepted by review40 and pushed at5d73f835. [Supported GUI edits/new-package reseal](PACKAGE_RESEAL_2026-11-09.md)
-retain all MP4/JPEG bindings and policy. Review41 finds M41-1 draft-loss on failure;
-[the correction](CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md) retains exact edits, permits explicit retry
-and requires matching-inventory revalidation after authority loss, pending exact-SHA follow-up.
-
-[Review37](CLAUDE_ROADMAP_REVIEW_37_2026-11-09.md) accepts36d30d24 within its derived
-package scope. [L37-1 test follow-up](CLAUDE_ROADMAP_FOLLOWUP_37_2026-11-09.md) pins
-coherent re-signed privacy/policy refusals, benign inclusion and v1 compatibility;
-production/format are unchanged. Actual review38 closesL37-1 with no new findings;
-checkpointb0463121 is pushed. Current GUI scope is read-only inspection plus static
-editable new-copy, pending review; video-preserving reseal/player work remains. Prior pending descriptions retain their checkpoint
-context; full native-project/course portability remains outside delivered scope.
+**Current status** (delivered, open, review state and owner decisions) lives in one place:
+the [roadmap status section](../LESSON_CAPTURE_ROADMAP.md#status-on-10-november-2026).
+The review-by-review status paragraphs that stood here, and the full previous map, are kept
+word for word in the [10 November product map snapshot](PRODUCT_MAP_HISTORY_2026-11-10.md).
+The phase sections below describe requirements and acceptance targets; where a line says a
+slice is "pending review", reviews 39 to 41 and the M42 follow-up have since accepted it,
+except the self-tested Opus slices named in the roadmap.
 
 ## Status and evidence rules
 
@@ -64,7 +44,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | C Privacy-safe capture, storage and export | Partial | Default-off Linux button gates, scope suppression, source-bound receipts/recovery exclusions; full redaction/allowlists remain | Critical, phase 0; broad capture gate |
 | A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Manual steps, neutral flag/typing drafts, native stills, editable source, selected HTML/Markdown and bounded print proof; semantic generation remains | Very high, phase 1 |
 | B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
-| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references and explicit Linux source confirmation; bounded selected-step MP4 export exists; timed player controls/progress remain | High, phase 3 |
+| D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references, Linux source confirmation, selected-step MP4 export and verified portable packages exist; timed player controls/progress remain ([plan](OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md)) | High, phase 3; next user-facing slice after the coordinator gate |
 | E Accessible differentiated outputs | Partial | Unified lesson Standard/Large print/High contrast, language/direction and image/code exclusions; reviewed simplification/narration/slow profiles remain | High, phase 1 defaults + phase 3 delivery |
 | F Recording script/checklist | Planned | Notes and flags; no source-linked recording checklist established | Medium-high, phase 4; small earlier slice allowed |
 | G Quality review | Partial | Probes/health plus source review labels/findings and bounded title/status/source queries; unified media QC remains | High, preflight now; unified report phase 4 |
@@ -125,8 +105,8 @@ claims that every listed operation exists.
    native proof, accepted through review36 and pushed atf0eacc95. HTTP cancellation requires aborting its
    active request. [Portable package v1](PORTABLE_LESSON_PACKAGE_2026-11-09.md) now implements
    explicit derived lesson/media packaging and moved-source verification/reopen,
-   accepted through review38; verified GUI inspection/static-copy is implemented pending
-   review, while video-preserving reseal and full native-course packaging remain. Timed Next/Previous/Replay/loop/speed, captions and local
+   accepted through review38; verified GUI inspection/static-copy is accepted by review39,
+   and video-preserving reseal by review41 with its follow-up; full native-course packaging remains. Timed Next/Previous/Replay/loop/speed, captions and local
    learner progress remain later work.
 4. Continue remaining privacy/redaction, continuous optional clock/edit projection,
    rolling buffer, retakes/handoff and physical/platform acceptance separately.
@@ -303,8 +283,8 @@ review30. [Selected-step MP4 editor export](SELECTED_STEP_MP4_2026-11-09.md) is
 accepted within its Linux subset by review31; its narrow test follow-up is accepted by review32. Headless confirmation/save is
 accepted by review33, with filesystem/startup follow-up accepted by review34; headless selected-step MP4/decoder follow-up accepted through review36; portable package prerequisite accepted within scope by review37; verify-side privacy follow-up accepted by review38; verified GUI inspection/static new-copy accepted within scope by review39; session-capability tests accepted by review40; media-preserving GUI reseal reviewed at41 with M41-1 corrected pending follow-up/push;
 [Verified GUI inspection/static editable copies](VERIFIED_PACKAGE_OPEN_2026-11-09.md)
-retain the imported package and existing authored work. [Bounded media-preserving edit/reseal](PACKAGE_RESEAL_2026-11-09.md) is implemented
-pending review; full editor/course packaging and timed output acceptance remain.
+retain the imported package and existing authored work. [Bounded media-preserving edit/reseal](PACKAGE_RESEAL_2026-11-09.md) is accepted
+by review41 with its follow-up; full editor/course packaging and timed output acceptance remain.
 
 - **Purpose/reuse:** a lesson opens elsewhere with every dependency; reuse current
   schema validation/relinker and legacy pack, acknowledging current-editor pack gap.
@@ -380,8 +360,10 @@ pending review; full editor/course packaging and timed output acceptance remain.
 ### P3.1 D — standalone follow-along player — Partial prerequisites; timed player planned; L
 
 **Delivered prerequisites:** independent static HTML reading/navigation/print and
-explicit source-bound ranges. **Not delivered:** timed video player, segment auto-
-pause, Replay/loop/speed, caption packaging or local progress. A backend native
+explicit source-bound ranges, plus verified portable packages with per-step MP4s.
+**Not delivered:** timed video player, segment auto-pause, Replay/loop/speed, caption
+packaging or local progress. **Plan:** [offline learner player plan](OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md)
+(drafted 10 November 2026; no code yet). A backend native
 MP4 proof is not a user-facing standalone player or complete portable course.
 
 - **Purpose/reuse:** practice one demonstration at a time; reuse source ranges,

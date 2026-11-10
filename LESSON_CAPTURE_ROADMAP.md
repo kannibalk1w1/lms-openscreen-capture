@@ -1,6 +1,6 @@
 # OpenScreen Lesson Capture roadmap
 
-Updated 9 November 2026. **Record once. Produce multiple editable teaching resources.**
+Updated 10 November 2026. **Record once. Produce multiple editable teaching resources.**
 This fork extends OpenScreen into a local-first teaching-content toolkit for coding,
 game development and technology lessons, including SEND learners. Primary targets
 are Windows and Linux, particularly CachyOS/KDE. Keep inherited macOS behavior
@@ -23,7 +23,8 @@ automated results and physically validated functionality. The
 [architecture overview](lesson-capture/ARCHITECTURE.md) defines reusable boundaries.
 The [original specification](lesson-capture/project-spec.md) preserves rolling-buffer
 capture, retakes, lesson/slide mapping, checkpoints and human/agent handoff.
-The [previous roadmap](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-05.md) is historical.
+Earlier roadmaps are historical: [5 November](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-05.md)
+and [10 November, before this status rewrite](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-10.md).
 
 ## Unified workflow
 
@@ -51,199 +52,98 @@ Accessibility, privacy and CLI/MCP parity apply throughout. AI may draft only wh
 explicitly configured; deterministic offline operation and human review remain.
 No telemetry, cloud upload or third-party AI processing is to be enabled by default.
 
-## Current implementation and exact limits
+## Status on 10 November 2026
 
-[Portable package v1](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md) and its
-privacy follow-up are accepted through review38, pushed atb0463121. The current
-[verified GUI package inspection/static new-copy slice](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
-provides explicit directory selection, strict verification, safe read-only display
-and static editable copies without replacing current work. Video bindings remain
-read-only in the old static-copy action; the separate [media-preserving reseal slice](lesson-capture/PACKAGE_RESEAL_2026-11-09.md)
-now supports text/order/code/alt edits with fixed bindings and policy, pending exact-SHA
-review/private push before player dependencies. Native source projects/full courses/audio/platform/physical
-acceptance remain outside this scope.
+This section is the current account, in the present tense. The checkpoint-by-checkpoint
+paragraphs it replaces are kept word for word in the
+[10 November roadmap snapshot](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-10.md), and the
+[product map snapshot](lesson-capture/PRODUCT_MAP_HISTORY_2026-11-10.md) keeps the old map.
+Every review, follow-up and evidence report stays unchanged in `lesson-capture/`.
 
-- [Narration captions](LESSON_CAPTURE.md): reuse local Whisper and transcript/caption
-  editing, including recorded/imported narration. Hardware microphone acceptance
-  differs from tested imported-audio/native export.
-- [Input evidence](LESSON_CAPTURE_INPUT_EVENTS.md), [boundaries](LESSON_CAPTURE_INPUT_BOUNDARIES.md),
-  [reader-time projection](LESSON_CAPTURE_INPUT_TIMING.md) and
-  [stop/recovery](LESSON_CAPTURE_INPUT_STOP.md): Linux journal, interval identity,
-  historical reader projection, bounded stop drain/audio admission and explicit
-  device/kernel gaps. Global driver scope and physical/Windows acceptance remain open.
-- [Editable lesson guides](LESSON_CAPTURE_GUIDES.md): separate bounded manifest, stable step IDs, metadata-only drafts, composed stills, selected offline HTML/Markdown, reading/language/direction profiles, source review/title queries, explicit bounded local recovery snapshots and real editable reopen. No automatic semantic interpretation or complete project/media packaging.
-- [Explicit clock link](LESSON_CAPTURE_CLOCK_BRIDGE.md): optional same-project Godot native-clock samples, pause state and portable bounded journal inspection. Read-only round-trip brackets; no automatic edit mapping, typing pause control or physical timing acceptance.
-- [Flags](LESSON_CAPTURE_FLAGS.md), [scoped typing](LESSON_CAPTURE_TYPING.md) and
-  [Godot onset association](LESSON_CAPTURE_ASSOCIATION.md): human-calibrated source
-  placement; no continuous Godot/encoder synchronization or arbitrary desktop text capture.
-- [Code presentation](LESSON_CAPTURE_CODE_PRESENTATION.md),
-  [typing exports](LESSON_CAPTURE_EXPORTS.md), [bundles](LESSON_CAPTURE_BUNDLES.md)
-  and [typing review](LESSON_CAPTURE_TYPING_TIMELINE.md): editable code panels,
-  independent clean/captured recipes and onset markers/catalog. External-app replay,
-  selected typing MP4/GIF workflow and clock-supported continuous ranges remain open.
-- [Vector annotations](LESSON_CAPTURE_ANNOTATIONS.md),
-  [SVG styles](LESSON_CAPTURE_SVG_ARROWS.md) and [cursors](LESSON_CAPTURE_CURSORS.md):
-  editable native-rendered overlays. Auto renumbering, object-bound endpoints,
-  complete CJK/clipping and cross-platform acceptance remain open.
-- Existing upstream CLI/MCP, checkpoints, presets and relinking are reused.
-  Legacy pack supports sidecars but explicitly rejects current editor projects;
-  bounded derived packages are delivered separately; complete native-project/course
-  portability remains incomplete.
+### Repository and review state
 
-## Active work and next concrete slices
+- **Main** is `fd2775e2`, unchanged.
+- **Private feature branch** `lesson-capture/input-boundaries` was pushed by the coordinator
+  at `139b9046`.
+- **Independently reviewed:** everything through review 41 and its follow-up. Fable's 13 slices
+  were reviewed in the [independent review](lesson-capture/FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md),
+  which found M42-1; the [follow-up review](lesson-capture/M42_FIX_INDEPENDENT_FOLLOWUP_REVIEW_2026-11-10.md)
+  accepts its fix `9355933a`.
+- **Self-tested, not independently reviewed:** the three Opus slices after `139b9046`
+  (`e3701396`, `7636185d`, `90116cae`) and this documentation commit. Results and
+  limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
-**Current status (9 November 2026, end of the Fable session).** [The Fable full review](lesson-capture/FABLE_FULL_REVIEW_2026-11-09.md)
-independently accepts the M41-1 fix at259534fe and the reseal slice beneath it, and reorders
-the queue by what an author can newly do. Thirteen local, unpushed slices follow it; **none is
-independently reviewed**. On Linux an author can now: save changes back to the opened lesson
-file and is asked before unsaved lesson work is lost; record LMS lesson/slide references and
-get a `lesson-mapping.json` with every guide; create a portable package, with exported step
-videos, from the Lesson guide dialog; and package after later text edits. An agent can build
-an illustrated lesson headlessly (`lesson new`, `add-step`, `edit-step`, `remove-step`,
-`move-step`, `illustrate`, and the matching MCP tools). Exact SHAs, commands, counts, proofs and limits are in the
-[session handoff](lesson-capture/FABLE_SESSION_HANDOFF_2026-11-09.md). Next, and needing
-outside input: an independent review of these slices; a Windows run (review finding H1, the
-lesson media pipeline is Linux-only); a decision on unbinding package tools from project
-state (M2); and a manual pilot on real hardware. The timed player and further package
-identity work are no longer next. **Known loss limit:** a renderer reload or crash still
-discards unsaved Lesson guide work (the authored lesson and any package draft); only window
-close and project switches ask first, recovery copies are manual, and no autosave exists
-until the owner decides the recovery-store privacy question. The
-[independent review](lesson-capture/FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md)
-found M42-1 in headless illustration; its fix is recorded in the handoff and awaits that
-reviewer's verification. The paragraphs below are earlier checkpoint accounts.
+### What an author can do today
 
-Review41 found MediumM41-1 in9479172b: failed reseals discarded unsaved package
-drafts. [The correction](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md)
-keeps exact edits, retains the same pinned authority where safe, and requires an
-explicit matching-inventory reopen after authority loss. It is validated locally
-and awaits exact-SHA follow-up/private push. Stop for coordinator review/handoff;
-headless reseal/player work does not start automatically.
+These steps work on Linux, in the GUI. "Tested" means automated tests plus probes of the
+production app under Xvfb with stubbed dialogs. Nobody has yet run them on real hardware,
+with a real picker, with a screen reader, or on Windows or macOS.
 
+1. **Record** with the inherited recorder. Button evidence is optional and off by default.
+   Recording flags, the scoped typing pad and the Godot plugin are available.
+2. **Author steps** in the Lesson guide: add them by hand or draft them from flags and typing
+   labels. Each step has a title, instructions, code, and LMS lesson and slide references.
+3. **Illustrate** a step from the saved playhead frame and describe the image.
+4. **Export** the selected steps as an offline HTML and Markdown guide folder, with
+   `lesson-mapping.json`.
+5. **Attach a video range** to a step, confirm it, and export that step's MP4. The MP4 is video
+   only, at most 1280 px, 30 fps and 120 s.
+6. **Keep the lesson.**
+   - Save a new editable copy, or save changes back to the lesson file this window opened or
+     saved.
+   - The app asks before unsaved lesson or package work is lost when you close the editor, open
+     another lesson, switch project or start recording.
+   - Recovery copies are made only when you ask.
+7. **Package.**
+   - Create a portable package, including exported step MP4s.
+   - Open and verify a package.
+   - Make a static editable copy, or edit supported text and step order and publish a new
+     package that keeps its media bindings.
+8. **Agents** (CLI and MCP, Linux) can create a lesson and add, edit, remove, move and
+   illustrate steps. They can also query, export the guide, confirm and export ranges, package,
+   and verify.
 
-Actual [review38](lesson-capture/CLAUDE_ROADMAP_REVIEW_38_2026-11-09.md) accepts
-17bed4e6 and closes review37's L37-1, with no new findings; checkpointb0463121 is
-pushed. [Portable v1 packaging](lesson-capture/PORTABLE_LESSON_PACKAGE_2026-11-09.md)
-and CLI/MCP selected-MP4 parity are delivered within their bounded Linux scope.
-[Verified GUI inspection/static editable copies](lesson-capture/VERIFIED_PACKAGE_OPEN_2026-11-09.md)
-are accepted within scope by actual review39 at8ae83766. The
-[narrow open-time capability test follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_39_2026-11-09.md)
-is accepted by review40, pushed at5d73f835. [Media-preserving GUI reseal](lesson-capture/PACKAGE_RESEAL_2026-11-09.md)
-now adds supported drafts and new-package publication, awaiting exact-SHA review/private
-push. Imported packages and current authored lessons remain unchanged; player work is later.
-Full native-project/course portability, audio and physical/platform acceptance remain.
-Earlier accounts below retain their historical checkpoint context.
+The Lesson guide routes (draft, save, open, export, plan-range) serve only the main frame of a
+registered editor window. The same-file save goes through a main-held, per-window permission
+that ends on navigation, crash or close.
 
-Actual [review35](lesson-capture/CLAUDE_ROADMAP_REVIEW_35_2026-11-09.md) accepts
-bbe56356's bounded CLI/MCP selected-MP4 architecture, with requiredM35-1: its
-unpackaged validator resolution failed outside the app root. [The follow-up](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_35_2026-11-09.md)
-now adds stable app/module roots, distinct tool errors and independentG3/G9/G17
-controls, with failing baseline and passing actual non-root CLI/stdio native
-sample/full-decode proofs. Coordinator exact-SHA follow-up/fixes/private push is
-next before packaging/player dependencies; prior root-only proofs are not general
-external-client acceptance. Existing platform/audio/GUI/physical limits remain.
+### User value still open
 
-Actual [review34](lesson-capture/CLAUDE_ROADMAP_REVIEW_34_2026-11-09.md) accepts
-f9dcd8df and closesL33-1; confirmation/new-copy persistence plus the real startup
-smoke and bootstrap fix are pushed at8a5074f0. [Selected-step MP4 CLI/MCP export](lesson-capture/HEADLESS_SELECTED_MP4_2026-11-09.md)
-now reuses accepted materialization/validation and actual caller/native ownership,
-with explicit saved files/source grants/directory, unchanged originals and real
-CLI/stdio native proof. HTTP registration/native proof is bounded by a controlled
-permission-provider harness; stateless HTTP cancellation requires aborting the
-active request. Coordinator exact-SHA actual Claude review/fixes/private push is
-next, before selected-media portable packaging and accessible timed-player work.
-Linux video-only bounds and audio/physical/other-platform limits remain.
+| Gap | Who it affects | What it needs |
+| --- | --- | --- |
+| Lesson media runs only on Linux (H1) | Every Windows author; Windows is a primary target | Windows hardware for a supervised run (D2) |
+| No learner playback: timed segments, Next/Previous/Replay, speed, captions, progress | Learners | The [offline player plan](lesson-capture/OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md); coordinator gate before slice 1 |
+| A reload or renderer crash loses unsaved Lesson guide work (L42-2) | Authors | Owner decision on automatic recovery (D1); until then the manual-recovery promise stands |
+| Audio is never verified in lesson outputs | Narrated lessons | Audio receipt design; real audio acceptance |
+| No GIF or standalone PNG step outputs; video is capped at 1280 px | Slide authors | Owner decision (D4); the accepted contracts are unchanged |
+| Package tools need a saved, clean video project (M2) | Authors handling received packages | Owner decision (D3) |
+| No retakes, rolling buffer, save-recent or checkpoint handoff | Authors re-recording a step | Not started (product map P0.4, P2.2) |
+| Headless illustrate and range export refuse the default wallpaper and do not name the refused dependency | Agents and new projects | A small usability slice |
+| Non-English catalogues show English for lesson features | Non-English authors | Owner decision (D5) |
+| No real-hardware pilot, screen-reader, physical-input or picker evidence (M5) | Release confidence | A person at a real desktop |
+| Semantic Godot adapter, generated guides, redaction, QC report, asset library, tutor review, troubleshooting | Later phases | [Product map](lesson-capture/PRODUCT_MAP.md) |
 
-Preserve the startup history: edb74a00 omitted a required provider in the headless
-consumer, breaking already-pushed035c8313; reviews31/32 missed it.00bdbc77 fixes
-it, and reviews33/34's real smoke detects both sides. Future handler/bootstrap
-changes and reviews run the committed real startup smoke; the parent was not
-generally functional. Earlier pending/pause/status labels below are historical.
+### Next work, in order
 
-The user rescinded the original 07:30/08:00 overnight cutoffs on 6 November 2026
-after a subscription interruption. Both scheduled checkpoints are disabled;
-continue authorized coherent implementation/reviews under the unchanged authority
-constraints. [Current authorization and superseded schedule](lesson-capture/OVERNIGHT_PLAN.md).
+1. The coordinator reviews the self-tested slices and decides on a private push.
+2. The owner answers the decisions below.
+3. Offline player slice 1 (bounded media access), only after the coordinator gate.
+4. A Windows run (H1) and a manual pilot of the specification's Enemy sequence, when hardware
+   and a person are available.
+5. Small usability work: name the refused dependency kind, and guide authors away from the
+   default wallpaper before a headless illustrate.
 
-**Post-restart resumption:** the user explicitly said “continue from where we
-left off pre-restart”. The pause is resumed; original time cutoffs remain revoked.
-Review20 accepted the bounded range-media backend at125ec5de. Actual
-[review21](lesson-capture/CLAUDE_POST_RESTART_REVIEW_21.md) accepts
-[B22-2 Linux native timing](LESSON_CAPTURE_NATIVE_VIDEO_TIMING.md) at2c29d268
-with no High/Medium, within Linux software synthetic/offscreen scope.
-[Slice24 runtime video validation](LESSON_CAPTURE_ENCODED_VIDEO_VALIDATION.md)
-adds bounded stored-sample timing and actual decoded-frame evidence; actual
-[review22](lesson-capture/CLAUDE_POST_RESTART_REVIEW_22.md) accepts91b59b1d with
-no High/Medium. Its [guard/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_22.md)
-is accepted by actual [review23](lesson-capture/CLAUDE_POST_RESTART_REVIEW_23.md)
-at361fde51, no High/Medium. The
-[settlement/provenance follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_23.md)
-is accepted at fd749b82 by actual [review24](lesson-capture/CLAUDE_POST_RESTART_REVIEW_24.md),
-with no High/Medium or material blocker. The user explicitly resumed with “continue”.
-[Slice26 authored source identity](lesson-capture/AUTHORED_SOURCE_IDENTITY.md) adds
-explicit bounded Linux content capture/refresh and stored-pin materialization
-enforcement, accepted at93518c36 by actual [review25](lesson-capture/CLAUDE_POST_RESTART_REVIEW_25.md).
-Its [bounded follow-up](lesson-capture/CLAUDE_POST_RESTART_FOLLOWUP_25.md) tightens
-same-project refresh and pins six guards. Actual
-[review26](lesson-capture/CLAUDE_POST_RESTART_REVIEW_26.md) acceptsd017e4b8
-with no findings and closesL26-3/T26-2/N26-5. Its accepted source-identity scope was backend-only;
-user-facing materialization has since been integrated in editor and headless paths;
-timed delivery remains separate work.
-Earlier pause/pending notes below are historical snapshots.
+### Decisions awaiting the owner
 
-Cursor timing `43c2f91d` passed the 5,336-test milestone. Actual Claude review 3
-found a Medium undelivered-bitmap regression; [slice 4](LESSON_CAPTURE_CURSOR_RECOVERY.md)
-fixes delivery ownership and strengthens shared production-handler tests.
-Actual [review 4](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_4.md) confirms M1 resolved
-at `a58f56d9`; [the Linux button-policy slice](LESSON_CAPTURE_PRIVACY.md) follows
-with separate validation/review and explicit remaining privacy gaps. Actual reviews 2/3 and their [disposition](lesson-capture/CLAUDE_OVERNIGHT_FOLLOWUP_2_3.md)
-are preserved; ordinary capture remains adapter-free while privacy coverage expands.
-
-1. Actual Claude review 4 confirms the cursor bitmap Medium finding resolved at
-   `a58f56d9`; minor retry/pending-clear and documentation follow-ups were included
-   in subsequent validated slices. Reviews 1–4 retain their exact SHA and test boundaries.
-2. The [Linux button collection policy](LESSON_CAPTURE_PRIVACY.md) now provides
-   default-off/explicit global consent, fail-closed unknown application scope,
-   producer/storage gates, live suppression, durable receipts and canary tests.
-   Actual [review 5](lesson-capture/CLAUDE_OVERNIGHT_REVIEW_5.md) found two Medium
-   gaps; the [privacy lifecycle follow-up](LESSON_CAPTURE_PRIVACY_FOLLOWUP.md) fixes
-   asynchronous consent and adds real source-bound import/reopen inspection,
-   reviewed at `d6fd5302`: all review-5 findings fixed, with a new High countdown
-   ownership and Medium optional metadata failure. The [recovery follow-up](LESSON_CAPTURE_PRIVACY_RECOVERY.md)
-   addresses those and packaging/metadata limits; actual reviews7/8 and later
-   follow-ups are preserved in the review ledger.
-   It is a bounded collection gate, not complete
-   text/media redaction, retention exclusions or pre-export privacy inspection.
-3. The [first optional boundary](LESSON_CAPTURE_INTEGRATIONS.md) adapts selected-file
-   Godot journal import with durable default-off controls, bounded instance/session/
-   scope/capability routing and disabled/failure/isolation/offline-reopen tests.
-   Live application/project attestation and integration CLI/MCP commands remain open.
-   Actual review8 reports no High/Medium on slices8/9; bounded Low followups are in slice10.
-   [Slice11](LESSON_CAPTURE_CLOCK_BRIDGE.md) adds explicit read-only Godot/native clock samples and pause state under that policy, with continuous edit mapping still open. The shared
-   lesson manifest and offline illustrated-guide slices described below are now
-   implemented within their bounded manual workflows. Expanded semantic capture waits for privacy.
-4. [Shared lesson guide slices13–18](LESSON_CAPTURE_GUIDES.md) deliver separate
-   editable manifests, native illustrations, selected offline outputs, reading
-   profiles, source review filters and explicit manual recovery copies.
-   [Slice19](LESSON_CAPTURE_COMMANDS.md) adds explicit-file CLI/MCP query/export
-   parity without recovery-store discovery. Actual review15 accepts414823d6
-   with no High/Medium; actual review16 accepts74d58a5a with no High/Medium. Slice20 tightens HTTP lesson
-   query permission before file access and adds script-free offline guide
-   navigation/print flow; actual review17 accepts d0949f9f with no High/Medium.
-   [Slice21](LESSON_CAPTURE_RANGES.md) adds explicit authored range references
-   bound to saved render inputs and existing trim/speed mapping, with no media
-   copying/playback. Actual review18 accepts8e0316ab with no High/Medium; its
-   boundary-test gaps are addressed in slice22.
-   Current phase: backend selected-media materialization/revalidation and native
-   encoded-output proof, including the bounded review19 M22-1 fix CLOSED by actual review20 at125ec5de.
-   Actual review21 accepts the post-restart B22-2 Linux software timing fix.
-   Slice24 adds runtime sample/decode validation for a narrow Linux MP4 subset,
-   with video flags true only on success; review22 accepts91b59b1d. Its
-   guard/provenance follow-up awaits exact-SHA review.
-   Synthesized AAC stays separate from video checks; audio flags remain false. This is not
-   GUI/API/player delivery; physical/native/platform acceptance remains open.
-5. Progressively deliver the [remaining dependency-ordered backlog](lesson-capture/PRODUCT_MAP.md),
-   including original rolling buffer, retakes and real Enemy handoff proof.
+| ID | Question | Options (current behaviour first) |
+| --- | --- | --- |
+| D1 | May Lesson guide work be saved automatically? | (a) Manual recovery copies only. (b) Opt-in automatic copies to the local recovery store, off by default. (c) Automatic copies on by default, with a retention limit. (b) and (c) close L42-2. |
+| D2 | Windows lesson media (H1) | (a) Linux only, unchanged gates. (b) Provide Windows hardware or a VM for a supervised run, then open the gates per measured result. (c) Say "Linux only" in the UI and defer. |
+| D3 | Package tools and the video project (M2) | (a) Keep the binding to a saved, clean project. (b) An owner-bound, explicit-file capability for inspection and playback only; reseal and create keep the binding. (c) Unbind every package action. |
+| D4 | GIF, standalone PNG and 1920 px | (a) MP4 only, 1280 px cap. (b) Add GIF and PNG as separate derived outputs under new contracts. (c) Raise the cap under a new contract version. |
+| D5 | Translations of lesson features | (a) English fallback. (b) Machine drafts with human review. (c) Human translation for chosen locales. |
+| D6 | Package verification depth (M3) | (a) Freeze the current layer. (b) State a threat model and simplify at the next format version. |
+| D7 | Same-file save sets the file to mode 0600 and replaces the inode | (a) Keep it private, as now. (b) Preserve the original mode; hard links still break. |
 
 ## Evidence and review ledger
 
