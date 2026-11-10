@@ -90,7 +90,7 @@ export function createLessonPlayerWindow(owners: LessonPlayerOwners = lessonPlay
 		if (!HEADLESS) win.show();
 	});
 	win.on("closed", () => {
-		owner.close();
+		owner.release();
 		if (ses.protocol.isProtocolHandled(LESSON_PLAYER_MEDIA_SCHEME))
 			ses.protocol.unhandle(LESSON_PLAYER_MEDIA_SCHEME);
 		void ses.clearStorageData().catch(() => undefined);

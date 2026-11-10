@@ -333,3 +333,113 @@ it("never pins media that changed between verification and installing the capabi
 	});
 	expect(await route("open")(p.event)).toEqual({ success: false, code: "lesson-package-invalid" });
 });
+
+function gate() {
+	let release!: () => void;
+	const promise = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	return { promise, release };
+}
+it.each([
+	"picker",
+	"verification",
+])("an explicit close while an open is in its %s ends that open: no view or capability, and only a fresh open restores", async (stage) => {
+	const p = player();
+	// An older package is playing when the learner starts opening another one.
+	const older = ((await route("open")(p.event)) as { result: LessonPlayerView }).result;
+	const olderSrc = older.steps[0].video!.src;
+	const held = gate();
+	inspect.mockClear();
+	if (stage === "picker")
+		pick.mockImplementationOnce(async () => {
+			await held.promise;
+			return moved;
+		});
+	else
+		inspect.mockImplementationOnce(
+			async (...args: Parameters<typeof openSelectedLessonPackage>) => {
+				await held.promise;
+				return openSelectedLessonPackage(...args);
+			},
+		);
+	const pending = route("open")(p.event);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	await route("close")(p.event);
+	// The release ends the older package at once, not when the pending open settles.
+	expect((await media(p.owner, olderSrc)).status).toBe(404);
+	held.release();
+	expect(await pending).toEqual({ success: false, code: "lesson-package-cancelled" });
+	if (stage === "picker") expect(inspect).not.toHaveBeenCalled();
+	// Positive control: a fresh open after the release works and plays.
+	const fresh = ((await route("open")(p.event)) as { result: LessonPlayerView }).result;
+	expect((await media(p.owner, fresh.steps[0].video!.src)).status).toBe(206);
+	expect((await media(p.owner, olderSrc)).status).toBe(404);
+});
+
+it("an open right after a close waits for the released verification to settle, then starts fresh", async () => {
+	const p = player(),
+		held = gate();
+	let settled = false;
+	inspect.mockImplementationOnce(async (...args: Parameters<typeof openSelectedLessonPackage>) => {
+		await held.promise;
+		try {
+			return await openSelectedLessonPackage(...args);
+		} finally {
+			settled = true;
+		}
+	});
+	const released = route("open")(p.event);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	await route("close")(p.event);
+	const next = route("open")(p.event);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	// Not busy-refused and not started over the unwinding verification.
+	expect(pick).toHaveBeenCalledTimes(1);
+	held.release();
+	expect(await released).toEqual({ success: false, code: "lesson-package-cancelled" });
+	const result = (await next) as { success: boolean; result: LessonPlayerView };
+	expect(settled).toBe(true);
+	expect(result.success).toBe(true);
+	expect(pick).toHaveBeenCalledTimes(2);
+	expect((await media(p.owner, result.result.steps[0].video!.src)).status).toBe(206);
+});
+
+it("choosing a new valid folder replaces the old package without cancelling the new open", async () => {
+	const p = player();
+	const first = ((await route("open")(p.event)) as { result: LessonPlayerView }).result;
+	const second = (await route("open")(p.event)) as { success: boolean; result: LessonPlayerView };
+	expect(second.success).toBe(true);
+	expect((await media(p.owner, first.steps[0].video!.src)).status).toBe(404);
+	expect((await media(p.owner, second.result.steps[0].video!.src)).status).toBe(206);
+});
+
+it("no other window can close or cancel a player's package or pending open", async () => {
+	const p = player(),
+		other = player(),
+		editor = contents("file:///app/dist/index.html?windowType=editor"),
+		stranger = contents();
+	editorRangeSessions.register(editor.value, editor.value.getURL());
+	const view = ((await route("open")(p.event)) as { result: LessonPlayerView }).result;
+	const held = gate();
+	pick.mockImplementationOnce(async () => {
+		await held.promise;
+		return moved;
+	});
+	const pending = route("open")(p.event);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	for (const intruder of [
+		other.event,
+		editor.event,
+		stranger.event,
+		{ ...p.event, senderFrame: {} },
+	]) {
+		await route("close")(intruder);
+		await route("cancel")(intruder);
+	}
+	expect((await media(p.owner, view.steps[0].video!.src)).status).toBe(206);
+	held.release();
+	const result = (await pending) as { success: boolean; result: LessonPlayerView };
+	expect(result.success).toBe(true);
+	expect((await media(p.owner, result.result.steps[0].video!.src)).status).toBe(206);
+});

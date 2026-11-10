@@ -137,30 +137,40 @@ export async function servePlayerMedia(
 			file.path,
 			constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
 		);
+		let bytes: Buffer<ArrayBuffer> | null = null;
 		try {
 			if (identity(await handle.stat()) !== file.identity) throw new Changed();
-			const bytes = Buffer.alloc(length);
+			const buffer = Buffer.alloc(length);
+			let complete = true;
 			for (let at = 0; at < length; ) {
-				if (cap.signal.aborted || request.signal?.aborted) return empty(404);
-				const { bytesRead } = await handle.read(bytes, at, length - at, range.start + at);
+				if (cap.signal.aborted || request.signal?.aborted) {
+					complete = false;
+					break;
+				}
+				const { bytesRead } = await handle.read(buffer, at, length - at, range.start + at);
 				if (!bytesRead) throw new Changed();
 				at += bytesRead;
 			}
-			// Final checks immediately before any byte leaves: the descriptor and the path are still
-			// the verified file, and the capability is still live.
-			if (identity(await handle.stat()) !== file.identity || !pathCurrent()) throw new Changed();
-			if (cap.signal.aborted || !cap.isCurrent() || request.signal?.aborted) return empty(404);
-			return new Response(bytes, {
-				status: 206,
-				headers: {
-					...base,
-					"Content-Length": String(length),
-					"Content-Range": `bytes ${range.start}-${range.end}/${file.size}`,
-				},
-			});
+			// The descriptor is still the verified file after the read.
+			if (complete && identity(await handle.stat()) !== file.identity) throw new Changed();
+			if (complete) bytes = buffer;
 		} finally {
+			// Every awaited cleanup finishes here, before the last authorization below.
 			await handle.close();
 		}
+		// Last authorization, synchronous and with no await before the response is returned: the path
+		// is still the verified file, the capability is live and the request was not abandoned.
+		if (!bytes) return empty(404);
+		if (!pathCurrent()) throw new Changed();
+		if (cap.signal.aborted || !cap.isCurrent() || request.signal?.aborted) return empty(404);
+		return new Response(bytes, {
+			status: 206,
+			headers: {
+				...base,
+				"Content-Length": String(length),
+				"Content-Range": `bytes ${range.start}-${range.end}/${file.size}`,
+			},
+		});
 	} catch {
 		// Changed, replaced, missing or unreadable: no bytes, no detail, and no more playback.
 		cap.revoke();

@@ -200,3 +200,25 @@ it("offers Cancel while a package is being checked, and is inert without the pla
 		(screen.getByRole("button", { name: "Open lesson package…" }) as HTMLButtonElement).disabled,
 	).toBe(true);
 });
+it("hides Close package while another package is being opened; Cancel is the only way to stop it", async () => {
+	let finish!: (value: Awaited<ReturnType<LessonPlayerApi["open"]>>) => void;
+	const open = vi
+		.fn<LessonPlayerApi["open"]>()
+		.mockResolvedValueOnce({ success: true, result: view })
+		.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
+	const bridge = api({ open });
+	show(bridge);
+	await openPackage();
+	expect(screen.getByRole("button", { name: "Close package" })).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Open lesson package…" }));
+	expect(screen.queryByRole("button", { name: "Close package" })).toBeNull();
+	expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+	await act(async () => finish({ success: true, result: { status: "cancelled" } }));
+	expect(screen.getByRole("button", { name: "Close package" })).toBeTruthy();
+	expect(bridge.close).not.toHaveBeenCalled();
+});

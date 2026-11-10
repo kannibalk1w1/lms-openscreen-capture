@@ -47,6 +47,8 @@ export class LessonPlayerOwner {
 	private epoch = 0;
 	private operation = 0;
 	private pending?: AbortController;
+	/** Resolves once the pending open, if any, has fully unwound (picker and verification). */
+	private settling: Promise<void> = Promise.resolve();
 	private capability?: PlayerMediaCapability & { abort: AbortController };
 	ended = false;
 	constructor(
@@ -56,14 +58,23 @@ export class LessonPlayerOwner {
 		for (const name of ["destroyed", "render-process-gone", "did-start-navigation"] as const)
 			contents.on(name, () => this.end());
 	}
-	/** Every navigation, crash or close: pending opens and the capability both end. */
+	/** Every navigation, crash or close: everything the window held ends, as on an explicit release. */
 	private end() {
-		this.epoch++;
-		this.pending?.abort();
-		this.close();
+		this.release();
 		if (this.contents.isDestroyed()) this.ended = true;
 	}
-	close() {
+	/**
+	 * The learner's explicit close, and every lifetime end: the open package's media AND any open still
+	 * in its picker or verification end now. A new epoch means nothing begun before can install a view
+	 * or capability; only a fresh open afterwards can.
+	 */
+	release() {
+		this.epoch++;
+		this.pending?.abort();
+		this.revokeCapability();
+	}
+	/** Ends only the current media capability (a newly chosen folder, or a changed file). */
+	private revokeCapability() {
 		this.capability?.abort.abort();
 		this.capability = undefined;
 	}
@@ -93,7 +104,18 @@ export class LessonPlayerOwner {
 			authority: { assertCurrent(): void; signal: AbortSignal },
 		) => Promise<InspectedPackage>,
 	): Promise<LessonPlayerView | { status: "cancelled" }> {
-		if (this.pending) throw new PlayerError("lesson-player-busy");
+		if (this.pending) {
+			if (!this.pending.signal.aborted) throw new PlayerError("lesson-player-busy");
+			// A released or cancelled open is still unwinding: let its picker and verification
+			// settle before any new work, then start fresh from the current page and epoch.
+			await this.settling;
+			if (this.pending) throw new PlayerError("lesson-player-busy");
+			if (!this.isPage(event)) throw new PlayerError("lesson-player-unavailable");
+		}
+		let settled!: () => void;
+		this.settling = new Promise<void>((resolve) => {
+			settled = resolve;
+		});
 		const epoch = this.epoch,
 			operation = ++this.operation,
 			abort = new AbortController();
@@ -110,8 +132,9 @@ export class LessonPlayerOwner {
 			const directory = await pick();
 			assertCurrent();
 			if (!directory) return { status: "cancelled" };
-			// The author chose a different folder: the previous package stops playing now.
-			this.close();
+			// A different folder was chosen: the previous package stops playing now. This open
+			// itself stays current (no new epoch).
+			this.revokeCapability();
 			const inspected = await inspect(directory, { assertCurrent, signal: abort.signal });
 			assertCurrent();
 			const videos = new Map<string, PlayerMediaFile>();
@@ -133,12 +156,13 @@ export class LessonPlayerOwner {
 				inflight: 0,
 				isCurrent: () => this.capability?.token === token && this.epoch === epoch,
 				revoke: () => {
-					if (this.capability?.token === token) this.close();
+					if (this.capability?.token === token) this.revokeCapability();
 				},
 			};
 			return playerView(token, inspected);
 		} finally {
 			if (this.pending === abort) this.pending = undefined;
+			settled();
 		}
 	}
 }
@@ -267,6 +291,6 @@ export function registerLessonPlayerHandlers(deps: {
 		ownerOf(event)?.cancel();
 	});
 	ipcMain.handle("lesson-player:close", (event) => {
-		ownerOf(event)?.close();
+		ownerOf(event)?.release();
 	});
 }

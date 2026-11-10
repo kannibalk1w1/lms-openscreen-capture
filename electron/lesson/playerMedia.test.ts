@@ -270,3 +270,99 @@ it("bounds requests in flight per capability and bytes buffered across every pla
 	for (const response of await Promise.all(pending)) expect(response.status).toBe(206);
 	expect(playerBufferedBytes()).toBe(0);
 });
+
+/**
+ * Holds the real descriptor close of the served file (after it has actually closed) until released,
+ * and counts close calls. FileHandle.close is an own property of each handle, so the handle the
+ * production code opens is wrapped as it is returned from the real fs.open.
+ */
+function wrapClose(after: (close: () => Promise<void>) => Promise<void>) {
+	const realOpen = fs.open.bind(fs);
+	let calls = 0;
+	vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+		const handle = await realOpen(...args);
+		if (args[0] === file) {
+			const realClose = handle.close.bind(handle);
+			handle.close = async () => {
+				calls++;
+				await after(realClose);
+			};
+		}
+		return handle;
+	});
+	return () => calls;
+}
+async function gateClose() {
+	let entered!: () => void, release!: () => void;
+	const reached = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const calls = wrapClose(async (close) => {
+		await close();
+		entered();
+		await held;
+	});
+	return { reached, release, calls };
+}
+it.each([
+	"capability-revoked",
+	"request-aborted",
+	"file-changed-in-place",
+	"ancestor-replaced",
+])("returns no bytes when, during the descriptor close, the %s", async (change) => {
+	const gate = await gateClose(),
+		abort = new AbortController();
+	const pending = servePlayerMedia(
+		new Request(url(), { headers: { Range: "bytes=301-310" }, signal: abort.signal }),
+		() => cap,
+	);
+	await gate.reached;
+	if (change === "capability-revoked") cap.revoke();
+	if (change === "request-aborted") abort.abort();
+	if (change === "file-changed-in-place") await fs.appendFile(file, "x");
+	if (change === "ancestor-replaced") {
+		// The package folder is swapped for a symlink to an identical copy: the path is no longer the
+		// verified file even though its bytes match.
+		const moved = root + "-moved";
+		await fs.rename(root, moved);
+		await fs.symlink(moved, root);
+	}
+	gate.release();
+	const response = await pending;
+	expect(response.status).toBe(404);
+	expect(await response.text()).toBe("");
+	expect(gate.calls()).toBe(1);
+	expect(cap.inflight).toBe(0);
+	expect(playerBufferedBytes()).toBe(0);
+	if (change === "file-changed-in-place" || change === "ancestor-replaced")
+		expect(cap.revoked).toBe(1);
+	if (change === "ancestor-replaced") {
+		await fs.rm(root);
+		await fs.rename(root + "-moved", root);
+	}
+});
+it("returns the range once its descriptor has closed while everything is still current (control)", async () => {
+	const gate = await gateClose();
+	const pending = get(url(), "bytes=301-310");
+	await gate.reached;
+	gate.release();
+	const response = await pending;
+	expect(response.status).toBe(206);
+	expect(Buffer.from(await response.arrayBuffer()).equals(bytes.subarray(301, 311))).toBe(true);
+	expect(gate.calls()).toBe(1);
+	expect(cap.revoked).toBe(0);
+});
+it("returns no bytes, closes once and releases its budget when the descriptor close fails", async () => {
+	const calls = wrapClose(async (close) => {
+		await close();
+		throw new Error("close failed");
+	});
+	const response = await get(url(), "bytes=0-9");
+	expect(response.status).toBe(404);
+	expect(calls()).toBe(1);
+	expect(cap.inflight).toBe(0);
+	expect(playerBufferedBytes()).toBe(0);
+});
