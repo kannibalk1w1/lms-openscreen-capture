@@ -74,7 +74,7 @@ Checkpoint markers, listing and within-take comparison are unchanged and work in
 
 All on source in this commit (see the commit SHA in the evidence README):
 
-- Unit: new `src/lib/applicationIntegrations/godotScene.history.test.ts` (26 tests:
+- Unit: new `src/lib/applicationIntegrations/godotScene.history.test.ts` (26 tests at `1372a9c2`, 33 after the review follow-ups:
   normalization, direction, withheld paths, baseline-only pre-existing run, 16 malformed
   shapes, cross-version rejection, raw tail validation after the cap, v4 checkpoints).
 - Focused: application integrations, lesson, Godot checkpoint CLI/MCP/file/UI —
@@ -112,4 +112,6 @@ commit addresses them:
 - N2: documented above. N1 (invisible formatting characters in labels) is retained,
   matching the existing checkpoint-label rule.
 
-The follow-up awaits a focused recheck.
+The [focused recheck of `03355303`](CLAUDE_GODOT_HISTORY_RUN_RECHECK_03355303_2026-11-10.md)
+**accepts** it with two Nits, both closed in the next commit: N3 (post-cap out-of-scope
+run path now tested) and N4 (test count above corrected).

@@ -337,5 +337,8 @@ describe("review 1372a9c2 follow-up guards", () => {
 		expect(() =>
 			parseGodotSceneJournal(build([{ event: "scene-history", history: startHistory }])),
 		).toThrow(/Invalid scene history record/);
+		expect(() =>
+			parseGodotSceneJournal(build([{ event: "scene-run", run: playing("res://main.tscn") }])),
+		).toThrow(/outside the captured scene/);
 	});
 });
