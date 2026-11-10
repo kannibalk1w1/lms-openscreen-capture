@@ -72,8 +72,14 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
 - **Opus slices after `139b9046`:** `e3701396`, `7636185d`, `90116cae` and the docs commit
   `51e46e44`. The [independent review of `51e46e44`](lesson-capture/OPUS_INDEPENDENT_REVIEW_2026-11-10.md)
   requested changes for two Medium lifetime defects, R1 and R2.
-- **Self-tested, not independently reviewed:** the R1/R2 fix `0c73895b` and the documentation
-  commit after it. The reviewer rechecks the exact fix before acceptance or a private push.
+- **R1/R2 fix accepted:** the [lifetime-fix review](lesson-capture/OPUS_LIFETIME_FIX_INDEPENDENT_REVIEW_2026-11-10.md)
+  accepts `0c73895b` and `3e3785da` with no new High or Medium, and one nonblocking Low (L1).
+  The coordinator pushed checkpoint `4489db2a` privately.
+- **Self-tested, not independently reviewed:**
+  - `cabaf30e`, which fixes L1;
+  - `82f69ca0`, the read-only offline lesson player;
+  - the documentation commit after them.
+
   Results and limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
 ### What an author can do today
@@ -105,6 +111,16 @@ with a real picker, with a screen reader, or on Windows or macOS.
 8. **Agents** (CLI and MCP, Linux) can create a lesson and add, edit, remove, move and
    illustrate steps. They can also query, export the guide, confirm and export ranges, package,
    and verify.
+9. **Learners play a package (since `82f69ca0`, self-tested).**
+   - Open the read-only Lesson player from the editor's "Lesson player" button or File > Open
+     Lesson Player. No video project is needed.
+   - Choose a package folder. The package is fully verified first.
+   - Read each step's instructions, code and image in order, and play its step video. Play,
+     pause and seek use the video's own controls, plus Replay, playback speed (0.5× to 1.5×)
+     and Previous/Next.
+   - Moving between steps pauses and never autoplays.
+   - It is entirely offline.
+   - Nothing is saved: no progress, no history.
 
 The Lesson guide routes (draft, save, open, export, plan-range) serve only the main frame of a
 registered editor window. The same-file save goes through a main-held, per-window permission.
@@ -119,7 +135,7 @@ no further permission.
 | Gap | Who it affects | What it needs |
 | --- | --- | --- |
 | Lesson media runs only on Linux (H1) | Every Windows author; Windows is a primary target | Windows hardware for a supervised run (D2) |
-| No learner playback: timed segments, Next/Previous/Replay, speed, captions, progress | Learners | The [offline player plan](lesson-capture/OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md); coordinator gate before slice 1 |
+| Learner playback is basic: no saved progress, captions, step shortcuts, troubleshooting or standalone (no-app) player | Learners | The [offline player plan](lesson-capture/OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md) slices 2 to 6; slices 0 and 1 plus minimal controls are delivered, self-tested |
 | A reload or renderer crash loses unsaved Lesson guide work (L42-2) | Authors | Owner decision on automatic recovery (D1); until then the manual-recovery promise stands |
 | Audio is never verified in lesson outputs | Narrated lessons | Audio receipt design; real audio acceptance |
 | No GIF or standalone PNG step outputs; video is capped at 1280 px | Slide authors | Owner decision (D4); the accepted contracts are unchanged |
@@ -132,14 +148,15 @@ no further permission.
 
 ### Next work, in order
 
-1. The reviewer rechecks the R1/R2 fix `0c73895b`; the coordinator then decides on a private
-   push.
+1. An independent review of `cabaf30e` and `82f69ca0`, then the coordinator's push decision.
 2. The owner answers the remaining decisions below (D3 is decided).
-3. Offline player slice 0 (a read-only package capability that does not need a video project,
-   per D3(b)), then slice 1 (bounded media access). Neither starts before the coordinator gate.
-4. A Windows run (H1) and a manual pilot of the specification's Enemy sequence, when hardware
+3. A manual learner pass of the player on real hardware: a real folder picker, keyboard only,
+   and a screen reader (Orca). This is the evidence the automated probes cannot give.
+4. Player slices 3 to 5: explicit-click progress, captions (needs package v2 acceptance), and
+   accessibility acceptance.
+5. A Windows run (H1) and a manual pilot of the specification's Enemy sequence, when hardware
    and a person are available.
-5. Small usability work: name the refused dependency kind, and guide authors away from the
+6. Small usability work: name the refused dependency kind, and guide authors away from the
    default wallpaper before a headless illustrate.
 
 ### Decisions awaiting the owner

@@ -16,6 +16,36 @@ writer. Each slice starts only after the coordinator gate.
 a time, fully offline: watch the step's video, pause, replay, change speed, read the
 instructions and code, move to the next step, and keep their place.
 
+## Delivered so far (10 November 2026, self-tested, not independently reviewed)
+
+Commit `82f69ca0` delivers slices 0 and 1, and a minimal slice 2. Where it differs from the plan
+below:
+
+- **Window and session (slice 1, P1).**
+  - Every player window gets its own `lesson-player-<uuid>` in-memory partition. Up to 4 player
+    windows may be open.
+  - The page is a separate `lesson-player.html` with its own CSP and its own minimal preload,
+    which exposes only open, cancel and close. It is not the editor's preload.
+  - The session refuses every network request except its own page assets, `data:` images and its
+    scheme.
+- **Media (slice 1, P2).**
+  - Over-budget requests are refused at once with `503` and `Retry-After: 1`. They are not
+    queued.
+  - A request with no `Range` header is treated as `bytes=0-` and answered `206` with at most
+    8 MiB, never an unbounded `200`.
+  - Revocation aborts reads in progress before their bytes are returned. Bytes Chromium already
+    buffered in that renderer can still play; no new bytes are served.
+- **Controls (slice 2, minimal).**
+  - Delivered: play, pause and seek through the native video controls, plus Replay, a speed
+    select (0.5× to 1.5×) and Previous/Next.
+  - Delivered: a step list with `aria-current`, a polite step counter, and focus moved to the
+    step heading on every explicit step change. Moving between steps pauses and never
+    autoplays.
+  - **Not delivered:** Loop, and the Space/R/L/[/] and Alt+arrow shortcuts. Native control
+    keys and Tab-reachable buttons are the keyboard path for now.
+- **Launch points.** The editor's "Lesson player" button, which works with no project, and
+  File > Open Lesson Player. Both are self-tested in the real app.
+
 ## Fixed constraints
 
 These do not change in any slice below:

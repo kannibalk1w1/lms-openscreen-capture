@@ -303,3 +303,130 @@ The [player plan](OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md) was updated, as a p
 - the R1/R2 lifetime pattern as a requirement for slice 0.
 
 No player code exists. Slice 0 waits for the coordinator gate.
+
+## Follow-up: L1 and the read-only offline player (10 November 2026, evening)
+
+**Status:** self-tested, **not independently reviewed**.
+
+**Coordinator task:** `task_79b62a210df3`, dispatch `ctx_7cec8747c95d`.
+
+**Base:** root checkpoint `4489db2a`, pushed privately. It records the
+[lifetime-fix review](OPUS_LIFETIME_FIX_INDEPENDENT_REVIEW_2026-11-10.md) accepting
+`0c73895b`/`3e3785da` (R1/R2 closed) with one nonblocking Low, L1. The review is unchanged. Its
+`/tmp` evidence was copied, hash-verified, to
+`../openscreen-evaluation/opus-lifetime-fix-review-2026-11-10-retained/`; the originals were
+left untouched.
+
+**Commits:** `cabaf30e` (L1), `82f69ca0` (the player), then this documentation commit.
+
+### `cabaf30e`: L1, no stale new-copy picker
+
+The new-copy save now checks its operation before showing the save dialog, as well as after it
+returns. The regression tests hold the real WebCrypto validation digest of a lesson with an
+image, then:
+- navigate the window, crash its renderer, or start a newer operation, after which no picker
+  opens;
+- or leave the request current, as a positive control, after which the picker opens once.
+
+Removing the new check fails all three refusal cases.
+
+### `82f69ca0`: the player (owner decision D3(b): read-only inspection and playback only)
+
+**What a learner gets.** The full description is in the roadmap ("What an author can do
+today", item 9) and the player plan's "Delivered so far" section. In short: open a verified
+package with no video project, read the ordered steps, and play each step's MP4 with seek,
+Replay, speed and Previous/Next. Everything is offline and nothing is saved.
+
+**Authority and isolation:**
+- **Window:**
+  - Each player window is created only by main.
+  - It is registered with its exact page URL.
+  - It runs on its own unique in-memory partition, with sandbox, `contextIsolation`, no Node,
+    `webSecurity` on and a separate CSP-locked page.
+  - Its only bridge is open, cancel and close.
+- **Opening a package:**
+  - The native folder picker is the only path authority.
+  - The existing full v1 verification runs before anything is shown, and every pinned file is
+    rechecked before the capability is installed.
+  - The R1 epoch and operation pattern ends the capability on navigation, crash, close, explicit
+    close or a newer folder.
+- **Media:** a scheme handled only in that partition, mapping token and step to the verified
+  inventory. Each request is one bounded buffered range from an `O_NOFOLLOW` descriptor, with
+  final descriptor, path and capability checks before any byte, under per-capability and
+  aggregate budgets. Any change ends the capability.
+- **Unchanged:** authoring, package copy, reseal and create, CLI/MCP, and their project checks.
+  The player gains none of them, and the editor gains no player media.
+
+### Validation
+
+All runs used pinned Node 22.22.1 and npm 10.9.4.
+
+| Check | Result |
+| --- | --- |
+| Both `tsc`; lint (35 baseline warnings); `i18n:check`; `docs:check` | pass |
+| `electron/lesson/playerMedia.test.ts` | 11 pass: ranges; headers; refusals; in-place, rename, symlink and delete changes; mutation and revocation during a read; budgets |
+| `electron/ipc/lessonPlayer.test.ts` | 15 pass: production registration; a real package built from the fixture and moved away from its deleted originals (decode mocked here only); isolation; lifecycle; cancellation; pre-install change |
+| `src/lessonPlayer/LessonPlayer.test.tsx` (jsdom) | 9 pass |
+| `electron/ipc/lesson.lifetime.test.ts` (with L1) | 22 pass |
+| Vite build (two preloads, two pages); required foreign-directory startup smoke | pass; `success: true` |
+| Full suite at `82f69ca0` | **6,360 / 464 files pass, 0 skipped** |
+
+**My mutants: 11, sources restored byte for byte.** 10 were killed by assertions:
+- token comparison;
+- the final identity and path check;
+- the final capability check;
+- the in-flight bound and the aggregate byte budget (made decisive with a 500 ms race after an
+  earlier run timed out instead of asserting);
+- the player-page frame check;
+- the pre-install recheck;
+- the launch editor check;
+- a new folder ending the previous package;
+- lifecycle ending plus epoch outdating, paired.
+
+The one survivor, lifecycle ending alone, is a real redundant layer: the epoch check in
+`isCurrent()` still refuses, and the pair is killed.
+
+### Full-app probe
+
+Production build, Xvfb, real preloads, IPC, partitions, scheme and Chromium `<video>`. Only the
+folder dialog is stubbed.
+
+**Package:** a real, CLI-built, moved v1 package copied from preserved evidence
+(`package-reseal-2026-11-09T1933Z/fresh moved package`; the original is hash-verified
+unchanged). It has two steps and a stored 45-sample 640×360 H.264 step video. The real CLI
+`lesson verify-package` on this build reported `verified`.
+
+| Probe | Result |
+| --- | --- |
+| Launch | The editor's real button (no project), File menu item and preload all open a player. The player has `lessonPlayer` only (no `electronAPI`), the CSP is present, and the preferences are sandbox/isolation/no Node/webSecurity on an in-memory session |
+| View | Title, ordered steps, "Step 1 of 2", instructions, data-URL JPEG with alt text, code, a capability video URL with no autoplay. The checked/not-signature/not-approved/audio-not-checked note is shown. The picker is parented and called once |
+| Playback | `loadedmetadata`: duration 1.5 s, 640×360. Played to about 0.48 s, seeked to 1.0, Replay restarted, speed 1.5. Next goes to step 2 (no video, focus on its heading); Previous gives a new paused video at 0 that keeps 1.5× |
+| Isolation, through each window's real session (`session.fetch`) | Own token 206. Editor session `ERR_UNKNOWN_URL_SCHEME`. Second player with the first player's token 404 (its own token 206). Multipart and out-of-range 416. Unknown step, `file:` URL and network in the player all refused. Two distinct in-memory sessions, neither the editor's nor the default |
+| Changes | A media byte appended → 404, and the capability stays ended after the file is restored. A fresh open gets a new token, 206 |
+| Lifecycle | Navigation in the player → 404, and a reopen from the navigated page returns `lesson-player-unavailable`. The editor's authoring routes are still served. Closing both players leaves the editor alive |
+| Files | The package copy and the original evidence are byte-identical before and after |
+
+An earlier run reported "loaded" after a change or navigation. That was Chromium's in-renderer
+media buffer, not the server, so the final run checks every server-side outcome through
+`session.fetch`.
+
+### Limits
+
+- **Not tested:** a real folder picker, physical keyboard or screen reader, Windows or macOS,
+  audio (receipts keep audio flags false), and real lessons. Browser `<video>` playback is not
+  independent verification of the visual content.
+- **Not delivered:** Loop and the keyboard shortcuts, progress, captions, troubleshooting, and a
+  standalone player outside the app.
+- **Buffered bytes:** bytes Chromium already buffered in a renderer may still play after
+  revocation; no new bytes are served.
+- **Linux only,** through the existing verification gate.
+
+### Evidence
+
+`../openscreen-evaluation/opus-player-2026-11-10/` holds:
+- the probe and launch-probe results;
+- the first, cache-limited run, kept and labelled;
+- the smoke;
+- the mutation script and results;
+- the fixture hash lists;
+- the build log.
