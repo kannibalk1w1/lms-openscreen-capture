@@ -50,6 +50,9 @@ Captured fields are deliberately narrow:
 - Script resource identity and Sprite2D texture resource identity: `res://` paths
   only; built-in/unsaved and external/unsupported resources have explicit markers.
 - Selection IDs within the observed node set.
+- New v4 takes: this scene's own undo-history version/position and bounded editor
+  action names, and polled editor run state (this scene's `res://` path, or another
+  scene without a path). See [history and run observations](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).
 
 No arbitrary Inspector/custom properties, metadata, script source, resource bytes,
 other scenes, project scans, global inputs or network messages are collected.
@@ -155,3 +158,12 @@ owned Node3D instances, plus local `visible`. Comparison and selected drafts reu
 the existing generic flow. No class-name suffix is used to infer inheritance, and
 no mesh/material contents or world transform is implied. Existing v1/v2 evidence
 keeps its original subset. [Exact scope and Windows/Linux evidence](lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md).
+
+## Editor history and run state (v4)
+
+New takes write raw journal v4. The decoder adds `editor-history` observations
+(forward/back/unresolved editor history position with the editor's action label) and
+`run-state` observations (run of this scene, another scene with its path withheld, or
+stopped). They are editor-reported and polled, not proof of a gesture, of new-vs-redo,
+or of a successful run; errors remain unavailable. [Exact scope and Linux/WinBoat
+evidence](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).

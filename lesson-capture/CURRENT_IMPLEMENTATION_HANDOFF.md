@@ -1,3 +1,20 @@
+# Claude owns building; Godot history/run slice awaiting review — 10 November 2026
+
+The owner moved implementation to Claude: Claude (Opus 5.5) is now lead builder and
+sole source integrator; Codex/root supervises orchestration, decisions and review
+routing only and makes no source edits. The earlier roughly 75% Codex utilisation stop
+is superseded for Claude building; provider limits still apply. Claude usage telemetry
+is not exposed to this session (percent/reset unavailable).
+
+Slice: [Godot scene history and run-state observations](GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md)
+— raw journal v4 adds this scene's own undo-history position/action names and polled
+run state (other-scene path withheld; errors unavailable). 6,558 tests / 482 files,
+both TypeScript configs, Vite, lint35, real Linux and WinBoat Windows 11 Godot 4.7.1
+editor/API probes pass. Independent review pending. Main fd2775e2, no pushes; player
+stays parked. Remaining: physical Windows/KDE acceptance, broader resource/signal
+semantics, project checkpoint/archive/restore, expected-state verification, retakes
+and handoff.
+
 # Stopped near utilisation cap; all Godot slices reviewed — 10 November 2026
 
 Claude [accepted source 5a77ac5d](CLAUDE_GODOT_NODE3D_REVIEW_5A77AC5D_2026-11-10.md)

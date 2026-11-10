@@ -52,6 +52,8 @@ and [10 November, before this status rewrite](LESSON_CAPTURE_ROADMAP_HISTORY_202
 **Autonomous run checkpoint:** stopped at 74% weekly utilisation on 10 November,
 near the owner's roughly 75% cap. All Godot slices through `5a77ac5d` are reviewed;
 no new push. [Resume checkpoint](lesson-capture/GODOT_CAPTURE_RESUME_2026-11-10.md).
+Claude then took over building: [Godot history and run-state observations](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md)
+(raw v4) are implemented with real Linux/WinBoat editor/API probes; review pending.
 
 ## Unified workflow
 

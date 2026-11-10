@@ -106,3 +106,11 @@ Node3D position, rotation and scale are recorded as finite XYZ `position3`,
 `rotation3` and `scale3` triples, with local `visible`. This is property sampling,
 not a full world transform. The generic normalized capture stays v1. See
 [Node3D scope and actual Linux/Windows validation](../../lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md).
+
+New takes write raw scene journal v4 (v1–v3 still import). v4 also records this
+scene's own editor undo-history position and action names (they may contain node
+names; global and other-scene history are excluded) and the polled editor run state:
+a run of this scene with its `res://` path, another scene's run without a path, or
+stopped. Run results, output and errors are not captured. These are editor-reported
+positions, not proof of a gesture or of a successful run. See
+[history/run scope and validation](../../lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).

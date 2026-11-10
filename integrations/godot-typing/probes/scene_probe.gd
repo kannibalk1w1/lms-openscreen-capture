@@ -286,5 +286,115 @@ func _probe() -> void:
 	if not _require(not spatial_capture.active(), "nonfinite value stopped capture"):
 		return
 	spatial_root.position = Vector3.ZERO
+	if not await _probe_history_and_run(editor):
+		return
 	print("SCENE_PROBE_PASSED")
 	get_tree().quit(0)
+
+func _pump(capture, seconds: float = 0.35) -> void:
+	var until := Time.get_ticks_msec() + int(seconds * 1000)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		capture.poll()
+
+func _count(text: String, needle: String) -> int:
+	return text.split(needle).size() - 1
+
+# v4 editor context: the captured scene's own history and polled run state.
+func _probe_history_and_run(editor: EditorInterface) -> bool:
+	editor.open_scene_from_path("res://history.tscn")
+	await _wait()
+	var root := editor.get_edited_scene_root() as Node2D
+	if not _require(root != null and root.scene_file_path == "res://history.tscn", "history scene opened"):
+		return false
+	var ur := get_undo_redo()
+	var take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(take.begin("res://history.jsonl", root, editor, ur), "history take start"):
+		return false
+	if not _require(take.connected_observer_count() == 5, "history observers connected"):
+		return false
+	var slime := Node2D.new()
+	slime.name = "Slime"
+	ur.create_action("Add Child Node")
+	ur.add_do_method(root, "add_child", slime)
+	ur.add_do_property(slime, "owner", root)
+	ur.add_do_reference(slime)
+	ur.add_undo_method(root, "remove_child", slime)
+	ur.commit_action()
+	await _pump(take)
+	for i in 3:
+		ur.create_action("Set position", UndoRedo.MERGE_ENDS)
+		ur.add_do_property(slime, "position", Vector2(i + 1, i + 1))
+		ur.add_undo_property(slime, "position", Vector2.ZERO)
+		ur.commit_action()
+		await get_tree().process_frame
+	await _pump(take)
+	var history := ur.get_history_undo_redo(ur.get_object_history_id(root))
+	history.undo()
+	await _pump(take)
+	history.redo()
+	await _pump(take)
+	history.undo()
+	await _pump(take)
+	ur.create_action("Rename HISTORY_LABEL_CANARY")
+	ur.add_do_property(slime, "name", "Slime2")
+	ur.add_undo_property(slime, "name", "Slime")
+	ur.commit_action()
+	await _pump(take)
+	ur.create_action("x".repeat(201))
+	ur.add_do_property(slime, "visible", false)
+	ur.add_undo_property(slime, "visible", true)
+	ur.commit_action()
+	await _pump(take)
+	var before_global := FileAccess.get_file_as_string("res://history.jsonl")
+	ur.create_action("GLOBAL_HISTORY_CANARY", UndoRedo.MERGE_DISABLE, ProjectSettings)
+	ur.add_do_method(self, "set_meta", "probe", 1)
+	ur.add_undo_method(self, "remove_meta", "probe")
+	ur.commit_action()
+	await _pump(take)
+	if not _require(_count(FileAccess.get_file_as_string("res://history.jsonl"), "scene-history") == _count(before_global, "scene-history"), "global history excluded"):
+		return false
+	editor.play_current_scene()
+	for i in 40:
+		await _pump(take, 0.1)
+		if editor.is_playing_scene():
+			break
+	if not _require(editor.is_playing_scene(), "current scene run started"):
+		return false
+	await _pump(take)
+	editor.stop_playing_scene()
+	await _pump(take)
+	editor.play_main_scene()
+	for i in 40:
+		await _pump(take, 0.1)
+		if editor.is_playing_scene():
+			break
+	if not _require(editor.is_playing_scene(), "main scene run started"):
+		return false
+	await _pump(take)
+	take.stop()
+	if not _require(take.connected_observer_count() == 0 and not take.active(), "history observers disconnected"):
+		return false
+	# A run that already exists when a take starts is baseline context only.
+	if not _require(take.begin("res://history-prerun.jsonl", root, editor, ur), "pre-existing run take"):
+		return false
+	await _pump(take)
+	editor.stop_playing_scene()
+	await _pump(take)
+	take.stop()
+	for i in 20:
+		if not editor.is_playing_scene():
+			break
+		await get_tree().create_timer(0.1).timeout
+	if not _require(not editor.is_playing_scene(), "probe runs stopped"):
+		return false
+	var text := FileAccess.get_file_as_string("res://history.jsonl")
+	for canary in ["GLOBAL_HISTORY_CANARY", "main.tscn"]:
+		if not _require(not text.contains(canary), "out-of-scope context withheld: " + canary):
+			return false
+	for needed in ["HISTORY_LABEL_CANARY", "unsupported-action-name", "\"scope\":\"current-scene\"", "\"scope\":\"other-scene\""]:
+		if not _require(text.contains(needed), "history/run evidence: " + needed):
+			return false
+	if not _require(_count(text, "\"Set position\"") == 2, "merged actions recorded once (plus redo)"):
+		return false
+	return true

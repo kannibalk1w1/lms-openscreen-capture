@@ -21,7 +21,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
 	path.join(fixture, "project.godot"),
-	'config_version=5\n[application]\nconfig/name="Disposable scene probe"\n[editor_plugins]\nenabled=PackedStringArray("res://addons/openscreen_typing/plugin.cfg", "res://addons/probe/plugin.cfg")\n',
+	'config_version=5\n[application]\nconfig/name="Disposable scene probe"\nrun/main_scene="res://main.tscn"\n[editor_plugins]\nenabled=PackedStringArray("res://addons/openscreen_typing/plugin.cfg", "res://addons/probe/plugin.cfg")\n',
 );
 fs.writeFileSync(
 	path.join(fixture, "enemy.tscn"),
@@ -38,6 +38,14 @@ fs.writeFileSync(
 fs.writeFileSync(
 	path.join(fixture, "slime.svg"),
 	'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="green"/></svg>',
+);
+fs.writeFileSync(
+	path.join(fixture, "history.tscn"),
+	'[gd_scene format=3]\n[node name="HistoryRoot" type="Node2D"]\n',
+);
+fs.writeFileSync(
+	path.join(fixture, "main.tscn"),
+	'[gd_scene format=3]\n[node name="MainScene" type="Node2D"]\n',
 );
 fs.writeFileSync(
 	path.join(fixture, "spatial.tscn"),
@@ -81,8 +89,8 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
-if (records.some((entry) => entry.schemaVersion !== 3))
-	throw new Error("New producer did not write schema v3 consistently");
+if (records.some((entry) => entry.schemaVersion !== 4))
+	throw new Error("New producer did not write schema v4 consistently");
 for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
 	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
 		throw new Error(`Missing ${label} marker`);
@@ -213,6 +221,54 @@ try {
 }
 if (!incompleteRejected) throw new Error("Incomplete footer-failure journal was accepted");
 fs.writeFileSync(path.join(fixture, "offline-review.json"), JSON.stringify(decoded, null, 2));
+// v4 editor context from real EditorUndoRedoManager/EditorInterface calls.
+const historyJournal = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "history.jsonl"), "utf8"),
+);
+const historyLabels = historyJournal.observations
+	.filter((entry) => entry.type === "editor-history")
+	.map((entry) => `${entry.payload.direction}:${entry.payload.after.action}`);
+const expectedHistory = [
+	"forward:Add Child Node",
+	"forward:Set position",
+	"back:Add Child Node",
+	"forward:Set position",
+	"back:Add Child Node",
+	"forward:Rename HISTORY_LABEL_CANARY",
+	"forward:unsupported-action-name",
+];
+if (JSON.stringify(historyLabels) !== JSON.stringify(expectedHistory))
+	throw new Error(`Unexpected real history observations: ${JSON.stringify(historyLabels)}`);
+const runLabels = historyJournal.observations
+	.filter((entry) => entry.type === "run-state")
+	.map((entry) => entry.label);
+if (
+	JSON.stringify(runLabels) !==
+	JSON.stringify([
+		"Editor run observed: res://history.tscn",
+		"Editor run stop observed",
+		"Editor run observed: another scene (path withheld)",
+	])
+)
+	throw new Error(`Unexpected real run observations: ${JSON.stringify(runLabels)}`);
+if (decoded.baseline.history?.available !== false)
+	throw new Error("Take without a history manager must report history unavailable");
+const prerun = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "history-prerun.jsonl"), "utf8"),
+);
+if (
+	prerun.baseline.run?.scope !== "other-scene" ||
+	JSON.stringify(prerun.observations.filter((e) => e.type === "run-state").map((e) => e.label)) !==
+		JSON.stringify(["Editor run stop observed"])
+)
+	throw new Error("Pre-existing run must be baseline context only");
+fs.writeFileSync(
+	path.join(fixture, "history-review.json"),
+	JSON.stringify(historyJournal, null, 2),
+);
+console.log(
+	`HISTORY_RUN_PASSED: ${historyLabels.length} history + ${runLabels.length} run observations; global history and other-scene path withheld`,
+);
 console.log(
 	`OFFLINE_DECODER_PASSED: ${decoded.observations.length} observations; both limited journals and disable journal valid; incomplete journal rejected`,
 );

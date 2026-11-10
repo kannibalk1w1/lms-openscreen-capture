@@ -52,8 +52,35 @@ const stateSchema = z
 		selected: z.array(nodeId).max(512),
 	})
 	.strict();
+// v4 editor context: the captured scene's own undo history and polled run state.
+const historyLabel = z
+	.string()
+	.min(1)
+	.max(200)
+	.refine((label) => label.trim().length > 0 && !/[\p{Cc}]/u.test(label));
+const historySchema = z.union([
+	z.object({ available: z.literal(false) }).strict(),
+	z
+		.object({
+			available: z.literal(true),
+			version: z.number().int().min(0).max(2147483647),
+			actionIndex: z.number().int().min(-1).max(1000000),
+			action: historyLabel.nullable(),
+		})
+		.strict()
+		.refine((history) => history.actionIndex < 0 === (history.action === null)),
+]);
+const runSchema = z.union([
+	z.object({ state: z.literal("stopped") }).strict(),
+	z
+		.object({ state: z.literal("playing"), scope: z.literal("current-scene"), scene: resourcePath })
+		.strict(),
+	z.object({ state: z.literal("playing"), scope: z.literal("other-scene") }).strict(),
+]);
+type SceneHistory = z.infer<typeof historySchema>;
+type SceneRun = z.infer<typeof runSchema>;
 const envelope = z.object({
-	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
 	sequence: z.number().int().min(0).max(4095),
@@ -67,6 +94,8 @@ const recordSchema = z.discriminatedUnion("event", [
 			scene: resourcePath,
 			state: stateSchema,
 			intervalMs: z.literal(250),
+			history: historySchema.optional(),
+			run: runSchema.optional(),
 		})
 		.strict(),
 	envelope
@@ -74,11 +103,13 @@ const recordSchema = z.discriminatedUnion("event", [
 			event: z.literal("scene-state"),
 			state: stateSchema,
 			trigger: z
-				.enum(["poll", "selection", "inspector", "tree", "save", "stop", "checkpoint"])
+				.enum(["poll", "selection", "inspector", "tree", "save", "stop", "checkpoint", "history"])
 				.optional(),
 		})
 		.strict(),
 	envelope.extend({ event: z.literal("scene-saved"), scene: resourcePath }).strict(),
+	envelope.extend({ event: z.literal("scene-history"), history: historySchema }).strict(),
+	envelope.extend({ event: z.literal("scene-run"), run: runSchema }).strict(),
 	envelope
 		.extend({
 			event: z.literal("scene-stop"),
@@ -112,7 +143,9 @@ export type SceneObservation = {
 		| "node-changed"
 		| "selection-changed"
 		| "scene-saved"
-		| "author-checkpoint";
+		| "author-checkpoint"
+		| "editor-history"
+		| "run-state";
 	label: string;
 	payload: JsonValue;
 };
@@ -125,7 +158,8 @@ export type GodotSceneJournal = {
 	coverage: "sampled" | "limited";
 	stopReason: string;
 	durationMs: number;
-	baseline: SceneState;
+	/** v4 adds the starting editor history/run context; earlier versions keep the bare state. */
+	baseline: SceneState | (SceneState & { history: SceneHistory; run: SceneRun });
 	observations: SceneObservation[];
 };
 function validateState(state: SceneState, rootId?: string, schemaVersion = 2): void {
@@ -190,6 +224,21 @@ function decodeGodotSceneJournal(text: string): {
 		)
 	)
 		throw new Error("Checkpoint requires scene journal schema v2");
+	const v4 = first.schemaVersion === 4;
+	if ((first.history !== undefined) !== v4 || (first.run !== undefined) !== v4)
+		throw new Error("Editor history/run context requires exactly scene journal schema v4");
+	if (
+		!v4 &&
+		records.some(
+			(record) =>
+				record.event === "scene-history" ||
+				record.event === "scene-run" ||
+				(record.event === "scene-state" && record.trigger === "history"),
+		)
+	)
+		throw new Error("Editor history/run records require scene journal schema v4");
+	if (first.history && !first.history.available && records.some((r) => r.event === "scene-history"))
+		throw new Error("History records require an available scene history");
 	const rootId = first.state.nodes[0].id;
 	const types = new Map(first.state.nodes.map((node) => [node.id, node.type]));
 	let previous = first.state,
@@ -205,9 +254,14 @@ function decodeGodotSceneJournal(text: string): {
 		coverage: last.coverage,
 		stopReason: last.reason,
 		durationMs: last.atMs,
-		baseline: first.state,
+		baseline:
+			first.history && first.run
+				? { ...first.state, history: first.history, run: first.run }
+				: first.state,
 		observations,
 	};
+	let history = first.history,
+		run = first.run;
 	// Diff expansion can exceed the source byte count. Keep a bounded prefix while
 	// validating every remaining raw record; never turn corrupt tails into partial success.
 	let normalizedBytes =
@@ -276,6 +330,49 @@ function decodeGodotSceneJournal(text: string): {
 			previous = record.state;
 		} else if (record.event === "scene-saved") {
 			add("scene-saved", "Scene save observed", { scene: record.scene });
+		} else if (record.event === "scene-history" && history?.available) {
+			const after = record.history;
+			if (!after.available || JSON.stringify(after) === JSON.stringify(history))
+				throw new Error("Invalid scene history record");
+			const direction =
+				after.version > history.version
+					? "forward"
+					: after.version < history.version
+						? "back"
+						: "unresolved";
+			// Version/action-name changes are editor-reported observations. They do not
+			// prove the gesture, whether a forward step was new or a redo, or what changed.
+			const label =
+				direction === "back"
+					? `Editor history stepped back from: ${history.action ?? "(start of history)"}`
+					: direction === "forward"
+						? `Editor history: ${after.action ?? "(start of history)"}`
+						: `Editor history changed: ${after.action ?? "(start of history)"}`;
+			add("editor-history", label, {
+				historyScope: "captured-scene",
+				direction,
+				before: history,
+				after,
+				interpretation: "editor-reported-history-position",
+			});
+			history = after;
+		} else if (record.event === "scene-run" && run) {
+			const after = record.run;
+			if (JSON.stringify(after) === JSON.stringify(run))
+				throw new Error("Invalid scene run record");
+			const label =
+				after.state === "stopped"
+					? "Editor run stop observed"
+					: after.scope === "current-scene"
+						? `Editor run observed: ${after.scene}`
+						: "Editor run observed: another scene (path withheld)";
+			add("run-state", label, {
+				before: run,
+				after,
+				observation: "polled-editor-run-state",
+				result: "unavailable",
+			});
+			run = after;
 		} else if (record.event === "scene-checkpoint") {
 			if (
 				first.schemaVersion < 2 ||
