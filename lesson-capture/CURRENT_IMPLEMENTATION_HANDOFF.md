@@ -1,3 +1,22 @@
+# Stopped near utilisation cap; all Godot slices reviewed — 10 November 2026
+
+Claude [accepted source 5a77ac5d](CLAUDE_GODOT_NODE3D_REVIEW_5A77AC5D_2026-11-10.md)
+with no blocking or Low findings. The owner requested autonomous Godot-roadmap work
+to roughly 75% utilisation; root stopped new feature work at **74% weekly usage**
+(measured 20:38 UTC), after completing validation and independent reviews. No review
+or worker task is pending. This is a budget checkpoint, not roadmap completion.
+
+[Concise resume state, completed capabilities, validation and remaining work](GODOT_CAPTURE_RESUME_2026-11-10.md).
+Final source validation: 6,532 tests / 481 files; actual Linux/WinBoat Godot 4.7.1 probes,
+Node3D/GridMap/Inspector/nonfinite/draft checks, bothTS/Vite/lint35/i18n15/docs37,
+real production startup and 15 v3 CLI/MCP checks. Source worktree was clean at the
+accepted commit; this final checkpoint changes documentation only.
+
+No new pushes. Private feature remote was verified read-only at e3c00e0e; main
+remains fd2775e2. Parked player and real lesson projects were not changed by this
+run. Existing Godot reviews exclude older/parked-player history. Earlier entries
+below retain their historical status; the resume checkpoint is current.
+
 # Node3D capture awaiting final review — 10 November 2026
 
 Claude [accepted 22eb61e4](CLAUDE_GODOT_CHECKPOINT_FILE_TOOLS_REVIEW_22EB61E4_2026-11-10.md)
@@ -7,7 +26,7 @@ added real Node3D-root/GridMap/Inspector/nonfinite/draft proofs on Linux and Win
 finite XYZ position3/rotation3/scale3 and local visible; v1/v2 remain strict, and
 generic capture v1/lesson flow stays unchanged. 6,532 tests / 481 files, 61 focused tests,
 both TypeScript configs, Vite, lint35/i18n15/docs37 and production startup+15 v3 CLI/MCP checks pass.
-Both actual Godot4.7.1 OS probes pass; no physical/rendered/game-run claims.
+Both actual Godot 4.7.1 OS probes pass; no physical/rendered/game-run claims.
 No inheritance is inferred by native type-name suffix; real GridMap covers that.
 
 Last measured weekly utilisation: 73% at20:32 UTC; no session meter.
@@ -61,7 +80,7 @@ Root integrated the cheaper worker's selected-file application capture prototype
 6,499 tests/475 files, 150 focused tests/7 files, both TypeScript configs, Vite,
 lint (35 baseline warnings), i18n15/docs37, real production Linux startup and
 11 real CLI/MCP parity checks pass. Shared file-service Node probes pass27checks
-on each of Linux and WinBoat Windows11. No Windows Electron/native claim.
+on each of Linux and WinBoat Windows 11. No Windows Electron/native claim.
 Source fingerprints/explicit IDs/new output paths and existing MCP consent guard
 file work; a final pre-write check covers consent revocation/cancellation.
 Independent review pending. Main fd2775e2 unchanged; no push. Weekly meter63%
@@ -92,7 +111,7 @@ with no findings and closed association L1/L2. The next bounded slice adds
 labels, synchronous allowlisted scene sampling, v2 raw journals with strict v1
 compatibility, offline review/selected draft persistence and stale-dialog guards.
 6,469 tests/472 files, both TypeScript configs, Vite, lint (35 baseline warnings),
-i18n15/docs37 and real Linux/WinBoat Godot4.7.1 editor/API probes pass. Both final
+i18n15/docs37 and real Linux/WinBoat Godot 4.7.1 editor/API probes pass. Both final
 probes include actual toolbar/dialog signals. No physical/native recording or
 project restoration/run-result claims. Marker slice awaits independent review.
 
@@ -1004,7 +1023,7 @@ identity before user-facing materialization or timed delivery.
 
 Current disk inspection found `/tmp` largely empty (16GiB available) and about
 555GiB free on `/home`; the old tmp-full note is historical. Use pinned
-Node22.22.1/npm10.9.4. Rust tests use the unnamespaced vendored FFmpeg libraries;
+Node 22.22.1/npm 10.9.4. Rust tests use the unnamespaced vendored FFmpeg libraries;
 the rebuilt Node addon uses its matched namespaced ORIGIN libraries without
 LD_LIBRARY_PATH. Rust raster tests need `OPENSCREEN_FONTS_DIR=$PWD/public/fonts`,
 the same bundled-font contract the app supplies.
@@ -1084,7 +1103,7 @@ have no completion summaries and are not counted; final reruns own their results
 
 ## Toolchain, artifacts and cleanup
 
-Pinned Node22.22.1/npm10.9.4 first on PATH. `/tmp` tmpfs is full; use a short
+Pinned Node 22.22.1/npm 10.9.4 first on PATH. `/tmp` tmpfs is full; use a short
 private `/home` cache TMPDIR for tests (long paths exceed Unix socket limits).
 Do not purge shared caches or remove other processes' files. Required root/test
 TS, Vite, lint/i18n/docs/diff and final suite evidence are recorded with the slice.

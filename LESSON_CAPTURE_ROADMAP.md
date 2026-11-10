@@ -33,8 +33,8 @@ has [Claude acceptance](lesson-capture/CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW
 [Read-only original-file marker listing and fingerprint-bound comparison through CLI/MCP](lesson-capture/GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md)
 are [accepted by Claude](lesson-capture/CLAUDE_GODOT_CHECKPOINT_FILE_TOOLS_REVIEW_22EB61E4_2026-11-10.md).
 [Bounded Node3D transforms](lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md) now have
-real Linux/WinBoat editor/API coverage and generic draft/CLI/MCP reuse, pending
-independent review. Application-project checkpoints/restoration,
+real Linux/WinBoat editor/API coverage and generic draft/CLI/MCP reuse, with
+[Claude acceptance](lesson-capture/CLAUDE_GODOT_NODE3D_REVIEW_5A77AC5D_2026-11-10.md). Application-project checkpoints/restoration,
 retakes, broader editor/runtime diagnostics and physical acceptance remain open. Earlier checkpoint/review entries below
 retain their historical scope.
 
@@ -48,6 +48,10 @@ The [original specification](lesson-capture/project-spec.md) preserves rolling-b
 capture, retakes, lesson/slide mapping, checkpoints and human/agent handoff.
 Earlier roadmaps are historical: [5 November](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-05.md)
 and [10 November, before this status rewrite](LESSON_CAPTURE_ROADMAP_HISTORY_2026-11-10.md).
+
+**Autonomous run checkpoint:** stopped at 74% weekly utilisation on 10 November,
+near the owner's roughly 75% cap. All Godot slices through `5a77ac5d` are reviewed;
+no new push. [Resume checkpoint](lesson-capture/GODOT_CAPTURE_RESUME_2026-11-10.md).
 
 ## Unified workflow
 
