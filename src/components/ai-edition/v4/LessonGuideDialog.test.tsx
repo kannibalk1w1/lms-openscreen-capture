@@ -580,6 +580,9 @@ it("marks unsaved lesson work, tells main, and saves edits back to the opened fi
 	const sameFile = () =>
 		screen.getByRole("button", { name: "Save changes to the opened file" }) as HTMLButtonElement;
 	expect(sameFile().disabled).toBe(true);
+	// The guide's own explanation matches both save actions.
+	expect(screen.queryByText(/never replaces an existing file/)).toBeNull();
+	screen.getByText(/Save changes to the opened file updates only the lesson file you opened/);
 	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
 	await screen.findByText("All lesson changes are saved in: /chosen/lesson.json");
 	expect(sameFile().disabled).toBe(true);
@@ -720,4 +723,25 @@ it("names every repeated step button with its step number and title", () => {
 			);
 	// The visible words stay inside the accessible name.
 	expect(screen.getAllByText("Move up")).toHaveLength(2);
+});
+it("keeps unsaved lesson work marked while the guide is hidden, and clears the mark only when the work itself is gone", async () => {
+	const setLessonUnsavedWork = vi.fn();
+	vi.stubGlobal("electronAPI", { setLessonUnsavedWork });
+	const view = (open: boolean) => (
+		<I18nProvider>
+			<LessonGuideDialog open={open} onClose={vi.fn()} />
+		</I18nProvider>
+	);
+	const { rerender, unmount } = render(view(true));
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	await waitFor(() => expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(true));
+	// Hiding the guide keeps its state, so closing the editor must still ask.
+	rerender(view(false));
+	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(true);
+	rerender(view(true));
+	expect(screen.getAllByLabelText("Step title")).toHaveLength(1);
+	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(true);
+	// Unmounting (a project switch remounts the guide) discards the work and the mark with it.
+	unmount();
+	expect(setLessonUnsavedWork).toHaveBeenLastCalledWith(false);
 });

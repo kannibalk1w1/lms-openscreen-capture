@@ -290,7 +290,7 @@
 	"lesson": {
 		"title": "Lesson guide",
 		"scope": "Build editable, application-neutral steps and export an offline HTML/Markdown guide. No application integration is required.",
-		"unsaved": "This lesson is separate from the video project. Save an editable copy before leaving this project; saving never replaces an existing file.",
+		"unsaved": "This lesson is separate from the video project, so save it before you leave this project. Save new editable copy always makes a new file. Save changes to the opened file updates only the lesson file you opened or saved here, and never a file changed elsewhere since.",
 		"lessonTitle": "Lesson title",
 		"stepName": "step {{number}}, {{title}}",
 		"packageCreate": {
