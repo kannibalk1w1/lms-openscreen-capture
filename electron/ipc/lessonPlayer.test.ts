@@ -377,33 +377,61 @@ it.each([
 	expect((await media(p.owner, olderSrc)).status).toBe(404);
 });
 
-it("an open right after a close waits for the released verification to settle, then starts fresh", async () => {
-	const p = player(),
-		held = gate();
-	let settled = false;
-	inspect.mockImplementationOnce(async (...args: Parameters<typeof openSelectedLessonPackage>) => {
-		await held.promise;
-		try {
-			return await openSelectedLessonPackage(...args);
-		} finally {
-			settled = true;
+// Review recheck MP2: a request made while a released open is still unwinding must never wait and
+// later run; it is refused at once, so no later close or cancel can miss it.
+const SECOND_ENDS = ["close", "cancel", "navigate", "crash", "destroy"] as const;
+for (const stage of ["picker", "verification"] as const)
+	it.each(
+		SECOND_ENDS,
+	)(`opens requested while a released open is unwinding in its ${stage} are refused at once and never run later (then %s)`, async (secondEnd) => {
+		const p = player(),
+			held = gate();
+		pick.mockClear();
+		inspect.mockClear();
+		if (stage === "picker")
+			pick.mockImplementationOnce(async () => {
+				await held.promise;
+				return moved;
+			});
+		else
+			inspect.mockImplementationOnce(
+				async (...args: Parameters<typeof openSelectedLessonPackage>) => {
+					await held.promise;
+					return openSelectedLessonPackage(...args);
+				},
+			);
+		const a = route("open")(p.event);
+		await vi.waitFor(() => expect(stage === "picker" ? pick : inspect).toHaveBeenCalledTimes(1));
+		await route("close")(p.event);
+		// Two more requests while A unwinds: both refused immediately, neither queued.
+		const busy = { success: false, code: "lesson-player-busy" };
+		const now = (request: Promise<unknown>) =>
+			Promise.race([
+				request,
+				new Promise((resolve) => setTimeout(() => resolve("still-waiting"), 200)),
+			]);
+		expect(await now(route("open")(p.event))).toEqual(busy);
+		expect(await now(route("open")(p.event))).toEqual(busy);
+		if (secondEnd === "close") await route("close")(p.event);
+		if (secondEnd === "cancel") await route("cancel")(p.event);
+		if (secondEnd === "navigate") p.navigate();
+		if (secondEnd === "crash") p.crash();
+		if (secondEnd === "destroy") p.destroy();
+		held.release();
+		expect(await a).toEqual({ success: false, code: "lesson-package-cancelled" });
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		// Nothing ran for the refused requests: no further picker or verification.
+		expect(pick).toHaveBeenCalledTimes(1);
+		expect(inspect).toHaveBeenCalledTimes(stage === "picker" ? 0 : 1);
+		// A genuinely new open afterwards works only where the page is still the player.
+		const fresh = await route("open")(p.event);
+		if (secondEnd === "navigate" || secondEnd === "destroy") {
+			expect(fresh).toEqual({ success: false, code: "lesson-player-unavailable" });
+			return;
 		}
+		const view = (fresh as { result: LessonPlayerView }).result;
+		expect((await media(p.owner, view.steps[0].video!.src)).status).toBe(206);
 	});
-	const released = route("open")(p.event);
-	await new Promise((resolve) => setTimeout(resolve, 10));
-	await route("close")(p.event);
-	const next = route("open")(p.event);
-	await new Promise((resolve) => setTimeout(resolve, 10));
-	// Not busy-refused and not started over the unwinding verification.
-	expect(pick).toHaveBeenCalledTimes(1);
-	held.release();
-	expect(await released).toEqual({ success: false, code: "lesson-package-cancelled" });
-	const result = (await next) as { success: boolean; result: LessonPlayerView };
-	expect(settled).toBe(true);
-	expect(result.success).toBe(true);
-	expect(pick).toHaveBeenCalledTimes(2);
-	expect((await media(p.owner, result.result.steps[0].video!.src)).status).toBe(206);
-});
 
 it("choosing a new valid folder replaces the old package without cancelling the new open", async () => {
 	const p = player();
@@ -442,4 +470,25 @@ it("no other window can close or cancel a player's package or pending open", asy
 	const result = (await pending) as { success: boolean; result: LessonPlayerView };
 	expect(result.success).toBe(true);
 	expect((await media(p.owner, result.result.steps[0].video!.src)).status).toBe(206);
+});
+
+it.each([
+	"close",
+	"cancel",
+])("a %s during verification aborts the verifier's own signal at once, so its work stops", async (end) => {
+	const p = player(),
+		held = gate();
+	let signal: AbortSignal | undefined;
+	inspect.mockImplementationOnce(async (...args: Parameters<typeof openSelectedLessonPackage>) => {
+		signal = args[1].signal;
+		await held.promise;
+		return openSelectedLessonPackage(...args);
+	});
+	const pending = route("open")(p.event);
+	await vi.waitFor(() => expect(signal).toBeDefined());
+	expect(signal!.aborted).toBe(false);
+	await route(end)(p.event);
+	expect(signal!.aborted).toBe(true);
+	held.release();
+	expect(await pending).toEqual({ success: false, code: "lesson-package-cancelled" });
 });

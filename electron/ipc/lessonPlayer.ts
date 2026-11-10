@@ -47,8 +47,6 @@ export class LessonPlayerOwner {
 	private epoch = 0;
 	private operation = 0;
 	private pending?: AbortController;
-	/** Resolves once the pending open, if any, has fully unwound (picker and verification). */
-	private settling: Promise<void> = Promise.resolve();
 	private capability?: PlayerMediaCapability & { abort: AbortController };
 	ended = false;
 	constructor(
@@ -104,18 +102,11 @@ export class LessonPlayerOwner {
 			authority: { assertCurrent(): void; signal: AbortSignal },
 		) => Promise<InspectedPackage>,
 	): Promise<LessonPlayerView | { status: "cancelled" }> {
-		if (this.pending) {
-			if (!this.pending.signal.aborted) throw new PlayerError("lesson-player-busy");
-			// A released or cancelled open is still unwinding: let its picker and verification
-			// settle before any new work, then start fresh from the current page and epoch.
-			await this.settling;
-			if (this.pending) throw new PlayerError("lesson-player-busy");
-			if (!this.isPage(event)) throw new PlayerError("lesson-player-unavailable");
-		}
-		let settled!: () => void;
-		this.settling = new Promise<void>((resolve) => {
-			settled = resolve;
-		});
+		// One open per window at a time, and nothing waits: while an earlier open is still running,
+		// or released/cancelled but still unwinding its picker or verification, a new request is
+		// refused at once. No request can sit waiting where a later close or cancel would miss it;
+		// the learner opens again once the earlier one has settled.
+		if (this.pending) throw new PlayerError("lesson-player-busy");
 		const epoch = this.epoch,
 			operation = ++this.operation,
 			abort = new AbortController();
@@ -162,7 +153,6 @@ export class LessonPlayerOwner {
 			return playerView(token, inspected);
 		} finally {
 			if (this.pending === abort) this.pending = undefined;
-			settled();
 		}
 	}
 }
