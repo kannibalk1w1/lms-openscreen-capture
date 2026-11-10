@@ -176,7 +176,7 @@ func _property_edited(property: String) -> void:
 	var target := _editor.get_inspector().get_edited_object()
 	if not target is Node or (target != _root and (target.owner != _root or not _root.is_ancestor_of(target))):
 		return
-	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture"):
+	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture"):
 		_pending_trigger = "inspector"
 
 func _snapshot() -> Dictionary:
@@ -207,6 +207,17 @@ func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 			_limited = true
 			return
 		properties = {"position": [target.position.x, target.position.y], "rotation": target.rotation, "scale": [target.scale.x, target.scale.y], "visible": target.visible}
+	elif node is Node3D:
+		var target := node as Node3D
+		if not target.position.is_finite() or not target.rotation.is_finite() or not target.scale.is_finite():
+			_limited = true
+			return
+		properties = {
+			"position3": [target.position.x, target.position.y, target.position.z],
+			"rotation3": [target.rotation.x, target.rotation.y, target.rotation.z],
+			"scale3": [target.scale.x, target.scale.y, target.scale.z],
+			"visible": target.visible,
+		}
 	if node is Sprite2D:
 		properties["texture"] = _resource(node.texture)
 	properties["script"] = _resource(node.get_script())
@@ -245,7 +256,7 @@ func _has_control(text: String) -> bool:
 func _write(payload: Dictionary) -> bool:
 	if not active():
 		return false
-	payload["schemaVersion"] = 2
+	payload["schemaVersion"] = 3
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence

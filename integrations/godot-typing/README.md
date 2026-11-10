@@ -84,7 +84,7 @@ See [scope, workflow and exact evidence](../../LESSON_CAPTURE_CLOCK_BRIDGE.md).
 
 The same addon now has a separate **Capture scene actions** control. It starts
 off and asks for current-scene permission and a new journal file. Review its
-bounded hierarchy/selection/2D transform/resource observations in **Lesson guide →
+bounded hierarchy/selection/2D and 3D transform/resource observations in **Lesson guide →
 Application capture observations**, then turn explicitly selected observations into draft
 steps. Typing and read-only clock capture remain independent. See the
 [workflow, privacy, evidence and limits](../../LESSON_CAPTURE_GODOT_SCENES.md).
@@ -99,5 +99,10 @@ During an active scene take, **Mark scene checkpoint** adds a short authored lab
 (up to 200 UTF-16 code units, no controls or blank labels) after sampling the scene.
 A marker dialog belongs to that take only. Labels are included in the journal, so
 review them before sharing. This does not save, archive, restore or run a project.
-Raw scene journals now use v2; OpenScreen still reads legacy v1 journals. See
+New raw scene journals use v3; OpenScreen still reads legacy v1/v2 journals. See
 [checkpoint scope and validation](../../lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md).
+
+Node3D position, rotation and scale are recorded as finite XYZ `position3`,
+`rotation3` and `scale3` triples, with local `visible`. This is property sampling,
+not a full world transform. The generic normalized capture stays v1. See
+[Node3D scope and actual Linux/Windows validation](../../lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md).

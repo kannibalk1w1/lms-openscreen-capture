@@ -39,6 +39,10 @@ fs.writeFileSync(
 	path.join(fixture, "slime.svg"),
 	'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="green"/></svg>',
 );
+fs.writeFileSync(
+	path.join(fixture, "spatial.tscn"),
+	'[gd_scene format=3]\n[node name="SpatialRoot" type="Node3D"]\n',
+);
 const env = {
 	...process.env,
 	XDG_DATA_HOME: path.join(fixture, "data"),
@@ -77,6 +81,11 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
+if (records.some((entry) => entry.schemaVersion !== 3))
+	throw new Error("New producer did not write schema v3 consistently");
+for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
+	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
+		throw new Error(`Missing ${label} marker`);
 if (records.at(-1).reason !== "scene-changed") throw new Error("Missing scope-change footer");
 const disabled = fs
 	.readFileSync(path.join(fixture, "disable.jsonl"), "utf8")
@@ -113,8 +122,66 @@ if (!process.env.OPENSCREEN_SCENE_DECODER)
 		format: "cjs",
 		outfile: decoderPath,
 	});
-const { parseGodotSceneJournal } = require(decoderPath);
+const { parseGodotSceneJournal, listGodotSceneCheckpoints, compareGodotSceneCheckpoints } = require(
+	decoderPath,
+);
 const decoded = parseGodotSceneJournal(journal);
+if (
+	decoded.baseline.nodes.find((node) => node.name === "SpatialCanary")?.properties.position3
+		?.length !== 3 ||
+	!["position3", "rotation3", "scale3"].every((field) =>
+		decoded.observations.some(
+			(entry) => entry.type === "node-changed" && entry.label.includes(field),
+		),
+	)
+)
+	throw new Error("Missing Node3D transform baseline/change evidence");
+const spatialText = fs.readFileSync(path.join(fixture, "spatial.jsonl"), "utf8");
+const spatialJournal = parseGodotSceneJournal(spatialText);
+if (
+	spatialJournal.baseline.nodes[0].type !== "Node3D" ||
+	spatialJournal.baseline.nodes[1].type !== "GridMap" ||
+	!spatialJournal.baseline.nodes[1].properties.position3
+)
+	throw new Error("Missing real Node3D root or unsuffixed native subclass evidence");
+const spatialChange = spatialJournal.observations.find(
+	(entry) => entry.type === "node-changed" && entry.payload.after?.name === "SpatialRoot",
+);
+if (
+	!spatialChange ||
+	JSON.stringify(spatialChange.payload.after.properties.position3) !== "[8,9,10]" ||
+	spatialChange.payload.after.properties.visible !== false
+)
+	throw new Error("Missing 3D root property observation");
+const spatialRecords = spatialText.trim().split("\n").map(JSON.parse);
+if (!spatialRecords.some((record) => record.trigger === "inspector"))
+	throw new Error("Missing 3D Inspector signal evidence");
+const spatialMarkers = listGodotSceneCheckpoints(spatialText);
+const spatialComparison = compareGodotSceneCheckpoints(
+	spatialText,
+	spatialMarkers[0].recordSequence,
+	spatialMarkers[1].recordSequence,
+);
+if (
+	spatialComparison.counts.changed !== 1 ||
+	!["position3", "rotation3", "scale3", "visible"].every((field) =>
+		spatialComparison.changed[0].fields.includes(field),
+	)
+)
+	throw new Error("3D checkpoint comparison lost transform fields");
+fs.writeFileSync(
+	path.join(fixture, "spatial-comparison.json"),
+	JSON.stringify(spatialComparison, null, 2),
+);
+const nonfinite = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "spatial-nonfinite.jsonl"), "utf8"),
+);
+if (nonfinite.coverage !== "limited" || nonfinite.stopReason !== "limit")
+	throw new Error("Nonfinite 3D values did not stop with valid limited footer");
+fs.writeFileSync(
+	path.join(fixture, "spatial-review.json"),
+	JSON.stringify(spatialJournal, null, 2),
+);
 const kinds = new Set(decoded.observations.map((entry) => entry.type));
 for (const kind of [
 	"node-appeared",
@@ -164,17 +231,23 @@ async function provePortableAuthoring() {
 			entry.type === "author-checkpoint" && entry.payload.label === "Texture and scale set",
 	);
 	if (!chosen) throw new Error("Missing authored checkpoint observation");
-	const lesson = appendApplicationDrafts(
-		newLesson("Disposable Godot scene proof"),
-		reopenedCapture,
-		[chosen.id],
+	let lesson = appendApplicationDrafts(newLesson("Disposable Godot scene proof"), reopenedCapture, [
+		chosen.id,
+	]);
+	const spatialCapture = godotSceneCapture(spatialJournal);
+	lesson = appendApplicationDrafts(lesson, spatialCapture, [spatialChange.id]);
+	fs.writeFileSync(
+		path.join(fixture, "spatial-normalized-capture.json"),
+		JSON.stringify(spatialCapture, null, 2),
 	);
 	const reopened = await parseLesson(JSON.stringify(lesson));
 	if (
-		reopened.steps.length !== 1 ||
+		reopened.steps.length !== 2 ||
 		reopened.steps[0].evidence[0].application.adapterId !== "godot-scene" ||
 		reopened.steps[0].evidence[0].clock !== "unmapped" ||
-		reopened.steps[0].evidence[0].application.type !== "author-checkpoint"
+		reopened.steps[0].evidence[0].application.type !== "author-checkpoint" ||
+		JSON.stringify(reopened.steps[1].evidence[0].application.payload.after.properties.position3) !==
+			"[8,9,10]"
 	)
 		throw new Error("Offline authoring lost evidence identity");
 	fs.writeFileSync(

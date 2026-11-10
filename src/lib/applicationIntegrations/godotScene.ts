@@ -24,6 +24,7 @@ const resourcePath = z
 		);
 	});
 const vector = z.tuple([z.number().finite(), z.number().finite()]);
+const vector3 = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]);
 const nodeSchema = z
 	.object({
 		id: nodeId,
@@ -38,6 +39,9 @@ const nodeSchema = z
 				visible: z.boolean().optional(),
 				script: resourcePath.nullable(),
 				texture: resourcePath.nullable().optional(),
+				position3: vector3.optional(),
+				rotation3: vector3.optional(),
+				scale3: vector3.optional(),
 			})
 			.strict(),
 	})
@@ -49,7 +53,7 @@ const stateSchema = z
 	})
 	.strict();
 const envelope = z.object({
-	schemaVersion: z.union([z.literal(1), z.literal(2)]),
+	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
 	sequence: z.number().int().min(0).max(4095),
@@ -124,9 +128,21 @@ export type GodotSceneJournal = {
 	baseline: SceneState;
 	observations: SceneObservation[];
 };
-function validateState(state: SceneState, rootId?: string): void {
+function validateState(state: SceneState, rootId?: string, schemaVersion = 2): void {
 	const depths = new Map<string, number>();
 	for (const [index, node] of state.nodes.entries()) {
+		const properties = node.properties;
+		const has2d =
+			properties.position !== undefined ||
+			properties.rotation !== undefined ||
+			properties.scale !== undefined;
+		const spatial3d = [properties.position3, properties.rotation3, properties.scale3];
+		const has3d = spatial3d.some((value) => value !== undefined);
+		if (schemaVersion < 3 && has3d)
+			throw new Error("3D transforms require scene journal schema v3");
+		if (has2d && has3d) throw new Error("Mixed 2D and 3D scene transforms");
+		if (has3d && spatial3d.some((value) => value === undefined))
+			throw new Error("Incomplete 3D scene transforms");
 		if (depths.has(node.id)) throw new Error("Duplicate scene node");
 		if (index === 0) {
 			if (node.parent !== "" || (rootId && node.id !== rootId))
@@ -162,7 +178,7 @@ function decodeGodotSceneJournal(text: string): {
 		last = records[records.length - 1];
 	if (first.event !== "scene-start" || last.event !== "scene-stop" || first.atMs !== 0)
 		throw new Error("Scene journal requires a header and footer");
-	validateState(first.state);
+	validateState(first.state, undefined, first.schemaVersion);
 	if (records.some((record) => record.schemaVersion !== first.schemaVersion))
 		throw new Error("Scene journal schema version mismatch");
 	if (
@@ -232,7 +248,7 @@ function decodeGodotSceneJournal(text: string): {
 			observations.push(observation);
 		};
 		if (record.event === "scene-state") {
-			validateState(record.state, rootId);
+			validateState(record.state, rootId, first.schemaVersion);
 			snapshotSequence = record.sequence;
 			const before = new Map(previous.nodes.map((node) => [node.id, node]));
 			const after = new Map(record.state.nodes.map((node) => [node.id, node]));
@@ -262,7 +278,7 @@ function decodeGodotSceneJournal(text: string): {
 			add("scene-saved", "Scene save observed", { scene: record.scene });
 		} else if (record.event === "scene-checkpoint") {
 			if (
-				first.schemaVersion !== 2 ||
+				first.schemaVersion < 2 ||
 				record.snapshotSequence !== snapshotSequence ||
 				record.nodeCount !== previous.nodes.length
 			)
@@ -378,6 +394,9 @@ export function compareGodotSceneCheckpoints(
 		"visible",
 		"script",
 		"texture",
+		"position3",
+		"rotation3",
+		"scale3",
 	] as const;
 	const valueFor = (node: SceneNode, field: (typeof fields)[number]) =>
 		field === "name" || field === "parent"

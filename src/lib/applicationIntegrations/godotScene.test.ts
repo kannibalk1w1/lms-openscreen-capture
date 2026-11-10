@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { godotSceneCapture, MAX_SCENE_JOURNAL_BYTES, parseGodotSceneJournal } from "./godotScene";
+import {
+	compareGodotSceneCheckpoints,
+	godotSceneCapture,
+	MAX_SCENE_JOURNAL_BYTES,
+	parseGodotSceneJournal,
+} from "./godotScene";
 import { sceneNode, sceneRecords, sceneSource } from "./godotScene.test-support";
 
 it("normalizes observed changes and keeps the starting state separate from action drafts", () => {
@@ -191,6 +196,113 @@ function sceneRecordsFromJsonl(source: string): Record<string, unknown>[] {
 		.map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
+it("decodes v3 Node3D transforms and reports their exact changed fields", () => {
+	const records = sceneRecords().slice(0, 3);
+	const spatial = {
+		id: "3",
+		parent: "1",
+		name: "SpatialCanary",
+		type: "Node3D",
+		properties: {
+			position3: [1, 2, 3],
+			rotation3: [0.1, 0.2, 0.3],
+			scale3: [1, 1, 1],
+			visible: true,
+			script: null,
+		},
+	};
+	const later = {
+		...spatial,
+		properties: { ...spatial.properties, position3: [4, 2, 3], rotation3: [0.1, 0.8, 0.3] },
+	};
+	const marker = (sequence: number, label: string, snapshotSequence: number) => ({
+		event: "scene-checkpoint",
+		schemaVersion: 3,
+		sessionId: records[0].sessionId,
+		instanceId: records[0].instanceId,
+		sequence,
+		atMs: sequence * 250,
+		label,
+		labelProvenance: "authored",
+		nodeCount: 2,
+		snapshotSequence,
+	});
+	const start = {
+		...records[0],
+		schemaVersion: 3,
+		state: { nodes: [rawState(records[0]).nodes[0], spatial], selected: [] },
+	};
+	const firstMarker = marker(1, "3D baseline", 0);
+	const state = {
+		...records[1],
+		schemaVersion: 3,
+		sequence: 2,
+		atMs: 500,
+		state: { nodes: [rawState(records[0]).nodes[0], later], selected: [] },
+	};
+	const secondMarker = marker(3, "3D later", 2);
+	const footer = { ...sceneRecords()[5], schemaVersion: 3, sequence: 4, atMs: 1000 };
+	const raw = sceneSource([start, firstMarker, state, secondMarker, footer]);
+	const journal = parseGodotSceneJournal(raw);
+	expect(journal.baseline.nodes[1].properties.position3).toEqual([1, 2, 3]);
+	expect(journal.observations.find((value) => value.type === "node-changed")?.label).toContain(
+		"position3, rotation3",
+	);
+	expect(compareGodotSceneCheckpoints(raw, 1, 3).changed[0].fields).toEqual([
+		"position3",
+		"rotation3",
+	]);
+});
+
+it("rejects 3D shapes in legacy versions and malformed or mixed v3 axes", () => {
+	for (const version of [1, 2]) {
+		const legacy = sceneRecords();
+		for (const record of legacy) record.schemaVersion = version;
+		rawState(legacy[0]).nodes[0].properties.position3 = [0, 0, 0];
+		expect(() => parseGodotSceneJournal(sceneSource(legacy))).toThrow("schema v3");
+	}
+	for (const invalid of [
+		{ position3: [0, 0, Infinity], rotation3: [0, 0, 0], scale3: [1, 1, 1] },
+		{ position3: [0, 0, 0], rotation3: [0, 0, 0], scale3: [1, 1] },
+		{ position3: [0, 0, 0], rotation3: [0, 0, 0] },
+		{ position3: [0, 0, 0], rotation3: [0, 0, 0], scale3: [1, 1, 1], position: [0, 0] },
+	]) {
+		const base = sceneRecords();
+		const records = [base[0], { ...base[5], sequence: 1, atMs: 250 }];
+		for (const record of records) record.schemaVersion = 3;
+		rawState(records[0]).nodes[0] = {
+			...sceneNode(),
+			type: "Node3D",
+			properties: { script: null, ...invalid },
+		};
+		expect(() => parseGodotSceneJournal(sceneSource(records))).toThrow();
+	}
+	const unsuffixedBase = sceneRecords();
+	const unsuffixed = [unsuffixedBase[0], { ...unsuffixedBase[5], sequence: 1, atMs: 250 }];
+	for (const record of unsuffixed) record.schemaVersion = 3;
+	rawState(unsuffixed[0]).nodes[0] = {
+		...rawState(unsuffixed[0]).nodes[0],
+		type: "CustomSpatialRoot",
+		properties: {
+			position3: [1, 2, 3],
+			rotation3: [0, 0, 0],
+			scale3: [1, 1, 1],
+			visible: true,
+			script: null,
+		},
+	};
+	expect(parseGodotSceneJournal(sceneSource(unsuffixed)).baseline.nodes[0].type).toBe(
+		"CustomSpatialRoot",
+	);
+	const legacyType = sceneRecords();
+	for (const record of legacyType)
+		if (record.event === "scene-start" || record.event === "scene-state")
+			rawState(record).nodes[0].type = "CustomLegacy3D";
+	expect(parseGodotSceneJournal(sceneSource(legacyType)).baseline.nodes[0].type).toBe(
+		"CustomLegacy3D",
+	);
+});
+
 function v2CheckpointJournal(label = `Texture\" set\\nC:\\private\\artifact.png`): string {
 	const base = sceneRecords();
 	const marker = {
@@ -314,3 +426,16 @@ it("retains authored nonblank text surrounded by Unicode whitespace", () => {
 		)?.payload,
 	).toMatchObject({ label });
 });
+
+function rawState(record: Record<string, unknown>) {
+	return record.state as {
+		nodes: Array<{
+			id: string;
+			parent: string;
+			name: string;
+			type: string;
+			properties: Record<string, unknown>;
+		}>;
+		selected: string[];
+	};
+}

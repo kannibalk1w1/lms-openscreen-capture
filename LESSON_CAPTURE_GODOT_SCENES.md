@@ -45,7 +45,8 @@ Captured fields are deliberately narrow:
 
 - Current root and descendants owned by that root: session-local object IDs,
   names, native types and parent IDs. Internal/non-owned subtrees are excluded.
-- Node2D position, rotation (radians), scale and visibility.
+- Node2D position, rotation (radians), scale and visibility; Node3D XYZ position,
+  Euler rotation (radians), scale and local visibility in new v3 takes.
 - Script resource identity and Sprite2D texture resource identity: `res://` paths
   only; built-in/unsaved and external/unsupported resources have explicit markers.
 - Selection IDs within the observed node set.
@@ -127,7 +128,7 @@ format; [adapter recipe and contract](lesson-capture/APPLICATION_CAPTURE_CONTRAC
 
 ## Authored checkpoint markers
 
-New takes use raw Godot scene journal v2; legacy v1 journals still import.
+New takes use raw Godot scene journal v3; legacy v1/v2 journals still import.
 Markers reference the latest bounded scene snapshot and carry an explicit authored
 label provenance. They normalize to `author-checkpoint` observations in the shared
 application capture v1 format and can be selected as editable lesson drafts.
@@ -146,3 +147,11 @@ with identical text remain distinct by record/time. Changing choices or replacin
 closing the journal clears old results. Normalized captures cannot supply missing
 raw snapshots. This is read-only endpoint comparison, not project restoration or
 outcome verification. [Exact scope and evidence](lesson-capture/GODOT_CHECKPOINT_COMPARISON_2026-11-10.md).
+
+## Node3D property observations
+
+New v3 takes also sample finite XYZ `position3`, `rotation3` and `scale3` values for
+owned Node3D instances, plus local `visible`. Comparison and selected drafts reuse
+the existing generic flow. No class-name suffix is used to infer inheritance, and
+no mesh/material contents or world transform is implied. Existing v1/v2 evidence
+keeps its original subset. [Exact scope and Windows/Linux evidence](lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md).

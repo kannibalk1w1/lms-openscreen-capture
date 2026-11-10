@@ -1,3 +1,22 @@
+# Node3D capture awaiting final review — 10 November 2026
+
+Claude [accepted 22eb61e4](CLAUDE_GODOT_CHECKPOINT_FILE_TOOLS_REVIEW_22EB61E4_2026-11-10.md)
+with no findings. Root integrated the cheaper worker's bounded Node3D sketch and
+added real Node3D-root/GridMap/Inspector/nonfinite/draft proofs on Linux and WinBoat.
+[Exact Node3D scope and evidence](GODOT_NODE3D_CAPTURE_2026-11-10.md): raw v3 adds
+finite XYZ position3/rotation3/scale3 and local visible; v1/v2 remain strict, and
+generic capture v1/lesson flow stays unchanged. 6,532 tests / 481 files, 61 focused tests,
+both TypeScript configs, Vite, lint35/i18n15/docs37 and production startup+15 v3 CLI/MCP checks pass.
+Both actual Godot4.7.1 OS probes pass; no physical/rendered/game-run claims.
+No inheritance is inferred by native type-name suffix; real GridMap covers that.
+
+Last measured weekly utilisation: 73% at20:32 UTC; no session meter.
+Final feature slice before the owner's roughly 75% utilisation stop. Review pending;
+resolve review findings, preserve its report and a concise resume checkpoint, then
+stop starting feature work near that cap. Player remains parked; main fd2775e2,
+private remote and real lesson projects unchanged. Broader editor/resource/runtime
+semantics, project archive/restore, retakes and physical acceptance remain open.
+
 # Godot checkpoint file tools awaiting review — 10 November 2026
 
 Claude [accepted 5055a279](CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW_5055A279_2026-11-10.md)
@@ -8,7 +27,7 @@ comparison via read-only CLI/MCP, supported by cheaper-worker service/test sketc
 15 real CLI/MCP parity checks and16 Node checks each on Linux/WinBoat Windows pass.
 No writes/project/resource loading, clock mapping or Windows Electron/native claim.
 
-Weekly meter 69% at 20:03 UTC, target roughly75%; player parked, main fd2775e2 and
+Weekly meter 69% at 20:03 UTC, target roughly 75%; player parked, main fd2775e2 and
 private remote unchanged. New v2 fixture is real disposable Windows Godot output.
 Review pending. A cheaper worker is preparing the next bounded capture slice only
 in /tmp/godot-spatial-capture-prototype: explicit Node3D transforms, with strict raw
@@ -28,7 +47,7 @@ actual Windows Edge frontend16checks with only final saveIPC stubbed. No physica
 packaged Windows Electron, restore/run/outcome claims. Old results/raw source clear
 on choice/import/forget. Final source/coverage distinctions are in the report.
 
-Weekly meter66% at19:45 UTC, target roughly75%; no session meter. Main remains
+Weekly meter66% at19:45 UTC, target roughly 75%; no session meter. Main remains
 fd2775e2; player parked; no push. The next cheaper worker is preparing read-only
 original-file marker listing and fingerprint-bound comparison CLI/MCP under
 /tmp/godot-checkpoint-file-tools-prototype only. Not integrated yet. Review pending.
@@ -46,7 +65,7 @@ on each of Linux and WinBoat Windows11. No Windows Electron/native claim.
 Source fingerprints/explicit IDs/new output paths and existing MCP consent guard
 file work; a final pre-write check covers consent revocation/cancellation.
 Independent review pending. Main fd2775e2 unchanged; no push. Weekly meter63%
-at19:23 UTC, target roughly75%. Player remains parked.
+at19:23 UTC, target roughly 75%. Player remains parked.
 
 Next: a cheaper worker is prototyping pure within-take Godot checkpoint-state
 comparison only under /tmp/godot-checkpoint-comparison-prototype. It is not yet
@@ -77,7 +96,7 @@ i18n15/docs37 and real Linux/WinBoat Godot4.7.1 editor/API probes pass. Both fin
 probes include actual toolbar/dialog signals. No physical/native recording or
 project restoration/run-result claims. Marker slice awaits independent review.
 
-Codex weekly meter **61% at19:06 UTC**, target roughly75%; no session meter.
+Codex weekly meter **61% at19:06 UTC**, target roughly 75%; no session meter.
 A cheaper worker is preparing CLI/MCP selected-file capture parity only under
 `/tmp/application-capture-parity-prototype/`; it is not implemented in source yet.
 Next: integrate that parity slice after review, then bounded checkpoint comparison.

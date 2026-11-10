@@ -316,7 +316,7 @@ by review41 with its follow-up; full editor/course packaging and timed output ac
 
 ### P2.1 B — opt-in Godot semantic adapter — Partial; very high/after privacy + clocks; XL
 
-**10 November update:** bounded current-scene hierarchy/selection/2D transforms,
+**10 November update:** bounded current-scene hierarchy/selection/2D and3D transforms,
 script/texture identities and save signals, authored markers, explicit manual
 recording timing and selected drafts are implemented. Linux/WinBoat editor API
 coverage is distinct from physical editor acceptance. [Current scope](../LESSON_CAPTURE_GODOT_SCENES.md).

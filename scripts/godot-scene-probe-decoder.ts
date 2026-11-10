@@ -2,7 +2,9 @@
 
 export { parseApplicationCapture } from "../src/lib/applicationIntegrations/capture";
 export {
+	compareGodotSceneCheckpoints,
 	godotSceneCapture,
+	listGodotSceneCheckpoints,
 	parseGodotSceneJournal,
 } from "../src/lib/applicationIntegrations/godotScene";
 export { appendApplicationDrafts } from "../src/lib/lesson/applicationDraft";

@@ -158,3 +158,29 @@ it("calls current-authority guard before reading and rejects invalid service arg
 		new GodotCheckpointFileError("invalid-request"),
 	);
 });
+
+it("inspects and compares a real v3 Node3D root without changing the generic file contract", async () => {
+	const journalPath = fileURLToPath(
+		new URL("../../integrations/godot-typing/probes/fixtures/spatial.jsonl", import.meta.url),
+	);
+	const inspected = inspectGodotCheckpointsFile({ journalPath });
+	expect(inspected).toMatchObject({
+		checkpointCount: 2,
+		clock: "unmapped",
+		adapterId: "godot-scene",
+	});
+	const compared = compareGodotCheckpointsFile({
+		journalPath,
+		sha256: inspected.sha256,
+		fromRecordSequence: inspected.checkpoints[0].recordSequence,
+		toRecordSequence: inspected.checkpoints[1].recordSequence,
+	});
+	expect(compared.comparison.counts.changed).toBe(1);
+	expect(compared.comparison.changed[0].fields).toEqual([
+		"visible",
+		"position3",
+		"rotation3",
+		"scale3",
+	]);
+	expect(JSON.stringify(compared)).not.toContain("res://");
+});

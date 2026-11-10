@@ -202,7 +202,7 @@ it("inspects and drafts from the retained real Godot v1 journal", async () => {
 	const unsupported = raw
 		.split("\n")
 		.filter(Boolean)
-		.map((line) => ({ ...JSON.parse(line), schemaVersion: 3 }));
+		.map((line) => ({ ...JSON.parse(line), schemaVersion: 4 }));
 	await fs.writeFile(
 		p.capturePath,
 		unsupported.map((record) => JSON.stringify(record)).join("\n") + "\n",

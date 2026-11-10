@@ -31,7 +31,10 @@ is [accepted by Claude](lesson-capture/CLAUDE_APPLICATION_CAPTURE_PARITY_REVIEW_
 [Within-take authored checkpoint comparison](lesson-capture/GODOT_CHECKPOINT_COMPARISON_2026-11-10.md)
 has [Claude acceptance](lesson-capture/CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW_5055A279_2026-11-10.md).
 [Read-only original-file marker listing and fingerprint-bound comparison through CLI/MCP](lesson-capture/GODOT_CHECKPOINT_FILE_TOOLS_2026-11-10.md)
-are locally validated and awaiting review. Application-project checkpoints/restoration,
+are [accepted by Claude](lesson-capture/CLAUDE_GODOT_CHECKPOINT_FILE_TOOLS_REVIEW_22EB61E4_2026-11-10.md).
+[Bounded Node3D transforms](lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md) now have
+real Linux/WinBoat editor/API coverage and generic draft/CLI/MCP reuse, pending
+independent review. Application-project checkpoints/restoration,
 retakes, broader editor/runtime diagnostics and physical acceptance remain open. Earlier checkpoint/review entries below
 retain their historical scope.
 

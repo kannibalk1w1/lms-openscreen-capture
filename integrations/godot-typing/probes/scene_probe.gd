@@ -48,12 +48,21 @@ func _probe() -> void:
 		return
 	var root := editor.get_edited_scene_root()
 	root.set_meta("private", "PRIVATE_METADATA_CANARY")
+	var spatial := Node3D.new()
+	spatial.name = "SpatialCanary"
+	spatial.position = Vector3(1, 2, 3)
+	spatial.rotation = Vector3(0.1, 0.2, 0.3)
+	spatial.scale = Vector3(1, 1, 1)
+	root.add_child(spatial)
+	spatial.owner = root
 	editor.get_selection().clear()
 	await _wait()
 	if not _require(capture.begin("res://scene.jsonl", root, editor), "explicit start"):
 		return
 	var first_take: String = capture.active_session_id()
 	if not _require(not first_take.is_empty(), "active take token exposed"):
+		return
+	if not _require(capture.mark_checkpoint("3D baseline", first_take), "3D baseline marker"):
 		return
 	var before_invalid := FileAccess.get_file_as_string("res://scene.jsonl")
 	for blank in ["\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff", " \u3000\u00a0"]:
@@ -112,6 +121,10 @@ func _probe() -> void:
 	await get_tree().process_frame
 	if not _require(capture.get("_sequence") > prior_sequence, "Inspector signal sampled"):
 		return
+	spatial.position = Vector3(4, 2, 3)
+	spatial.rotation = Vector3(0.1, 0.8, 0.3)
+	if not _require(capture.mark_checkpoint("3D transforms later", first_take), "3D change marker"):
+		return
 	var holder := Node2D.new()
 	holder.name = "Container"
 	root.add_child(holder)
@@ -124,6 +137,10 @@ func _probe() -> void:
 	editor.save_scene()
 	await _wait()
 	if not _require(capture.mark_checkpoint("Scene saved", first_take), "save milestone"):
+		return
+	spatial.scale = Vector3(2, 3, 4)
+	capture._sample("stop")
+	if not _require(capture.mark_checkpoint("3D stop boundary", first_take), "3D stop boundary marker"):
 		return
 	plugin.get("_checkpoint_button").pressed.emit()
 	plugin.get("_checkpoint_label").text = "Stale dialog must not write"
@@ -230,5 +247,44 @@ func _probe() -> void:
 		bounded._sample()
 	if not _require(not bounded.active(), "byte budget stopped capture"):
 		return
+	# A separate real Node3D root and unsuffixed native Node3D subclass.
+	editor.open_scene_from_path("res://spatial.tscn")
+	await _wait()
+	var spatial_root := editor.get_edited_scene_root() as Node3D
+	if not _require(spatial_root != null, "3D root opened"):
+		return
+	var grid := GridMap.new()
+	grid.name = "NativeSpatialType"
+	spatial_root.add_child(grid)
+	grid.owner = spatial_root
+	var spatial_capture = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(spatial_capture.begin("res://spatial.jsonl", spatial_root, editor), "3D root take start"):
+		return
+	var spatial_token: String = spatial_capture.active_session_id()
+	if not _require(spatial_capture.mark_checkpoint("3D root baseline", spatial_token), "3D root baseline"):
+		return
+	editor.edit_node(spatial_root)
+	await _wait()
+	var spatial_prior: int = spatial_capture.get("_sequence")
+	spatial_root.position = Vector3(8, 9, 10)
+	spatial_root.rotation = Vector3(0.125, 0.25, 0.5)
+	spatial_root.scale = Vector3(2, 3, 4)
+	spatial_root.visible = false
+	editor.get_inspector().property_edited.emit("position")
+	await get_tree().create_timer(0.09).timeout
+	spatial_capture.poll()
+	if not _require(spatial_capture.get("_sequence") > spatial_prior, "3D Inspector signal sampled"):
+		return
+	if not _require(spatial_capture.mark_checkpoint("3D root adjusted", spatial_token), "3D root checkpoint"):
+		return
+	spatial_capture.stop()
+	if not _require(spatial_capture.begin("res://spatial-nonfinite.jsonl", spatial_root, editor), "nonfinite guard take"):
+		return
+	spatial_root.position = Vector3(INF, 0, 0)
+	if not _require(not spatial_capture.mark_checkpoint("Must not claim nonfinite", spatial_capture.active_session_id()), "nonfinite marker refused"):
+		return
+	if not _require(not spatial_capture.active(), "nonfinite value stopped capture"):
+		return
+	spatial_root.position = Vector3.ZERO
 	print("SCENE_PROBE_PASSED")
 	get_tree().quit(0)
