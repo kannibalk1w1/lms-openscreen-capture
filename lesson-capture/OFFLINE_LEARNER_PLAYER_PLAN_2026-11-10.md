@@ -1,7 +1,16 @@
 # Offline learner player — implementation and dependency plan (10 November 2026)
 
 **Status:** plan only. No code exists for anything below. Written by the Opus session as sole
-writer; not reviewed. Each slice starts only after the coordinator gate.
+writer. Each slice starts only after the coordinator gate.
+
+**Updates, 10 November 2026:**
+- **D3 decided.** The owner approved D3(b) for read-only inspection and playback only (see the
+  roadmap decision table). Slice 0's dependency is met; its implementation still waits for the
+  coordinator gate.
+- **Review lows P1 and P2.** The [independent review](OPUS_INDEPENDENT_REVIEW_2026-11-10.md)
+  raised these against slices 0 and 1, and they are folded in below.
+- **Lifetime pattern.** The R1/R2 fix (`0c73895b`) sets the pattern every player capability
+  must follow.
 
 **Goal:** a learner opens a verified portable lesson package and works through it one step at
 a time, fully offline: watch the step's video, pause, replay, change speed, read the
@@ -40,7 +49,8 @@ contract.
 
 ### Slice 0 — package capability that does not depend on the video project (prerequisite; M)
 
-**Depends on:** owner decision D3, option (b).
+**Depends on:** owner decision D3, option (b): **approved 10 November 2026**, for read-only
+inspection and playback only.
 
 Today a package capability requires a selected, saved, clean video project (M2). A learner has
 no project, so the player needs a capability that is:
@@ -57,10 +67,19 @@ no project, so the player needs a capability that is:
   - It does not depend on project selection or dirty state.
 - **Read-only and narrow:** it allows playback and reading the lesson only. Reseal, copy and
   create keep their current project-bound capability unchanged.
+- **Lifetime, following the R1/R2 fix:**
+  - The owner's state and its navigation, crash and close listeners exist before the picker is
+    awaited.
+  - Each open pins an epoch and an operation generation.
+  - The open rechecks owner, page, epoch and generation after the picker, after verification,
+    and before installing the capability or returning.
+  - A stale or superseded open verifies nothing further and grants nothing. An older open can
+    neither replace nor revoke a newer one.
 
 **Tests:**
 - Refusal for a foreign window, a subframe, navigation, crash, a stale token, symlinks and
   unlisted files.
+- Navigation, crash or close while the picker or the verification is pending. Overlapping opens.
 - A real-app probe that opens a package with no project selected.
 
 **Mutation controls:** owner check, lifetime events, and that the read-only scope gives no
@@ -73,9 +92,18 @@ reseal or create access.
 The `<video>` element needs bytes without `file://` access and without widening
 `webSecurity`. The design:
 
-- **A dedicated player window and session.**
-  - It uses its own in-memory partition (for example `lesson-player`) with sandbox,
+- **One exclusive session per player owner (review Low P1).**
+  - Each player window gets its own unique, ephemeral, in-memory partition, such as
+    `lesson-player-<random uuid>`, never a shared fixed name. It uses sandbox,
     `contextIsolation`, no Node integration and `webSecurity` on.
+  - Exclusivity is enforced, not assumed:
+    - no other window or `webContents` is ever created on that partition;
+    - `will-attach-webview` and subframe creation are refused;
+    - `setWindowOpenHandler` denies every `window.open`;
+    - `will-navigate` and `will-redirect` refuse anything but the player's own page.
+  - The partition and its protocol handler are torn down when the owner ends.
+  - Tests cover a second player window (its own partition, unable to fetch the first one's
+    media) as well as an editor and the HUD.
   - CSP: `default-src 'none'; script-src 'self'; style-src 'self'; img-src data:;
     media-src openscreen-lesson-media:`.
 - **A privileged scheme registered only on that session.**
@@ -87,10 +115,22 @@ The `<video>` element needs bytes without `file://` access and without widening
 - **What the handler serves:**
   - Only `media/<stepId>.mp4` entries in the verified manifest, and only while the
     capability's owner is alive.
-  - Each request opens the file with `O_NOFOLLOW` and compares `fstat` with the open-time pins.
-    Any difference ends the capability and refuses. The full hash runs at open, not per range.
-  - A single byte range per request, with an 8 MiB response bound. `206` and `416` follow the
-    spec, with `Content-Type: video/mp4` and no directory listing.
+  - Each request reads one bounded buffer, never a stream over a live file (review Low P2):
+    1. open with `O_NOFOLLOW` and compare `fstat` with the open-time pins;
+    2. read the requested range, at most 8 MiB, into memory;
+    3. compare `fstat` again and confirm the capability is still current, immediately before
+       returning the bytes;
+    4. close the descriptor.
+
+    Any difference, or an in-place change seen at step 3, ends the capability and returns no
+    bytes. The full hash runs at open, not per range.
+  - One byte range per request. `206` and `416` follow the spec, with `Content-Type: video/mp4`
+    and no directory listing.
+  - **Aggregate budget:** at most 2 requests in flight per capability, and at most 32 MiB
+    buffered across all player owners. Requests beyond either limit wait in a bounded queue or
+    are refused with `503`, and are never buffered without limit.
+  - **Revocation cancels:** release, navigation, crash or close aborts queued requests, closes
+    open descriptors and discards buffers. No pending range completes after revocation.
   - Everything else gets a fixed 404 with no path in the body.
 - **No other route.** The player never receives filesystem paths. Images stay as data URLs
   from the verified lesson JSON.
@@ -98,6 +138,10 @@ The `<video>` element needs bytes without `file://` access and without widening
 **Tests:**
 - Handler unit tests: token, owner, inventory membership, range parsing and bounds, identity
   change, symlink swap.
+- The file mutated in place during a read (same inode, changed bytes or size), which must
+  return no bytes.
+- Navigation or release while a range is pending, which must abort it and close its descriptor.
+- The per-capability and global concurrency and byte limits.
 - A real-app probe: a `<video>` element plays and `currentTime` advances. A tampered or
   replaced MP4 after open is refused. A second window cannot fetch.
 
@@ -174,7 +218,7 @@ v1 verification stays unchanged. Decide after slices 1 to 3 are in use.
 
 ```mermaid
 flowchart LR
-  D3[Owner decision D3 b] --> S0[0 Project-independent read-only capability]
+  D3[D3 b approved 10 Nov 2026] --> S0[0 Project-independent read-only capability]
   S0 --> S1[1 Bounded media access]
   S1 --> S2[2 Learner controls]
   S2 --> S3[3 Local progress]
@@ -193,8 +237,9 @@ flowchart LR
   with the shipped FFmpeg, and the player does not.
 - **Range bounds.** Chromium may request large ranges; the 8 MiB bound must be measured
   against smooth seeking.
-- **Binding without the frame.** Protocol requests do not identify the frame. The dedicated
-  partition is the binding, so no other window may ever share it.
+- **Binding without the frame.** Protocol requests do not identify the frame. The unique
+  per-owner partition is the binding, and slice 1 enforces that no other window, webview,
+  subframe or navigation can share it.
 - **Linux only.** Windows and macOS learners cannot use the player until H1 is resolved.
 
 ## Validation for every slice

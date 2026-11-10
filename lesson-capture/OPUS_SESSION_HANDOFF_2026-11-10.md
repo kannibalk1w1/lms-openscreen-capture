@@ -181,3 +181,125 @@ web preferences. It is not kept as evidence, and its fixtures were rebuilt for t
    commit, then a decision on a private push.
 2. Owner decisions D1 to D7 (roadmap).
 3. Only after the gate: player slice 0, then slice 1 (bounded media access).
+
+## Follow-up: the R1/R2 lifetime fix (10 November 2026, later)
+
+**Status:** self-tested, **not independently reviewed**. The same reviewer rechecks the exact fix
+before acceptance or a private push.
+
+**Coordinator task:** `task_ee920747221a`, dispatch `ctx_8d1db20d474c`.
+
+**Why:**
+- The [independent review of `51e46e44`](OPUS_INDEPENDENT_REVIEW_2026-11-10.md) requested
+  changes for two Medium lifetime defects, both reproduced. The report is committed unchanged
+  (SHA256 `ae4fdef9…`).
+- R1: a pending open could grant overwrite permission after a navigation.
+- R2: a same-file save already in flight still replaced the file and reported `saved` after its
+  permission was revoked.
+- My earlier lifecycle test had asserted that bad outcome. It now requires the refusal.
+
+**Commits:** `0c73895b` (the fix), then this documentation commit.
+
+### What changed
+
+- **Opens and new-copy saves (R1):**
+  - The window's file state and its navigation, crash and close listeners are created before
+    the picker is awaited.
+  - Each operation pins an epoch (bumped by every lifecycle event) and an operation generation
+    (bumped by every new open or new-copy save).
+  - It rechecks those and the registered editor page after the picker, after the read and hash,
+    and before installing a grant or returning.
+  - A stale or superseded open reads nothing, writes nothing and grants nothing. The service's
+    read is counted in tests. An older open can neither replace nor revoke a newer permission.
+- **Same-file saves (R2):**
+  - `save-current` requires the editor page at entry.
+  - It passes `replaceLessonFile` a revocable check: same page, same epoch, same grant.
+  - The helper consults that check at entry, before staging, and in the rename's own
+    synchronous turn.
+  - An invalidation before the commit leaves the original bytes and the renderer's unsaved
+    draft intact, with `lesson-file-unavailable` and no partial file left behind.
+- **Honest committed outcome.** A save that had already committed when the context ended is
+  reported as `saved` with no `file`, and no further permission exists. The dialog shows it as
+  saved and disables same-file saving until a fresh open. The same holds for a new copy written
+  just before the context ended.
+- **Unchanged:**
+  - Conflict, regular-file, symlink, private 0600 staging and atomic-replace checks.
+  - `wx` new-copy saves.
+  - Headless explicit-file paths and the arbitrary-grant policy.
+  - Renderers still never name a path to grant.
+
+### Validation
+
+All runs used pinned Node 22.22.1 and npm 10.9.4.
+
+| Check | Result |
+| --- | --- |
+| Both `tsc`; lint (35 baseline warnings); `i18n:check` | pass |
+| Focused: `electron/ipc`, `electron/lesson`, `LessonGuideDialog` | 716 pass |
+| New `electron/ipc/lesson.lifetime.test.ts` (production `registerEditorLessonHandlers`, real service and file helpers, gated only) | 18 pass |
+| Vite build; required foreign-directory startup smoke | pass; `success: true` |
+| Full suite at `0c73895b` | **6,321 / 461 files pass, 0 skipped** |
+
+The lifetime tests cover:
+- each of hash navigation, document navigation, renderer crash and destroy, with the picker
+  pending, the read and hash pending, and the save not yet committed;
+- a page change with no lifecycle event;
+- overlapping opens;
+- a save overtaken by a newer completed open;
+- a save committed just before the context ended;
+- a new copy refused during its picker, and one written just before the context ended;
+- fresh-open positive controls (none after destroy).
+
+**My mutants: 15 of 15 killed by assertion failures, sources restored byte for byte.** They
+covered:
+- the epoch bump, the page check and the operation generation;
+- each open check, singly and together;
+- the new-copy picker check and stale-grant tolerance;
+- the save's grant identity and the committed-outcome branch;
+- each helper check point and the post-commit report.
+
+I had predicted two of them (the picker plus pre-read pair, and the helper's entry check) would
+survive as redundant layers. The read-count and call-count assertions kill them too.
+
+**Full-app probe** (production build, Xvfb, stubbed dialogs, real preload and IPC):
+
+| Probe | Fix `0c73895b` | Control `139b9046` |
+| --- | --- | --- |
+| A: reviewer's R1 repro (pending open, real hash navigation, resolve, save-current) | open refused; draft status refused; save refused; bytes unchanged | open succeeded with a token; save replaced the file |
+| B: same window back on the editor page, fresh open and save | saved | not run |
+| C: real Lesson guide holds an edited opened file, the page navigates, Save changes is clicked | refused with the plain "no longer linked" message; file bytes unchanged; typed text kept; status shows unsaved | not run |
+
+The reviewer's own repro at `51e46e44` is the primary control, and its evidence is preserved.
+
+### Not covered
+
+- A real crash or destroy during a physical save. These are deterministic event probes in unit
+  tests.
+- A commit racing an invalidation in the real app. It is covered only at the helper and
+  registration level, by consultation order.
+- Windows rename semantics, a real picker, a screen reader and audio.
+
+### Evidence
+
+- `../openscreen-evaluation/opus-r1-r2-fix-2026-11-10/`: probe results for the fix and the
+  control, smoke, mutation script and results, and the build log.
+- The reviewer's temporary evidence, copied before `/tmp` loss and checked against its source
+  hashes: `../openscreen-evaluation/opus-independent-review-2026-11-10-retained/`. The originals
+  in `/tmp` were left untouched, and the large code snapshot is listed, not copied.
+
+### D3 decision recorded
+
+On 10 November 2026 the owner approved D3(b), recorded in the roadmap decision table. The
+approval covers read-only inspection and playback of an explicitly chosen package without
+opening a video project. It does not cover create, copy or reseal unbinding, automatic recovery
+writes, Windows gates, format, GIF/PNG or cap changes. The review's statement that D3 was still
+pending was true when written, and the review is not edited.
+
+The [player plan](OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md) was updated, as a plan only, with:
+- the D3 approval;
+- review Lows P1 (one unique ephemeral partition per player owner, with enforced exclusivity)
+  and P2 (bounded buffered reads with final identity and capability checks, an aggregate
+  concurrency and byte budget, cancellation on revocation, and mutation-during-read tests);
+- the R1/R2 lifetime pattern as a requirement for slice 0.
+
+No player code exists. Slice 0 waits for the coordinator gate.

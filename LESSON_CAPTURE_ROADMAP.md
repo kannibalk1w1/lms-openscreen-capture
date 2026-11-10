@@ -69,9 +69,12 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
   were reviewed in the [independent review](lesson-capture/FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md),
   which found M42-1; the [follow-up review](lesson-capture/M42_FIX_INDEPENDENT_FOLLOWUP_REVIEW_2026-11-10.md)
   accepts its fix `9355933a`.
-- **Self-tested, not independently reviewed:** the three Opus slices after `139b9046`
-  (`e3701396`, `7636185d`, `90116cae`) and this documentation commit. Results and
-  limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
+- **Opus slices after `139b9046`:** `e3701396`, `7636185d`, `90116cae` and the docs commit
+  `51e46e44`. The [independent review of `51e46e44`](lesson-capture/OPUS_INDEPENDENT_REVIEW_2026-11-10.md)
+  requested changes for two Medium lifetime defects, R1 and R2.
+- **Self-tested, not independently reviewed:** the R1/R2 fix `0c73895b` and the documentation
+  commit after it. The reviewer rechecks the exact fix before acceptance or a private push.
+  Results and limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
 ### What an author can do today
 
@@ -104,8 +107,12 @@ with a real picker, with a screen reader, or on Windows or macOS.
    and verify.
 
 The Lesson guide routes (draft, save, open, export, plan-range) serve only the main frame of a
-registered editor window. The same-file save goes through a main-held, per-window permission
-that ends on navigation, crash or close.
+registered editor window. The same-file save goes through a main-held, per-window permission.
+Since `0c73895b` (self-tested, awaiting re-review), that permission ends on navigation, crash or
+close, including for an open or save still in progress. A pending open grants nothing, and a
+save not yet committed is refused with the file and the typed text kept. The one honest
+exception: a save that had already committed when the context ended is reported as saved, with
+no further permission.
 
 ### User value still open
 
@@ -116,7 +123,7 @@ that ends on navigation, crash or close.
 | A reload or renderer crash loses unsaved Lesson guide work (L42-2) | Authors | Owner decision on automatic recovery (D1); until then the manual-recovery promise stands |
 | Audio is never verified in lesson outputs | Narrated lessons | Audio receipt design; real audio acceptance |
 | No GIF or standalone PNG step outputs; video is capped at 1280 px | Slide authors | Owner decision (D4); the accepted contracts are unchanged |
-| Package tools need a saved, clean video project (M2) | Authors handling received packages | Owner decision (D3) |
+| Package tools need a saved, clean video project (M2) | Authors handling received packages | D3(b) decided on 10 November 2026 for read-only inspection and playback only (player slice 0); create, copy and reseal keep the binding |
 | No retakes, rolling buffer, save-recent or checkpoint handoff | Authors re-recording a step | Not started (product map P0.4, P2.2) |
 | Headless illustrate and range export refuse the default wallpaper and do not name the refused dependency | Agents and new projects | A small usability slice |
 | Non-English catalogues show English for lesson features | Non-English authors | Owner decision (D5) |
@@ -125,9 +132,11 @@ that ends on navigation, crash or close.
 
 ### Next work, in order
 
-1. The coordinator reviews the self-tested slices and decides on a private push.
-2. The owner answers the decisions below.
-3. Offline player slice 1 (bounded media access), only after the coordinator gate.
+1. The reviewer rechecks the R1/R2 fix `0c73895b`; the coordinator then decides on a private
+   push.
+2. The owner answers the remaining decisions below (D3 is decided).
+3. Offline player slice 0 (a read-only package capability that does not need a video project,
+   per D3(b)), then slice 1 (bounded media access). Neither starts before the coordinator gate.
 4. A Windows run (H1) and a manual pilot of the specification's Enemy sequence, when hardware
    and a person are available.
 5. Small usability work: name the refused dependency kind, and guide authors away from the
@@ -139,7 +148,7 @@ that ends on navigation, crash or close.
 | --- | --- | --- |
 | D1 | May Lesson guide work be saved automatically? | (a) Manual recovery copies only. (b) Opt-in automatic copies to the local recovery store, off by default. (c) Automatic copies on by default, with a retention limit. (b) and (c) close L42-2. |
 | D2 | Windows lesson media (H1) | (a) Linux only, unchanged gates. (b) Provide Windows hardware or a VM for a supervised run, then open the gates per measured result. (c) Say "Linux only" in the UI and defer. |
-| D3 | Package tools and the video project (M2) | (a) Keep the binding to a saved, clean project. (b) An owner-bound, explicit-file capability for inspection and playback only; reseal and create keep the binding. (c) Unbind every package action. |
+| D3 | Package tools and the video project (M2) | **Decided 10 November 2026: (b), for read-only inspection and playback only.** The owner answered "reccomended" to the root's question ("For learner player should opening/playing explicitly chosen package work without first opening saved video project? read-only capability; create/edit keep author checks"), and the root confirmed. Not approved: unbinding create, copy or reseal; automatic recovery writes; any change to Windows gates, the package format, GIF/PNG outputs or the 1280 px cap. The options as first offered: (a) keep the binding to a saved, clean project; (b) an owner-bound, explicit-file capability for inspection and playback only, with reseal and create keeping the binding; (c) unbind every package action. |
 | D4 | GIF, standalone PNG and 1920 px | (a) MP4 only, 1280 px cap. (b) Add GIF and PNG as separate derived outputs under new contracts. (c) Raise the cap under a new contract version. |
 | D5 | Translations of lesson features | (a) English fallback. (b) Machine drafts with human review. (c) Human translation for chosen locales. |
 | D6 | Package verification depth (M3) | (a) Freeze the current layer. (b) State a threat model and simplify at the next format version. |
