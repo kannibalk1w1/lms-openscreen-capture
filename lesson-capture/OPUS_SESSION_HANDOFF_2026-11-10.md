@@ -430,3 +430,109 @@ media buffer, not the server, so the final run checks every server-side outcome 
 - the mutation script and results;
 - the fixture hash lists;
 - the build log.
+
+## Follow-up: player lifetime fixes MP1 and MP2 (10 November 2026, night)
+
+**Status:** self-tested, **not independently reviewed**. The same reviewer rechecks the exact
+fix before a private push or any further player features.
+
+**Coordinator task:** `task_fd7103fdbe70`, dispatch `ctx_cf71bfa77a7e`.
+
+**Why:**
+- The [offline-player review](OFFLINE_PLAYER_INDEPENDENT_REVIEW_2026-11-10.md) of `43b18c70`
+  closes L1 but requests changes for two Medium player lifetime defects, MP1 and MP2, plus a
+  documentation Low, DOC1. The review is committed unchanged (SHA256 `ddd71b66…`).
+- Its `/tmp` evidence was copied, hash-verified, to
+  `../openscreen-evaluation/offline-player-review-2026-11-10-retained/`; the originals were left
+  untouched.
+
+**Commits:** `71546046` (the fix), then this documentation commit.
+
+### What changed
+
+- **MP1 (media):**
+  - Every awaited step, including the descriptor `close`, now finishes before the last
+    authorization.
+  - That last check is synchronous, with no await before the `Response`: the path is still the
+    verified file, the capability is live, and the request is not abandoned.
+  - Unchanged: the descriptor identity check after the read, the bounded buffer, and the
+    per-capability and aggregate budgets.
+  - The descriptor closes exactly once on every path, including when `close` itself fails, and
+    the budgets return to zero.
+- **MP2 (owner):**
+  - The public close and every navigation, crash or window close now call `release()`. It
+    advances the epoch, aborts any open still in its picker or verification, and revokes the
+    current media capability.
+  - Revoking the old capability when a new folder is chosen is a separate private step, so an
+    open never cancels itself.
+  - A new open after a release waits for the released open to settle, then starts fresh. Other
+    windows still cannot close or cancel a player's work.
+- **DOC1:** the plan header now separates the delivered, self-tested slices from what is still
+  only planned.
+- **Unchanged:** D3 read-only scope, authoring and project checks, CSP, session isolation,
+  budgets, v1 contracts and media formats. No new features.
+
+### Validation
+
+All runs used pinned Node 22.22.1 and npm 10.9.4.
+
+| Check | Result |
+| --- | --- |
+| Both `tsc`; lint (35 baseline warnings); `i18n:check`; `docs:check` | pass |
+| `playerMedia.test.ts` | 17 pass, including a held real descriptor close during: revocation, request abort, in-place change, and ancestor folder replaced by a symlink to an identical copy; a held-close positive control; and a failing close (one close, budgets zero) |
+| `lessonPlayer.test.ts` | 20 pass, including: close during picker and during verification (no inspector after a picker-stage close, the older package ends at once, a fresh open plays); open-after-close waits for the released verification to settle; a new valid folder does not cancel itself; no other window can close or cancel |
+| `LessonPlayer.test.tsx` | 10 pass, including: Close package hidden while opening, Cancel shown |
+| The new tests against the pre-fix `43b18c70` production files | **all 7 new MP1/MP2 regressions fail**, then the fixed files were restored |
+| Vite build; required foreign-directory startup smoke | pass; `success: true` |
+| Full suite at `71546046` | **6,372 / 464 files pass, 0 skipped** |
+
+**My mutants: 9, sources restored byte for byte. 7 were killed by assertions:**
+- the post-close capability/abort check;
+- the post-close path check;
+- release without a pending abort (the next open is then busy-refused);
+- release ending neither the epoch nor the pending open;
+- release only aborting the pending open (paired);
+- a new folder using the public release;
+- no wait for the released open to settle.
+
+Two survive alone, each covered by the other: release without the epoch bump (the revocation
+still removes the capability), and release without revoking (the epoch makes it non-current).
+
+### Full-app probe
+
+Production build, Xvfb, real preload, IPC, player session, protocol and `<video>`. Only the folder
+dialog is stubbed; MP1 also holds the real descriptor close inside the main process. The package
+is the same CLI-verified, moved v1 copy as before, and both it and the original evidence are
+byte-identical afterwards.
+
+| Probe | Result |
+| --- | --- |
+| Baseline playback | 1.5 s 640×360; plays, seeks to 1.0, replays, 1.5×; Next/Previous gives a paused video at 0 that keeps 1.5× |
+| MP2: `lessonPlayer.close()` during a held real picker, then the picker resolves | `lesson-package-cancelled`; the older package ends at once (404) |
+| MP2: close during the real full verification | `lesson-package-cancelled`; a fresh open works (206) |
+| MP1: `lessonPlayer.close()` while a range's descriptor close is held | client unsettled before the release, then **404 and 0 bytes**; one close; later requests 404 |
+| MP1 control: held close, nothing changed | 206, 10 bytes |
+| MP1: media changed in place during the held close | 404, and stays 404 |
+| Final | A fresh open plays in the real `<video>`; the editor's authoring is still served |
+
+The reviewer's real reproductions at `43b18c70` (206 and 10 bytes after release; a new view and
+token after close) are the bug-present control.
+
+### Limits
+
+- **Not tested:** a physical picker, a screen reader, physical input, Windows or macOS, and
+  audio.
+- **Buffered bytes:** bytes Chromium already buffered may still play after release; no new bytes
+  are sent.
+- **Close-during-verification probe:** in the real app it relies on a 30 ms wait. The
+  deterministic, gated case is in the unit tests.
+
+### Evidence
+
+`../openscreen-evaluation/opus-player-mp1-mp2-fix-2026-11-10/` holds:
+- the probe results;
+- the smoke;
+- the mutation script and results;
+- the log of the new tests against `43b18c70`;
+- the build log;
+- the fixture hashes.

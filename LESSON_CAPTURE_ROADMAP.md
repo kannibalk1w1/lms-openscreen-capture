@@ -75,10 +75,13 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
 - **R1/R2 fix accepted:** the [lifetime-fix review](lesson-capture/OPUS_LIFETIME_FIX_INDEPENDENT_REVIEW_2026-11-10.md)
   accepts `0c73895b` and `3e3785da` with no new High or Medium, and one nonblocking Low (L1).
   The coordinator pushed checkpoint `4489db2a` privately.
-- **Self-tested, not independently reviewed:**
-  - `cabaf30e`, which fixes L1;
-  - `82f69ca0`, the read-only offline lesson player;
-  - the documentation commit after them.
+- **Player review:** the [offline-player review](lesson-capture/OFFLINE_PLAYER_INDEPENDENT_REVIEW_2026-11-10.md)
+  of `43b18c70` closes L1 (`cabaf30e`). It requests changes for two Medium player lifetime
+  defects: MP1, a range could be answered after release; and MP2, a close did not end a pending
+  open.
+- **Self-tested, not independently reviewed:** `71546046`, which fixes MP1 and MP2, and the
+  documentation commit after it. The player (`82f69ca0`) is not accepted until that reviewer
+  rechecks the fix.
 
   Results and limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
@@ -148,7 +151,7 @@ no further permission.
 
 ### Next work, in order
 
-1. An independent review of `cabaf30e` and `82f69ca0`, then the coordinator's push decision.
+1. The reviewer rechecks the MP1/MP2 fix `71546046`, then the coordinator decides on a push.
 2. The owner answers the remaining decisions below (D3 is decided).
 3. A manual learner pass of the player on real hardware: a real folder picker, keyboard only,
    and a screen reader (Orca). This is the evidence the automated probes cannot give.
