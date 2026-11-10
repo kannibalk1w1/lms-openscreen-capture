@@ -288,6 +288,8 @@ func _probe() -> void:
 	spatial_root.position = Vector3.ZERO
 	if not await _probe_history_and_run(editor):
 		return
+	if not await _probe_connections(editor):
+		return
 	print("SCENE_PROBE_PASSED")
 	get_tree().quit(0)
 
@@ -397,4 +399,67 @@ func _probe_history_and_run(editor: EditorInterface) -> bool:
 			return false
 	if not _require(_count(text, "\"Set position\"") == 2, "merged actions recorded once (plus redo)"):
 		return false
+	return true
+
+func _noop_lambda_target() -> void:
+	pass
+
+# v5: saved signal connections between observed nodes only.
+func _probe_connections(editor: EditorInterface) -> bool:
+	editor.open_scene_from_path("res://connections.tscn")
+	await _wait()
+	var root := editor.get_edited_scene_root()
+	if not _require(root != null and root.has_node("Timer") and root.has_node("Hitbox"), "connections scene opened"):
+		return false
+	var timer := root.get_node("Timer")
+	var hitbox := root.get_node("Hitbox")
+	var take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(take.begin("res://connections.jsonl", root, editor, get_undo_redo()), "connections take start"):
+		return false
+	# Positive: deferred one-shot with a bound value (value must never be recorded).
+	timer.connect("renamed", Callable(hitbox, "_on_ready").bind("BOUND_VALUE_CANARY"), CONNECT_PERSIST | CONNECT_DEFERRED | CONNECT_ONE_SHOT)
+	# Canaries that must not be described.
+	timer.connect("tree_entered", Callable(hitbox, "nonpersistent_canary"))
+	timer.connect("tree_exiting", func(): _noop_lambda_target(), CONNECT_PERSIST)
+	var unowned := Timer.new()
+	unowned.name = "UNOWNED_SOURCE_CANARY"
+	root.add_child(unowned)
+	unowned.connect("timeout", Callable(hitbox, "_on_timeout"), CONNECT_PERSIST)
+	# A custom (unbind) wrapper around a real method: excluded and counted, never described.
+	timer.connect("child_entered_tree", Callable(hitbox, "_on_timeout").unbind(1), CONNECT_PERSIST)
+	var resource := Gradient.new()
+	resource.connect("changed", Callable(hitbox, "resource_canary"), CONNECT_PERSIST)
+	hitbox.connect("area_entered", Callable(get_tree().root, "OUTSIDE_TARGET_CANARY"), CONNECT_PERSIST)
+	await _pump(take)
+	timer.disconnect("timeout", Callable(hitbox, "_on_timeout"))
+	await _pump(take)
+	take.stop()
+	if not _require(take.connected_observer_count() == 0, "connections observers disconnected"):
+		return false
+	resource.disconnect("changed", Callable(hitbox, "resource_canary"))
+	unowned.disconnect("timeout", Callable(hitbox, "_on_timeout"))
+	unowned.free()
+	hitbox.disconnect("area_entered", Callable(get_tree().root, "OUTSIDE_TARGET_CANARY"))
+	timer.disconnect("tree_entered", Callable(hitbox, "nonpersistent_canary"))
+	for connection in timer.get_signal_connection_list("child_entered_tree"):
+		timer.disconnect("child_entered_tree", connection.callable)
+	for connection in timer.get_signal_connection_list("tree_exiting"):
+		if not connection.callable.is_standard():
+			timer.disconnect("tree_exiting", connection.callable)
+	editor.save_scene()
+	await _wait()
+	# Reopen from the saved file: connections are now baseline context of a new take.
+	editor.reload_scene_from_path("res://connections.tscn")
+	await _wait()
+	var reopened := editor.get_edited_scene_root()
+	var again = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(again.begin("res://connections-reopen.jsonl", reopened, editor, get_undo_redo()), "reopened take start"):
+		return false
+	await _pump(again)
+	again.stop()
+	for name in ["connections.jsonl", "connections-reopen.jsonl"]:
+		var text := FileAccess.get_file_as_string("res://" + name)
+		for canary in ["BOUND_VALUE_CANARY", "nonpersistent_canary", "UNOWNED_SOURCE_CANARY", "resource_canary", "OUTSIDE_TARGET_CANARY", "PRIVATE_CONNECTION_SCRIPT_CANARY", "Gradient", "child_entered_tree", "_noop_lambda_target"]:
+			if not _require(not text.contains(canary), name + " withholds " + canary):
+				return false
 	return true

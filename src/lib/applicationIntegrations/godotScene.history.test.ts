@@ -303,7 +303,7 @@ describe("review 1372a9c2 follow-up guards", () => {
 		}));
 		records[0] = { ...records[0], history: startHistory, run: stopped };
 		expect(() => parseGodotSceneJournal(sceneSource(records))).toThrow(
-			/exactly scene journal schema v4/,
+			/scene journal schema v4 or later/,
 		);
 	});
 

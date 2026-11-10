@@ -114,3 +114,9 @@ a run of this scene with its `res://` path, another scene's run without a path, 
 stopped. Run results, output and errors are not captured. These are editor-reported
 positions, not proof of a gesture or of a successful run. See
 [history/run scope and validation](../../lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).
+
+Raw v5 (current producer) also records saved signal connections between nodes of the
+captured scene: signal, source, target and method names, flags and the number of bound
+arguments, never their values. Connections touching anything outside the scene, or
+using unsupported callables, are only counted. See
+[signal connection scope and validation](../../lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md).

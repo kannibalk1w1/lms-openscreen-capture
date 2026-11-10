@@ -46,10 +46,27 @@ const nodeSchema = z
 			.strict(),
 	})
 	.strict();
+const identifier = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,99}$/);
+// v5: persistent signal connections between observed nodes. Bound argument values are
+// never part of the journal, only their count.
+const connectionSchema = z
+	.object({
+		signal: identifier,
+		from: nodeId,
+		to: nodeId,
+		method: identifier,
+		boundArgs: z.number().int().min(0).max(64),
+		deferred: z.boolean(),
+		oneShot: z.boolean(),
+	})
+	.strict();
+type SceneConnection = z.infer<typeof connectionSchema>;
 const stateSchema = z
 	.object({
 		nodes: z.array(nodeSchema).min(1).max(512),
 		selected: z.array(nodeId).max(512),
+		connections: z.array(connectionSchema).max(1024).optional(),
+		excludedConnections: z.number().int().min(0).max(1000000).optional(),
 	})
 	.strict();
 // v4 editor context: the captured scene's own undo history and polled run state.
@@ -80,7 +97,7 @@ const runSchema = z.union([
 type SceneHistory = z.infer<typeof historySchema>;
 type SceneRun = z.infer<typeof runSchema>;
 const envelope = z.object({
-	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
 	sequence: z.number().int().min(0).max(4095),
@@ -145,7 +162,10 @@ export type SceneObservation = {
 		| "scene-saved"
 		| "author-checkpoint"
 		| "editor-history"
-		| "run-state";
+		| "run-state"
+		| "signal-connection-added"
+		| "signal-connection-removed"
+		| "signal-connections-unrecorded";
 	label: string;
 	payload: JsonValue;
 };
@@ -193,6 +213,32 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 		state.selected.some((id) => !depths.has(id))
 	)
 		throw new Error("Invalid scene selection");
+	if (
+		(state.connections !== undefined) !== schemaVersion >= 5 ||
+		(state.excludedConnections !== undefined) !== schemaVersion >= 5
+	)
+		throw new Error("Signal connections require exactly scene journal schema v5 or later");
+	const connections = state.connections ?? [];
+	if (
+		new Set(connections.map(connectionKey)).size !== connections.length ||
+		connections.some((connection) => !depths.has(connection.from) || !depths.has(connection.to))
+	)
+		throw new Error("Invalid scene signal connections");
+}
+function connectionKey(connection: SceneConnection): string {
+	return JSON.stringify([
+		connection.from,
+		connection.signal,
+		connection.to,
+		connection.method,
+		connection.boundArgs,
+		connection.deferred,
+		connection.oneShot,
+	]);
+}
+function describeConnection(connection: SceneConnection, state: SceneState): string {
+	const name = (id: string) => state.nodes.find((node) => node.id === id)?.name ?? id;
+	return `${name(connection.from)}.${connection.signal} → ${name(connection.to)}.${connection.method}`;
 }
 /** Pure offline decoder. Does not connect to Godot, read resource paths or map video time. */
 function decodeGodotSceneJournal(text: string): {
@@ -224,9 +270,9 @@ function decodeGodotSceneJournal(text: string): {
 		)
 	)
 		throw new Error("Checkpoint requires scene journal schema v2");
-	const v4 = first.schemaVersion === 4;
+	const v4 = first.schemaVersion >= 4;
 	if ((first.history !== undefined) !== v4 || (first.run !== undefined) !== v4)
-		throw new Error("Editor history/run context requires exactly scene journal schema v4");
+		throw new Error("Editor history/run context requires exactly scene journal schema v4 or later");
 	if (
 		!v4 &&
 		records.some(
@@ -336,6 +382,33 @@ function decodeGodotSceneJournal(text: string): {
 					before: previous.selected,
 					after: record.state.selected,
 				});
+			const beforeConnections = new Set((previous.connections ?? []).map(connectionKey));
+			const afterConnections = new Set((record.state.connections ?? []).map(connectionKey));
+			// Observed saved-connection differences between samples; not the dock gesture.
+			for (const connection of previous.connections ?? [])
+				if (!afterConnections.has(connectionKey(connection)))
+					add(
+						"signal-connection-removed",
+						`Signal connection no longer observed: ${describeConnection(connection, previous)}`,
+						{ before: connection },
+					);
+			for (const connection of record.state.connections ?? [])
+				if (!beforeConnections.has(connectionKey(connection)))
+					add(
+						"signal-connection-added",
+						`Signal connection observed: ${describeConnection(connection, record.state)}`,
+						{ after: connection },
+					);
+			if ((previous.excludedConnections ?? 0) !== (record.state.excludedConnections ?? 0))
+				add(
+					"signal-connections-unrecorded",
+					`Unrecorded saved signal connections: ${record.state.excludedConnections}`,
+					{
+						before: previous.excludedConnections ?? 0,
+						after: record.state.excludedConnections ?? 0,
+						reason: "outside-observed-scene-or-unsupported-callable",
+					},
+				);
 			previous = record.state;
 		} else if (record.event === "scene-saved") {
 			capturedScenes.add(record.scene);
@@ -451,6 +524,8 @@ export type GodotCheckpointComparison = {
 	removed: Array<{ id: string; name: string; type: string; parent: string }>;
 	changed: Array<{ id: string; nameBefore: string; nameAfter: string; fields: string[] }>;
 	selection?: { before: string[]; after: string[] };
+	/** v5 only, present when the saved signal connections differ between the two snapshots. */
+	connections?: { added: SceneConnection[]; removed: SceneConnection[] };
 };
 
 /**
@@ -534,6 +609,14 @@ export function compareGodotSceneCheckpoints(
 	}
 	const selectionChanged =
 		JSON.stringify([...before.selected].sort()) !== JSON.stringify([...after.selected].sort());
+	const beforeKeys = new Set((before.connections ?? []).map(connectionKey));
+	const afterKeys = new Set((after.connections ?? []).map(connectionKey));
+	const connectionsAdded = (after.connections ?? []).filter(
+		(c) => !beforeKeys.has(connectionKey(c)),
+	);
+	const connectionsRemoved = (before.connections ?? []).filter(
+		(c) => !afterKeys.has(connectionKey(c)),
+	);
 	return {
 		from: {
 			recordSequence: fromRecord.sequence,
@@ -558,6 +641,9 @@ export function compareGodotSceneCheckpoints(
 		changed,
 		...(selectionChanged
 			? { selection: { before: [...before.selected], after: [...after.selected] } }
+			: {}),
+		...(connectionsAdded.length || connectionsRemoved.length
+			? { connections: { added: connectionsAdded, removed: connectionsRemoved } }
 			: {}),
 	};
 }

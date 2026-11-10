@@ -21,7 +21,7 @@ $process = Start-Process -FilePath $NodeExe -ArgumentList @(('"' + $entry + '"')
 
 # Acquire the handle before completion so PowerShell 5.1 retains the exit code.
 $null = $process.Handle
-if (!$process.WaitForExit(120000)) { throw "Probe exceeded deadline; inspect owned PID $($process.Id). No user processes were stopped." }
+if (!$process.WaitForExit(240000)) { throw "Probe exceeded deadline; inspect owned PID $($process.Id). No user processes were stopped." }
 $process.Refresh()
 Get-Content $stdout
 if ($process.ExitCode -ne 0) { Get-Content $stderr; throw "Windows scene probe exited $($process.ExitCode)" }

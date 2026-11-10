@@ -53,7 +53,7 @@ and [10 November, before this status rewrite](LESSON_CAPTURE_ROADMAP_HISTORY_202
 near the owner's roughly 75% cap. All Godot slices through `5a77ac5d` are reviewed;
 no new push. [Resume checkpoint](lesson-capture/GODOT_CAPTURE_RESUME_2026-11-10.md).
 Claude then took over building: [Godot history and run-state observations](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md)
-(raw v4) are implemented with real Linux/WinBoat editor/API probes; review pending.
+(raw v4) are independently accepted; [saved signal connections](lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md) (raw v5) are implemented, review pending.
 
 ## Unified workflow
 

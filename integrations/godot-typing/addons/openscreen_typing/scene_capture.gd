@@ -4,6 +4,7 @@ extends RefCounted
 # Independent, explicitly started journal. Never watches files or enumerates properties.
 signal status_changed(message: String)
 const MAX_NODES := 512
+const MAX_CONNECTIONS := 1024
 const MAX_RECORDS := 4096
 const MAX_BYTES := 8 * 1024 * 1024
 const INTERVAL_MS := 250
@@ -26,6 +27,7 @@ var _history: UndoRedo
 var _history_manager: EditorUndoRedoManager
 var _history_key := ""
 var _run_key := ""
+var _identifier_pattern := RegEx.create_from_string("^[A-Za-z_][A-Za-z0-9_]*$")
 
 func active() -> bool:
 	return _file != null
@@ -288,7 +290,73 @@ func _snapshot() -> Dictionary:
 		if allowed.has(identity):
 			selected.append(identity)
 	selected.sort()
-	return {"nodes": nodes, "selected": selected}
+	var excluded := [0]
+	var connections := _connections(nodes, allowed, excluded)
+	return {"nodes": nodes, "selected": selected, "connections": connections, "excludedConnections": excluded[0]}
+
+# v5: persistent (scene-saved) signal connections whose source and target are both
+# observed nodes and whose target is a plain method on that node. Editor-internal,
+# lambda/custom callables and connections from outside the owned set are excluded.
+# Bound argument values are never recorded; only their count. Persistent connections
+# into an observed node that are not recorded (source outside the observed set, custom
+# or lambda callable, unsupported names) are counted in `excluded`, never described.
+func _connections(nodes: Array, allowed: Dictionary, excluded: Array) -> Array:
+	var connections: Array = []
+	for node in nodes:
+		if _limited:
+			break
+		var target := instance_from_id(int(node.id)) as Node
+		if not is_instance_valid(target):
+			continue
+		for connection in target.get_incoming_connections():
+			if (connection.flags & CONNECT_PERSIST) == 0:
+				continue
+			var source := connection.signal.get_object() as Node
+			var callable: Callable = connection.callable
+			if not is_instance_valid(source) or not allowed.has(str(source.get_instance_id())) or callable.get_object() != target or not _method_callable(callable, target):
+				excluded[0] += 1
+				continue
+			var signal_name := str(connection.signal.get_name())
+			var method := str(callable.get_method())
+			if not _identifier(signal_name) or not _identifier(method):
+				excluded[0] += 1
+				continue
+			if connections.size() >= MAX_CONNECTIONS:
+				_limited = true
+				break
+			connections.append({
+				"signal": signal_name,
+				"from": str(source.get_instance_id()),
+				"to": node.id,
+				"method": method,
+				"boundArgs": clampi(callable.get_bound_arguments_count(), 0, 64),
+				"deferred": (connection.flags & CONNECT_DEFERRED) != 0,
+				"oneShot": (connection.flags & CONNECT_ONE_SHOT) != 0,
+			})
+	connections.sort_custom(func(a, b): return JSON.stringify(a) < JSON.stringify(b))
+	return connections
+
+# A plain method callable, or a bound wrapper (custom in Godot) around a method that the
+# target's script declares. Lambdas and other custom callables are excluded. Only the
+# script's method table is consulted, never its source text.
+func _method_callable(callable: Callable, target: Node) -> bool:
+	if callable.is_standard():
+		return true
+	if callable.get_bound_arguments_count() < 1:
+		return false
+	var script := target.get_script() as Script
+	if script == null:
+		return false
+	var method := callable.get_method()
+	for entry in script.get_script_method_list():
+		if entry.name == method:
+			return true
+	return false
+
+func _identifier(text: String) -> bool:
+	if text.is_empty() or text.length() > 100:
+		return false
+	return _identifier_pattern.search(text) != null
 
 func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 	if _limited or (node != _root and node.owner != _root):
@@ -353,7 +421,7 @@ func _has_control(text: String) -> bool:
 func _write(payload: Dictionary) -> bool:
 	if not active():
 		return false
-	payload["schemaVersion"] = 4
+	payload["schemaVersion"] = 5
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence

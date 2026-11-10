@@ -1,3 +1,13 @@
+# Godot saved signal connections awaiting review — 10 November 2026
+
+Claude builder. History/run slice accepted (1372a9c2, follow-ups 03355303/6be3ae7f;
+[review](CLAUDE_GODOT_HISTORY_RUN_REVIEW_1372A9C2_2026-11-10.md),
+[recheck](CLAUDE_GODOT_HISTORY_RUN_RECHECK_03355303_2026-11-10.md)). New slice:
+[raw v5 saved signal connections](GODOT_SIGNAL_CONNECTIONS_2026-11-10.md) between observed
+nodes; excluded ones counted, bound values never recorded. 6,585 tests / 483 files, real
+Linux/WinBoat probes, production CLI/MCP raw v4+v5 roundtrip and startup smoke pass.
+Independent review pending. No pushes; main fd2775e2; player parked.
+
 # Claude owns building; Godot history/run slice awaiting review — 10 November 2026
 
 The owner moved implementation to Claude: Claude (Opus 5.5) is now lead builder and

@@ -40,6 +40,14 @@ fs.writeFileSync(
 	'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="green"/></svg>',
 );
 fs.writeFileSync(
+	path.join(fixture, "connections.gd"),
+	"extends Area2D\n# PRIVATE_CONNECTION_SCRIPT_CANARY\nfunc _on_timeout(): pass\nfunc _on_ready(_v = null): pass\nfunc nonpersistent_canary(): pass\nfunc resource_canary(): pass\n",
+);
+fs.writeFileSync(
+	path.join(fixture, "connections.tscn"),
+	'[gd_scene format=3]\n[ext_resource type="Script" path="res://connections.gd" id="1"]\n[node name="ConnectionsRoot" type="Node2D"]\n[node name="Timer" type="Timer" parent="."]\n[node name="Hitbox" type="Area2D" parent="."]\nscript = ExtResource("1")\n[connection signal="timeout" from="Timer" to="Hitbox" method="_on_timeout"]\n',
+);
+fs.writeFileSync(
 	path.join(fixture, "history.tscn"),
 	'[gd_scene format=3]\n[node name="HistoryRoot" type="Node2D"]\n',
 );
@@ -59,8 +67,8 @@ const env = {
 };
 const result = spawnSync(
 	process.env.GODOT_BIN || "godot",
-	["--headless", "--editor", "--path", fixture, "res://enemy.tscn", "--quit-after", "1800"],
-	{ env, encoding: "utf8", timeout: 60000, maxBuffer: 4 * 1024 * 1024 },
+	["--headless", "--editor", "--path", fixture, "res://enemy.tscn", "--quit-after", "4000"],
+	{ env, encoding: "utf8", timeout: 150000, maxBuffer: 4 * 1024 * 1024 },
 );
 const output = `${result.stdout || ""}\n${result.stderr || ""}`;
 fs.writeFileSync(path.join(fixture, "probe.log"), output);
@@ -89,8 +97,8 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
-if (records.some((entry) => entry.schemaVersion !== 4))
-	throw new Error("New producer did not write schema v4 consistently");
+if (records.some((entry) => entry.schemaVersion !== 5))
+	throw new Error("New producer did not write schema v5 consistently");
 for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
 	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
 		throw new Error(`Missing ${label} marker`);
@@ -265,6 +273,60 @@ if (
 fs.writeFileSync(
 	path.join(fixture, "history-review.json"),
 	JSON.stringify(historyJournal, null, 2),
+);
+// v5 saved signal connections from real Object.connect/disconnect calls.
+const connectionsJournal = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "connections.jsonl"), "utf8"),
+);
+const describeIds = (journal, connection) => {
+	const name = (id) => journal.baseline.nodes.find((node) => node.id === id)?.name;
+	return `${name(connection.from)}.${connection.signal}->${name(connection.to)}.${connection.method}`;
+};
+if (
+	JSON.stringify(
+		connectionsJournal.baseline.connections.map((c) => describeIds(connectionsJournal, c)),
+	) !== JSON.stringify(["Timer.timeout->Hitbox._on_timeout"]) ||
+	connectionsJournal.baseline.excludedConnections !== 0
+)
+	throw new Error("Saved connection must be baseline context");
+const connectionKinds = connectionsJournal.observations
+	.filter((entry) => entry.type.startsWith("signal-"))
+	.map((entry) => entry.type);
+const added = connectionsJournal.observations.find((e) => e.type === "signal-connection-added");
+const unrecorded = connectionsJournal.observations.find(
+	(e) => e.type === "signal-connections-unrecorded",
+);
+if (
+	JSON.stringify(connectionKinds) !==
+		JSON.stringify([
+			"signal-connection-added",
+			"signal-connections-unrecorded",
+			"signal-connection-removed",
+		]) ||
+	describeIds(connectionsJournal, added.payload.after) !== "Timer.renamed->Hitbox._on_ready" ||
+	added.payload.after.boundArgs !== 1 ||
+	!added.payload.after.deferred ||
+	!added.payload.after.oneShot ||
+	unrecorded.payload.after !== 3
+)
+	throw new Error(
+		`Unexpected real connection observations: ${JSON.stringify(connectionsJournal.observations)}`,
+	);
+const reopenedConnections = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "connections-reopen.jsonl"), "utf8"),
+);
+if (
+	JSON.stringify(
+		reopenedConnections.baseline.connections.map((c) => describeIds(reopenedConnections, c)),
+	) !== JSON.stringify(["Timer.renamed->Hitbox._on_ready"])
+)
+	throw new Error("Reopened saved scene must carry the saved connection as baseline");
+fs.writeFileSync(
+	path.join(fixture, "connections-review.json"),
+	JSON.stringify({ connectionsJournal, reopenedConnections }, null, 2),
+);
+console.log(
+	`CONNECTIONS_PASSED: baseline/add/remove/reopen; ${unrecorded.payload.after} out-of-scope or unsupported persistent connections counted, not described`,
 );
 console.log(
 	`HISTORY_RUN_PASSED: ${historyLabels.length} history + ${runLabels.length} run observations; global history and other-scene path withheld`,

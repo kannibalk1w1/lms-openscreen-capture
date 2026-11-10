@@ -167,3 +167,10 @@ New takes write raw journal v4. The decoder adds `editor-history` observations
 stopped). They are editor-reported and polled, not proof of a gesture, of new-vs-redo,
 or of a successful run; errors remain unavailable. [Exact scope and Linux/WinBoat
 evidence](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).
+
+## Saved signal connections (v5)
+
+Raw v5 states carry the saved signal connections between observed nodes (names, flags,
+bound-argument count only) plus a count of excluded ones. Added/removed connections are
+sampled relationship differences, not proof of the Signals-dock route or of emission.
+[Exact scope and Linux/WinBoat/production evidence](lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md).
