@@ -28,6 +28,7 @@ const electron = vi.hoisted(() => ({
 vi.mock("electron", () => ({
 	ipcMain: { handle: electron.handle },
 	app: { getPath: electron.getPath },
+	BrowserWindow: { fromWebContents: () => null },
 	dialog: { showSaveDialog: electron.save, showOpenDialog: electron.open },
 }));
 const rangeControl = vi.hoisted(() => ({

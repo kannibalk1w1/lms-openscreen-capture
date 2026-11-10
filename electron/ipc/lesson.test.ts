@@ -12,9 +12,11 @@ const electron = vi.hoisted(() => ({
 	open: vi.fn(),
 	save: vi.fn(),
 	getPath: vi.fn(() => "/disposable"),
+	from: vi.fn((_sender: unknown): unknown => null),
 }));
 vi.mock("electron", () => ({
 	app: { getPath: electron.getPath },
+	BrowserWindow: { fromWebContents: electron.from },
 	dialog: { showOpenDialog: electron.open, showSaveDialog: electron.save },
 	ipcMain: { handle: electron.handle },
 }));
@@ -370,4 +372,37 @@ it.each([
 		await fs.rm(root, { recursive: true, force: true });
 		electron.getPath.mockReturnValue("/disposable");
 	}
+});
+
+it("attaches the save, open and export dialogs to the asking editor window", async () => {
+	electron.handle.mockClear();
+	electron.open.mockReset();
+	electron.save.mockReset();
+	electron.open.mockResolvedValue({ canceled: true, filePaths: [] });
+	electron.save.mockResolvedValue({ canceled: true });
+	registerLessonHandlers(
+		new LessonService(
+			async () => {
+				throw new Error("no project");
+			},
+			async () => null,
+		),
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
+	);
+	const route = (name: string) =>
+		electron.handle.mock.calls.find(([value]) => value === `lesson:${name}`)![1];
+	const editor = editorEvent(),
+		window = { id: "editor-window" };
+	electron.from.mockImplementation((sender) => (sender === editor.sender ? window : null));
+	const lesson = { ...newLesson("Parented"), steps: [newStep("One")] };
+	for (const result of [
+		await route("save")(editor, lesson),
+		await route("open")(editor),
+		await route("export")(editor, lesson, [lesson.steps[0].id]),
+	])
+		expect(result).toEqual({ success: true, result: { status: "cancelled" } });
+	expect(electron.save.mock.calls.map((call) => call[0])).toEqual([window]);
+	expect(electron.open.mock.calls.map((call) => call[0])).toEqual([window, window]);
+	electron.from.mockImplementation(() => null);
 });

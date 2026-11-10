@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
-import { app, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { z } from "zod";
 import { type LessonErrorCode, LessonOperationError } from "../../src/lib/lesson/api";
 import { LessonDraftStore } from "../lesson/draftStore";
@@ -43,6 +43,15 @@ export function registerLessonHandlers(
 				return { success: false as const, code: "lesson-operation-failed" as const };
 			return run(event, ...args);
 		};
+	// Native dialogs attach to the asking editor window, so they cannot open behind it.
+	const saveDialog = (event: IpcMainInvokeEvent, options: Electron.SaveDialogOptions) => {
+		const parent = BrowserWindow.fromWebContents(event.sender);
+		return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
+	};
+	const openDialog = (event: IpcMainInvokeEvent, options: Electron.OpenDialogOptions) => {
+		const parent = BrowserWindow.fromWebContents(event.sender);
+		return parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options);
+	};
 	const drafts = new LessonDraftStore(path.join(app.getPath("userData"), "lesson-recovery-copies"));
 	ipcMain.handle(
 		"lesson:draft-status",
@@ -133,7 +142,7 @@ export function registerLessonHandlers(
 		editorOnly((event, input) =>
 			bounded(async () => {
 				const saved = await service.saveEditable(input, async () => {
-					const result = await dialog.showSaveDialog({
+					const result = await saveDialog(event, {
 						title: "Save a new editable lesson",
 						defaultPath: path.join(app.getPath("documents"), "lesson.openscreen-lesson.json"),
 						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
@@ -177,7 +186,7 @@ export function registerLessonHandlers(
 		editorOnly((event) =>
 			bounded(async () => {
 				const opened = await service.openEditable(async () => {
-					const result = await dialog.showOpenDialog({
+					const result = await openDialog(event, {
 						title: "Open editable lesson",
 						properties: ["openFile"],
 						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
@@ -192,10 +201,10 @@ export function registerLessonHandlers(
 	);
 	ipcMain.handle(
 		"lesson:export",
-		editorOnly((_event, input, ids) =>
+		editorOnly((event, input, ids) =>
 			bounded(() =>
 				service.exportGuide(input, ids, async () => {
-					const result = await dialog.showOpenDialog({
+					const result = await openDialog(event, {
 						title: "Choose parent folder for a new offline guide",
 						properties: ["openDirectory", "createDirectory"],
 					});
