@@ -152,7 +152,9 @@ Usage:
                      --at <ruler-seconds> --alt <image description> --source <absolute-file> [--source ...]
                      --out <new-lesson.json> [--json]
                             Attach one composed frame of the saved project to a step and save a new copy;
-                            every source file the project plays must be named; the step becomes draft
+                            every screen source must be named; screen-only projects only (a webcam, image background
+                            or annotation, added audio, click sound, webcam effect or cursor file is refused);
+                            the step becomes draft
   openscreen lesson move-step <lesson.json> --step <UUID> --to <position> --out <new-lesson.json> [--json]
                             Move one step to a 1-based position and save a new copy; nothing else changes
   openscreen lesson remove-step <lesson.json> --step <UUID> --out <new-lesson.json> [--json]

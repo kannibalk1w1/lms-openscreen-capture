@@ -105,7 +105,13 @@ an illustrated lesson headlessly (`lesson new`, `add-step`, `edit-step`, `remove
 outside input: an independent review of these slices; a Windows run (review finding H1, the
 lesson media pipeline is Linux-only); a decision on unbinding package tools from project
 state (M2); and a manual pilot on real hardware. The timed player and further package
-identity work are no longer next. The paragraphs below are earlier checkpoint accounts.
+identity work are no longer next. **Known loss limit:** a renderer reload or crash still
+discards unsaved Lesson guide work (the authored lesson and any package draft); only window
+close and project switches ask first, recovery copies are manual, and no autosave exists
+until the owner decides the recovery-store privacy question. The
+[independent review](lesson-capture/FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md)
+found M42-1 in headless illustration; its fix is recorded in the handoff and awaits that
+reviewer's verification. The paragraphs below are earlier checkpoint accounts.
 
 Review41 found MediumM41-1 in9479172b: failed reseals discarded unsaved package
 drafts. [The correction](lesson-capture/CLAUDE_ROADMAP_FOLLOWUP_41_2026-11-09.md)

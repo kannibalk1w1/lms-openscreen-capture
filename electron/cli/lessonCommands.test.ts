@@ -2,8 +2,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { illustrationUnsupportedMessage } from "../../src/lib/lesson/api";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { emptyLessonQuery } from "../../src/lib/lesson/review";
+import {
+	illustrationFixture,
+	UNGRANTED_DEPENDENCIES,
+	type UngrantedDependency,
+} from "../lesson/fileIllustrate.test-support";
 import { fixture } from "../lesson/fileRange.test-support";
 import { parseCliArgs } from "./args";
 import { runLessonCommand } from "./lessonCommands";
@@ -538,6 +544,7 @@ it("illustrate reports a fixed reason such as a trimmed time and otherwise the g
 	const { createEmptyDocument } = await import("../../src/lib/ai-edition/schema");
 	const doc = createEmptyDocument({ projectId: "p", title: "PRIVATE_PROJECT_TITLE" });
 	doc.assets = [{ id: "a", kind: "video", label: "S", originalPath: source, cameraTrack: null }];
+	doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
 	doc.timeline.clips = [
 		{
 			id: "c",
@@ -641,4 +648,49 @@ it("moves a step from the command line and through nothing else", async () => {
 		expect(
 			parseCliArgs(["electron", "app", "lesson", "move-step", "a.json", ...args], 2, root)?.kind,
 		).toBe("error");
+});
+it.each([
+	...UNGRANTED_DEPENDENCIES.map((dependency) => [dependency]),
+	["webcam", "image-background", "image-annotation"],
+] as UngrantedDependency[][])("illustrate refuses a project with %s through the CLI with the fixed code and guidance, rendering nothing", async (...add) => {
+	const f = await illustrationFixture(root, add),
+		chunks: string[] = [],
+		renderFrames = vi.fn(async () => null);
+	const command = parseCliArgs(
+		[
+			"electron",
+			"app",
+			"lesson",
+			"illustrate",
+			f.manifestPath,
+			"--project",
+			f.projectPath,
+			"--project-id",
+			"p",
+			"--step",
+			f.step.id,
+			"--at",
+			"2.5",
+			"--alt",
+			"Described",
+			"--source",
+			f.source,
+			"--out",
+			f.request.outputPath,
+			"--json",
+		],
+		2,
+		root,
+	);
+	if (command?.kind !== "lesson") throw new Error(JSON.stringify(command));
+	expect(await runLessonCommand(command, (value) => chunks.push(value), { renderFrames })).toBe(1);
+	expect(JSON.parse(chunks.join(""))).toEqual({
+		event: "error",
+		message: "illustration-unsupported",
+		detail: illustrationUnsupportedMessage,
+	});
+	expect(chunks.join("")).not.toMatch(/SECRET|private/);
+	expect(renderFrames).not.toHaveBeenCalled();
+	await expect(fs.stat(f.request.outputPath)).rejects.toThrow();
+	expect(await fs.readFile(f.projectPath, "utf8")).toBe(f.project);
 });

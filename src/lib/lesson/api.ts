@@ -4,6 +4,7 @@ export type LessonErrorCode =
 	| "lesson-operation-failed"
 	| "project-changed"
 	| "frame-unavailable"
+	| "illustration-unsupported"
 	| "range-unavailable"
 	| "range-target-changed"
 	| "range-source-unavailable"
@@ -79,6 +80,9 @@ export interface LessonApi {
 	>;
 }
 
+/** Fixed transport wording for a refused headless illustration; names kinds, never paths. */
+export const illustrationUnsupportedMessage =
+	"Headless illustration supports screen-only projects. This project uses a webcam, an image background, an image annotation, added audio, a click sound, a webcam effect or a recorded cursor file beside a source video, so nothing was rendered or saved. Remove those from a copy of the project, or illustrate this step in the editor.";
 /** Fixed transport wording; the editor uses its matching translated catalog key. */
 export const rangeExportToolUnavailableMessage =
 	"The video verification tool is unavailable. Reinstall or update OpenScreen, or ask your administrator to check the configured FFmpeg tool, then retry. Unverified files are kept; this is not a completed export.";

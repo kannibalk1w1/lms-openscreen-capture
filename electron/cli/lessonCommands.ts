@@ -1,4 +1,8 @@
-import { LessonOperationError, rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
+import {
+	illustrationUnsupportedMessage,
+	LessonOperationError,
+	rangeExportToolUnavailableMessage,
+} from "../../src/lib/lesson/api";
 import {
 	addLessonStepsFile,
 	createLessonFile,
@@ -173,6 +177,9 @@ export async function runLessonCommand(
 						...(error === "range-export-tool-unavailable"
 							? { detail: rangeExportToolUnavailableMessage }
 							: {}),
+						...(error === "illustration-unsupported"
+							? { detail: illustrationUnsupportedMessage }
+							: {}),
 						...(failure instanceof LessonPackageError
 							? { detail: lessonPackageMessages[failure.code] }
 							: {}),
@@ -189,6 +196,7 @@ export async function runLessonCommand(
 					(error === "range-export-tool-unavailable"
 						? `\n${rangeExportToolUnavailableMessage}`
 						: "") +
+					(error === "illustration-unsupported" ? `\n${illustrationUnsupportedMessage}` : "") +
 					((failure instanceof LessonFileRangeError || failure instanceof LessonPackageError) &&
 					failure.artifactPath
 						? `\nUnfinished copy: ${failure.artifactPath}`

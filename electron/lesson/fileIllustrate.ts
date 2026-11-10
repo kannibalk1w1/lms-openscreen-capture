@@ -2,11 +2,19 @@ import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { LessonOperationError } from "../../src/lib/lesson/api";
 import { attachLessonIllustration, reviseLesson } from "../../src/lib/lesson/authoring";
-import { lessonRenderFingerprint } from "../../src/lib/lesson/frameSource";
+import {
+	buildLessonSceneDescription,
+	lessonRenderFingerprint,
+} from "../../src/lib/lesson/frameSource";
 import { MAX_LESSON_BYTES, validateLesson } from "../../src/lib/lesson/schema";
+import { buildNativeClipList } from "../../src/native/sceneDescription";
+import { RangeMediaError } from "./rangeErrors";
+import { unsupportedRenderDependencies } from "./renderDependencies";
 import { openSelectedLessonContext } from "./selectedLessonContext";
 import { LessonService } from "./service";
+import { requireNoCursorSidecar } from "./sourceFiles";
 
 const absolute = z
 	.string()
@@ -37,7 +45,9 @@ export type LessonFrameRenderer = ConstructorParameters<typeof LessonService>[1]
 /**
  * Headless form of the editor's "Illustrate from current saved playhead": one composed frame of an
  * explicitly selected saved project, attached to one step and saved as a new lesson copy.
- * Every source file the project plays must be named by the caller; nothing is discovered or relinked.
+ * Every screen source the project plays must be named by the caller; nothing is discovered or relinked.
+ * Any other file-bearing dependency (webcam, image background or annotation, added audio, click
+ * sound, webcam effect, recorded cursor file) is refused before rendering.
  */
 export async function illustrateLessonStepFile(
 	input: unknown,
@@ -53,21 +63,47 @@ export async function illustrateLessonStepFile(
 	const context = await openSelectedLessonContext(request, check);
 	const step = context.lesson.steps.find((value) => value.id === request.stepId);
 	if (!step) throw new Error("Unknown step");
-	const sources = new Map(context.document.assets.map((asset) => [asset.id, asset.originalPath]));
+	// What the renderer would be handed, computed from the pinned project bytes only.
+	const clips = buildNativeClipList(context.document),
+		scene = buildLessonSceneDescription(context.document);
 	// The same file named with redundant segments is still the file the caller granted.
 	const granted = new Set(request.sourcePaths.map((value) => path.resolve(value)));
-	for (const clip of context.document.timeline.clips) {
-		const source = sources.get(clip.assetId);
-		if (
-			!source ||
-			!path.isAbsolute(source) ||
-			!granted.has(path.resolve(source)) ||
-			realpathSync(source) !== path.resolve(source)
-		)
-			throw new Error("Source not granted");
+	const isGranted = (source: string | undefined) =>
+		!!source && path.isAbsolute(source) && granted.has(path.resolve(source));
+	// Refuse by kind, before any filesystem or native access, every dependency that is not a
+	// granted screen source. Nothing is granted implicitly, substituted or dropped from the picture.
+	if (!clips.length || unsupportedRenderDependencies(clips, scene).length)
+		throw new LessonOperationError("illustration-unsupported");
+	const sources = new Map(context.document.assets.map((asset) => [asset.id, asset.originalPath]));
+	const screens = new Set<string>();
+	for (const source of [
+		...context.document.timeline.clips.map((clip) => sources.get(clip.assetId)),
+		...clips.map((clip) => clip.screenPath),
+	]) {
+		if (!isGranted(source)) throw new Error("Source not granted");
+		screens.add(path.resolve(source!));
+	}
+	for (const source of screens) {
+		if (realpathSync(source) !== source) throw new Error("Source not granted");
+		// The renderer would read a recorded cursor file beside a source without being asked to.
+		await requireNoCursorSidecar(source, authority.signal).catch((error) => {
+			if (error instanceof RangeMediaError && error.code === "range-media-cancelled") throw error;
+			throw new LessonOperationError("illustration-unsupported");
+		});
 	}
 	check();
-	const image = await new LessonService(context.readDocument, renderFrames).captureFrame({
+	// Last line of defence on the exact native arguments: only granted screens, nothing else.
+	const guarded: LessonFrameRenderer = (nativeClips, sceneJson, ...rest) => {
+		check();
+		if (
+			!nativeClips.length ||
+			nativeClips.some((clip) => !isGranted(clip.screenPath)) ||
+			unsupportedRenderDependencies(nativeClips, JSON.parse(sceneJson)).length
+		)
+			throw new LessonOperationError("illustration-unsupported");
+		return renderFrames(nativeClips, sceneJson, ...rest);
+	};
+	const image = await new LessonService(context.readDocument, guarded).captureFrame({
 		projectId: request.projectId,
 		rulerSec: request.rulerSec,
 		documentSha256: await lessonRenderFingerprint(context.document),

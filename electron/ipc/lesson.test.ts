@@ -184,3 +184,41 @@ it("updates only the file this window explicitly opened, through a main-held per
 	expect(plain.result.file).toBeUndefined();
 	await fs.rm(root, { recursive: true, force: true });
 });
+
+it("grants no file permission when the file on disk is not the lesson the window was given", async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-file-race-"));
+	electron.getPath.mockReturnValue(root);
+	electron.handle.mockClear();
+	const target = path.join(root, "lesson.json"),
+		given = { ...newLesson("Read first"), steps: [newStep("One")] },
+		// The file changed between the read that produced `given` and the grant snapshot.
+		newer = JSON.stringify({ ...given, revision: 5, title: "Written by someone else since" });
+	await fs.writeFile(target, newer);
+	const service = new LessonService(
+		async () => {
+			throw new Error("no project");
+		},
+		async () => null,
+	);
+	service.openEditable = async () => ({ status: "opened" as const, path: target, lesson: given });
+	registerLessonHandlers(service, () => ({ projectId: "p", assertCurrent: () => undefined }));
+	const route = (name: string) =>
+		electron.handle.mock.calls.find(([value]) => value === `lesson:${name}`)![1];
+	const sender = Object.assign(new EventEmitter(), { mainFrame: {}, isDestroyed: () => false }),
+		editor = { sender, senderFrame: sender.mainFrame };
+	const opened = await route("open")(editor);
+	expect(opened).toMatchObject({ success: true, result: { status: "opened", lesson: given } });
+	expect(opened.result.file).toBeUndefined();
+	// With no permission, nothing this window sends can replace the newer bytes.
+	expect(
+		await route("save-current")(editor, {
+			token: crypto.randomUUID(),
+			lesson: { ...given, revision: 9 },
+		}),
+	).toEqual({ success: false, code: "lesson-file-unavailable" });
+	expect(await fs.readFile(target, "utf8")).toBe(newer);
+	// The same window opening an unchanged file is granted as usual.
+	await fs.writeFile(target, JSON.stringify(given));
+	expect((await route("open")(editor)).result.file).toMatchObject({ path: target });
+	await fs.rm(root, { recursive: true, force: true });
+});

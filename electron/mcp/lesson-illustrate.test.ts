@@ -6,8 +6,14 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
+import { illustrationUnsupportedMessage } from "../../src/lib/lesson/api";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { jpegBase64 } from "../../src/lib/lesson/fixtures.test-support";
+import {
+	illustrationFixture,
+	UNGRANTED_DEPENDENCIES,
+	type UngrantedDependency,
+} from "../lesson/fileIllustrate.test-support";
 import { createLessonFileLifecycle } from "../lesson/fileLifecycle";
 import { registerLessonTools } from "./lesson-tools";
 
@@ -42,6 +48,7 @@ beforeEach(async () => {
 		doc = createEmptyDocument({ projectId: "p", title: "PRIVATE_PROJECT" });
 	await fs.writeFile(source, "video");
 	doc.assets = [{ id: "a", kind: "video", label: "S", originalPath: source, cameraTrack: null }];
+	doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
 	doc.timeline.clips = [
 		{
 			id: "c",
@@ -126,4 +133,28 @@ it("consent withdrawn while the frame renders publishes nothing; a closed connec
 	await connect(false);
 	expect(text(await call())).toBe("lesson-file-operation-failed");
 	await expect(fs.stat(args.outputPath as string)).rejects.toThrow();
+});
+it.each([
+	...UNGRANTED_DEPENDENCIES.map((dependency) => [dependency]),
+	["webcam", "image-background", "image-annotation"],
+] as UngrantedDependency[][])("refuses a project with %s through MCP with the fixed code and guidance, rendering nothing", async (...add) => {
+	await connect(true);
+	const dir = await fs.mkdtemp(path.join(root, "dependency-")),
+		f = await illustrationFixture(dir, add);
+	const result = await call(f.request);
+	expect(result.isError).toBe(true);
+	expect(text(result)).toBe(`illustration-unsupported: ${illustrationUnsupportedMessage}`);
+	expect(text(result)).not.toMatch(/SECRET|private/);
+	expect(render).not.toHaveBeenCalled();
+	await expect(fs.stat(f.request.outputPath)).rejects.toThrow();
+	expect(await fs.readFile(f.projectPath, "utf8")).toBe(f.project);
+	expect(await fs.readFile(f.manifestPath, "utf8")).toBe(f.raw);
+});
+it("still asks for consent before looking at an unsupported project", async () => {
+	await connect(true);
+	const dir = await fs.mkdtemp(path.join(root, "dependency-")),
+		f = await illustrationFixture(dir, ["image-background"]);
+	allowed = false;
+	expect(text(await call(f.request))).toContain("consent_required");
+	expect(render).not.toHaveBeenCalled();
 });

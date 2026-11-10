@@ -3,10 +3,20 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createEmptyDocument } from "../../src/lib/ai-edition/schema";
+import { LessonOperationError } from "../../src/lib/lesson/api";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
 import { jpegBase64 } from "../../src/lib/lesson/fixtures.test-support";
+import { buildLessonSceneDescription } from "../../src/lib/lesson/frameSource";
 import { parseLesson } from "../../src/lib/lesson/schema";
+import * as sceneDescription from "../../src/native/sceneDescription";
+import { buildNativeClipList } from "../../src/native/sceneDescription";
 import { illustrateLessonStepFile } from "./fileIllustrate";
+import {
+	illustrationFixture,
+	UNGRANTED_DEPENDENCIES,
+	type UngrantedDependency,
+} from "./fileIllustrate.test-support";
+import { unsupportedRenderDependencies } from "./renderDependencies";
 
 let root: string;
 const authority = {
@@ -40,6 +50,8 @@ async function fixture() {
 			reason: "fixture",
 		},
 	];
+	// A screen-only project: the default wallpaper is an image and is refused (M42-1).
+	doc.legacyEditor = { aspectRatio: "16:9", wallpaper: "#ffffff" };
 	const step = { ...newStep("Add the enemy"), status: "reviewed" as const, instructions: "Kept" },
 		lesson = { ...newLesson("L"), steps: [step, newStep("Other")] },
 		manifestPath = path.join(root, "lesson.json"),
@@ -145,5 +157,99 @@ it("refuses a cancelled request before rendering, and a project file that change
 	});
 	await expect(illustrateLessonStepFile(f.request, authority, f.render)).rejects.toThrow();
 	expect(f.render).toHaveBeenCalledTimes(1);
+	await expect(fs.stat(f.request.outputPath)).rejects.toThrow();
+});
+
+// M42-1: nothing but granted screen sources may reach the renderer.
+it("the screen-only fixture has no unsupported dependency and each canary adds exactly its own kind", async () => {
+	const kinds: Record<UngrantedDependency, string[]> = {
+		webcam: ["webcam"],
+		"image-background": ["image-background"],
+		"image-annotation": ["image-annotation"],
+		"added-audio": ["added-audio"],
+		"webcam-effect": ["webcam-effect"],
+		"cursor-sidecar": [],
+	};
+	const found = async (add: UngrantedDependency[]) => {
+		const dir = await fs.mkdtemp(path.join(root, "kind-"));
+		const { doc } = await illustrationFixture(dir, add);
+		return unsupportedRenderDependencies(
+			buildNativeClipList(doc),
+			buildLessonSceneDescription(doc),
+		);
+	};
+	expect(await found([])).toEqual([]);
+	for (const dependency of UNGRANTED_DEPENDENCIES)
+		expect(await found([dependency])).toEqual(kinds[dependency]);
+	// A click sound cannot be authored from a document in this process; pin its guard on the scene.
+	const { doc } = await illustrationFixture(await fs.mkdtemp(path.join(root, "kind-")));
+	expect(
+		unsupportedRenderDependencies(buildNativeClipList(doc), {
+			...buildLessonSceneDescription(doc),
+			clickSound: { downPath: "/SECRET_DOWN.wav", upPath: "/SECRET_UP.wav", hits: [] },
+		}),
+	).toEqual(["click-sound"]);
+});
+it.each([
+	...UNGRANTED_DEPENDENCIES.map((dependency) => [dependency]),
+	["webcam", "image-background", "image-annotation"],
+	[...UNGRANTED_DEPENDENCIES],
+] as UngrantedDependency[][])("refuses %s before any render, with the fixed code, no output and unchanged inputs", async (...add) => {
+	const f = await illustrationFixture(root, add),
+		render = vi.fn(async () => null);
+	const failure = await illustrateLessonStepFile(f.request, authority, render).catch(
+		(error) => error,
+	);
+	expect(failure).toBeInstanceOf(LessonOperationError);
+	expect(failure.code).toBe("illustration-unsupported");
+	expect(String(failure.message)).not.toMatch(/SECRET|private/);
+	expect(render).not.toHaveBeenCalled();
+	await expect(fs.stat(f.request.outputPath)).rejects.toThrow();
+	expect(await fs.readFile(f.manifestPath, "utf8")).toBe(f.raw);
+	expect(await fs.readFile(f.projectPath, "utf8")).toBe(f.project);
+	// The canary files were never created: the refusal cannot have depended on reading them.
+	await expect(fs.stat(path.join(root, "private"))).rejects.toThrow();
+});
+it("a dependency refusal comes before the screen grant check and before any source file is touched", async () => {
+	const f = await illustrationFixture(root, ["image-background"]),
+		render = vi.fn(async () => null),
+		lstat = vi.spyOn(fs, "lstat");
+	// Even with no usable grant at all, the answer is the unsupported project, not a grant error.
+	const failure = await illustrateLessonStepFile(
+		{ ...f.request, sourcePaths: [f.manifestPath] },
+		authority,
+		render,
+	).catch((error) => error);
+	expect(failure.code).toBe("illustration-unsupported");
+	expect(lstat.mock.calls.map(([target]) => String(target))).not.toContain(
+		`${f.source}.cursor.json`,
+	);
+	vi.restoreAllMocks();
+});
+it.each([
+	{ webcamPath: "/SECRET_CAMERA.mp4" },
+	{ screenPath: "/SECRET_SCREEN.mp4" },
+])("refuses at the renderer boundary if the native arguments ever carry %j", async (tamper) => {
+	const f = await illustrationFixture(root),
+		native = vi.fn(async (_c: unknown, _s: string, _f: number, frames: number[]) => [
+			{ index: frames[0], width: 2, height: 2, jpeg: Buffer.from(jpegBase64, "base64") },
+		]);
+	// A project that changes between the check and the render is caught by the pinned-file check
+	// first; this drives the last guard directly through the service's own renderer hook.
+	const original = sceneDescription.buildNativeClipList;
+	let builds = 0;
+	vi.spyOn(sceneDescription, "buildNativeClipList").mockImplementation((document) => {
+		const built = original(document);
+		// The fourth build is the one inside captureFrame whose result is handed to the renderer.
+		return ++builds === 4 ? built.map((clip) => ({ ...clip, ...tamper })) : built;
+	});
+	const failure = await illustrateLessonStepFile(f.request, authority, native).catch(
+		(error) => error,
+	);
+	vi.restoreAllMocks();
+	expect(failure).toBeInstanceOf(LessonOperationError);
+	expect(failure.code).toBe("illustration-unsupported");
+	expect(builds).toBe(4);
+	expect(native).not.toHaveBeenCalled();
 	await expect(fs.stat(f.request.outputPath)).rejects.toThrow();
 });

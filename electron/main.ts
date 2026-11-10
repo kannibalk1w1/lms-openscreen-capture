@@ -58,6 +58,7 @@ import {
 	getSelectedDesktopSource,
 	registerIpcHandlers,
 } from "./ipc/handlers";
+import { createLessonUnsavedWorkFlag } from "./lesson/unsavedWorkFlag";
 import { isOnlyLingeringOverlay } from "./lingeringOverlay";
 import { installMainProcessErrorGuards } from "./main-process-errors";
 import { serveAppChannel } from "./mcp/app-channel";
@@ -1090,10 +1091,9 @@ ipcMain.on("set-has-unsaved-changes", (_, hasChanges: boolean) => {
 });
 // Separate from project dirtiness: unsaved lesson-guide work asks before closing, but must never
 // change the saved-project authority that lesson media operations check.
-let lessonHasUnsavedWork = false;
+const lessonUnsavedWork = createLessonUnsavedWorkFlag(() => mainWindow);
 ipcMain.on("set-lesson-unsaved-work", (event, unsaved: unknown) => {
-	if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents)
-		lessonHasUnsavedWork = unsaved === true;
+	lessonUnsavedWork.set(event.sender, unsaved);
 });
 
 // Quit requested from the editor's in-app File menu. Mirrors the native
@@ -1126,12 +1126,12 @@ function createEditorWindowWrapper() {
 	}
 	mainWindow = createEditorWindow();
 	editorHasUnsavedChanges = false;
-	lessonHasUnsavedWork = false;
+	lessonUnsavedWork.reset();
 
 	mainWindow.on("close", (event) => {
 		if (
 			isForceClosing ||
-			(!editorHasUnsavedChanges && !lessonHasUnsavedWork) ||
+			(!editorHasUnsavedChanges && !lessonUnsavedWork.get()) ||
 			isCloseConfirmInFlight
 		)
 			return;

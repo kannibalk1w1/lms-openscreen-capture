@@ -22,6 +22,7 @@ import { buildNativeClipList } from "../../src/native/sceneDescription";
 import { validateRangeVideo } from "./encodedVideo";
 import { RangeMediaError, RangeVideoToolUnavailableError } from "./rangeErrors";
 import { planLessonRange } from "./rangePlan";
+import { unsupportedRenderDependencies } from "./renderDependencies";
 import {
 	checkSourceCancellation,
 	hashRegularFile,
@@ -93,16 +94,7 @@ export async function prepareLessonRangeMedia(document: AxcutDocument, input: un
 	const clips = buildNativeClipList(derived),
 		scene = buildLessonSceneDescription(derived);
 	// No hidden source dependency or native sidecar fallback is silently dropped.
-	if (
-		!clips.length ||
-		clips.length > 32 ||
-		clips.some((clip) => !!clip.webcamPath) ||
-		scene.audioTracks.length ||
-		scene.clickSound ||
-		scene.background.kind === "image" ||
-		scene.annotations.some((item) => !!item.imagePath) ||
-		scene.webcamEffect
-	)
+	if (!clips.length || clips.length > 32 || unsupportedRenderDependencies(clips, scene).length)
 		throw new RangeMediaError("range-media-unsupported");
 	const scale = Math.min(1, 1280 / Math.max(scene.output.width, scene.output.height));
 	const params = {

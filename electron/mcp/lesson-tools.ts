@@ -1,5 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { LessonOperationError, rangeExportToolUnavailableMessage } from "../../src/lib/lesson/api";
+import {
+	illustrationUnsupportedMessage,
+	LessonOperationError,
+	rangeExportToolUnavailableMessage,
+} from "../../src/lib/lesson/api";
 import {
 	addLessonStepsFile,
 	createLessonFile,
@@ -266,7 +270,7 @@ export function registerLessonTools(
 		"illustrateLessonStep",
 		{
 			description:
-				"Attach one composed frame of an explicitly selected SAVED project (projectPath, projectId, rulerSec on the editor ruler) to one step of an explicitly selected editable lesson file, with a required imageAlt description, and save the result as a NEW file at an explicit absolute outputPath. sourcePaths must name every source file the project's clips play; nothing is discovered or relinked and symlinked sources are refused. The step returns to draft: a person must still review the pixels for private content and check that the frame shows the step. Selected files are unchanged and no file is replaced. Fails with frame-unavailable for a time inside a cut. Requires MCP edits.",
+				"Attach one composed frame of an explicitly selected SAVED project (projectPath, projectId, rulerSec on the editor ruler) to one step of an explicitly selected editable lesson file, with a required imageAlt description, and save the result as a NEW file at an explicit absolute outputPath. sourcePaths must name every screen source file the project's clips play; nothing is discovered or relinked and symlinked sources are refused. Screen-only projects only: a webcam, image background, image annotation, added audio, click sound, webcam effect or recorded cursor file beside a source is refused with illustration-unsupported before anything is rendered. The step returns to draft: a person must still review the pixels for private content and check that the frame shows the step. Selected files are unchanged and no file is replaced. Fails with frame-unavailable for a time inside a cut. Requires MCP edits.",
 			inputSchema: illustrateLessonStepFileSchema,
 			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
 		},
@@ -293,6 +297,8 @@ export function registerLessonTools(
 			} catch (error) {
 				if (!editsAllowed()) return failure(refused);
 				// Fixed codes only, such as a trimmed time; no paths, payloads or raw errors.
+				if (error instanceof LessonOperationError && error.code === "illustration-unsupported")
+					return failure(`illustration-unsupported: ${illustrationUnsupportedMessage}`);
 				return failure(
 					error instanceof LessonOperationError ? error.code : "lesson-file-operation-failed",
 				);

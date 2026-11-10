@@ -340,6 +340,7 @@
 			"frame-unavailable": "This ruler position has no kept source frame. Choose a visible position outside cuts and gaps.",
 			"render-busy": "A lesson operation is already running. Wait for it to finish, then retry.",
 			"destination-exists": "That file already exists. Choose a new filename; existing lessons are never replaced.",
+			"illustration-unsupported": "This illustration route supports screen-only projects. Remove the webcam, image background, image annotations, added audio, click sound, webcam effect or recorded cursor file, or illustrate from the editor.",
 			"lesson-file-changed": "The lesson file changed, moved or holds a different lesson, so it was not replaced. Your work is still here. Use Save new editable copy.",
 			"lesson-file-unavailable": "This lesson is no longer linked to a file that can be updated. Your work is still here. Use Save new editable copy.",
 			"local-draft-limit": "The local recovery limit is reached. Delete unwanted local copies or save a new editable file elsewhere. Existing copies are preserved.",
