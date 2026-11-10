@@ -94,7 +94,7 @@ it("agrees across takes with different session/node IDs and selection, keeping s
 		instanceId: "c".repeat(32),
 		coverage: "sampled",
 		stopReason: "user-stop",
-		checkpoint: { recordSequence: 1, label: "Step 1", atMs: 250 },
+		checkpoint: { recordSequence: 1, label: "Step 1", atMs: 250, snapshotSequence: 0 },
 	});
 	// v3 sources cannot record saved connections: that is unknown, not equal.
 	expect(result.connections).toEqual({ status: "unobserved" });
@@ -209,7 +209,12 @@ it("reports v1/v2 Node3D transforms as unobserved, never as equal or different",
 	const result = compare(legacy, modern);
 	expect(result.outcome).toBe("partial-no-observed-difference");
 	expect(result.unknowns).toContain("node3d-fields-unobserved");
-	expect(result.counts.differing).toBe(0);
+	// The test root also has no 2D transform, so it is partially compared too.
+	expect(result.counts).toMatchObject({ differing: 0, matched: 0, partiallyCompared: 2 });
+	expect(result.partiallyCompared).toContainEqual({
+		path: ["Cube"],
+		unobservedFields: ["visible", "position3", "rotation3", "scale3"],
+	});
 	const moved = take(
 		[
 			spatialNode(100, {
@@ -291,7 +296,9 @@ it("bounds rows and bytes for deep paths while keeping complete counts", () => {
 	for (let i = 0; i < 300; i++) deep.nodes.push(sceneNode(String(i + 100), `wide${i}`, "1"));
 	const result = compare(take([enemy(0)]), take([deep], { session: "c" }));
 	expect(result.counts.candidateOnly).toBe(364);
-	expect(result.truncated).toBe(true);
+	expect(result.truncated).toEqual(["candidateOnly"]);
+	// A clean prefix: once the byte bound cuts the deep chain, no later (smaller) row is kept.
+	expect(result.candidateOnly.every((row, index) => row.path.length === index + 1)).toBe(true);
 	expect(result.candidateOnly.length).toBeLessThanOrEqual(GODOT_REFERENCE_MAX_ROWS);
 	expect(new TextEncoder().encode(JSON.stringify(result)).byteLength).toBeLessThan(300 * 1024);
 });
@@ -371,4 +378,136 @@ it("agrees on the same real probe scene captured separately on Linux and Windows
 	);
 	expect(cross.unknowns).toContain("connections-unobserved");
 	expect(cross.outcome).toBe("sampled-fields-differ");
+});
+
+describe("review 0777440c follow-up", () => {
+	const plain = (offset: number, name = "Thing") => ({
+		nodes: [
+			sceneNode(String(1 + offset), "Root"),
+			{
+				id: String(2 + offset),
+				parent: String(1 + offset),
+				name,
+				type: "Node3D",
+				properties: { script: null },
+			},
+		],
+		selected: [],
+	});
+	it("flags unobservable 3D fields when both sources are legacy, without type-name inference", () => {
+		const result = compare(
+			take([plain(0)], { version: 2 }),
+			take([plain(100)], { version: 2, session: "c" }),
+		);
+		expect(result.unknowns).toContain("node3d-fields-unobserved");
+		expect(result.partiallyCompared.map((row) => row.path)).toEqual([[], ["Thing"]]);
+	});
+	it("does not flag 3D fields for v3+ sources or for legacy nodes with a 2D transform", () => {
+		expect(compare(take([plain(0)]), take([plain(100)], { session: "c" })).unknowns).not.toContain(
+			"node3d-fields-unobserved",
+		);
+		const withRootTransform = (state: State): State => ({
+			...state,
+			nodes: [
+				{
+					...state.nodes[0],
+					properties: { script: null, position: [0, 0], rotation: 0, scale: [1, 1], visible: true },
+				},
+				...state.nodes.slice(1),
+			],
+		});
+		const legacy2d = take([withRootTransform(enemy(0))], { version: 2 });
+		const spatial: State = {
+			nodes: [
+				sceneNode("101", "Enemy"),
+				{
+					id: "102",
+					parent: "101",
+					name: "Sprite2D",
+					type: "Node3D",
+					properties: {
+						script: null,
+						position3: [0, 0, 0],
+						rotation3: [0, 0, 0],
+						scale3: [1, 1, 1],
+						visible: true,
+					},
+				},
+			],
+			selected: [],
+		};
+		const result = compare(legacy2d, take([withRootTransform(spatial)], { session: "c" }));
+		expect(
+			result.differing.find((row) => row.path[0] === "Sprite2D")?.unobservedFields,
+		).toBeUndefined();
+		expect(result.unknowns).not.toContain("node3d-fields-unobserved");
+	});
+	it("shows connection flags and bound-argument counts in rows", () => {
+		const v5 = (offset: number, extra: Record<string, unknown>): State => ({
+			...enemy(offset),
+			connections: [
+				{
+					signal: "renamed",
+					from: String(2 + offset),
+					to: String(1 + offset),
+					method: "_on_renamed",
+					boundArgs: 0,
+					deferred: false,
+					oneShot: false,
+					...extra,
+				},
+			],
+			excludedConnections: 0,
+		});
+		const result = compare(
+			take([v5(0, {})], { version: 5 }),
+			take([v5(100, { boundArgs: 2 })], { version: 5, session: "c" }),
+		);
+		expect(result.connections).toMatchObject({
+			referenceOnly: [{ boundArgs: 0, deferred: false, oneShot: false }],
+			candidateOnly: [{ boundArgs: 2 }],
+		});
+	});
+	it("caps rows by count with clean prefixes and per-list flags", () => {
+		const many: State = { nodes: [sceneNode("1", "Enemy")], selected: [] };
+		for (let i = 0; i < 250; i++) many.nodes.push(sceneNode(String(i + 2), `n${i}`, "1"));
+		const result = compare(take([enemy(0)]), take([many], { session: "c" }));
+		expect(result.candidateOnly).toHaveLength(GODOT_REFERENCE_MAX_ROWS);
+		expect(result.candidateOnly.map((row) => row.path[0])).toEqual(
+			Array.from({ length: GODOT_REFERENCE_MAX_ROWS }, (_, i) => `n${i}`),
+		);
+		expect(result.truncated).toEqual(["candidateOnly"]);
+		expect(result.counts.candidateOnly).toBe(250);
+		expect(result.referenceOnly).toEqual([{ path: ["Sprite2D"], type: "Sprite2D" }]);
+	});
+	it("keeps path identity cheap for maximal deep hierarchies", () => {
+		const deep = (offset: number): State => {
+			const state: State = { nodes: [sceneNode(String(1 + offset), "Root")], selected: [] };
+			for (let i = 0; i < 511; i++) {
+				const parent = i < 63 ? String(i + 1 + offset) : String(63 + offset);
+				state.nodes.push(sceneNode(String(i + 2 + offset), `${i}`.padEnd(200, "\u0001"), parent));
+			}
+			return state;
+		};
+		const started = performance.now();
+		const result = compare(take([deep(0)]), take([deep(1000)], { session: "c" }));
+		expect(performance.now() - started).toBeLessThan(1000);
+		expect(result.counts.matched).toBe(512);
+	});
+	it("keeps interned path keys unambiguous between parent identity and name", () => {
+		const siblings = Array.from({ length: 12 }, (_, i) =>
+			sceneNode(String(i + 2), `c${i + 1}`, "1"),
+		);
+		const reference: State = {
+			nodes: [sceneNode("1", "Root"), ...siblings, sceneNode("50", "x", "13")],
+			selected: [],
+		};
+		const candidate: State = {
+			nodes: [sceneNode("1", "Root"), ...siblings, sceneNode("50", "2x", "2")],
+			selected: [],
+		};
+		const result = compare(take([reference]), take([candidate], { session: "c" }));
+		expect(result.referenceOnly).toEqual([{ path: ["c12", "x"], type: "Node2D" }]);
+		expect(result.candidateOnly).toEqual([{ path: ["c1", "2x"], type: "Node2D" }]);
+	});
 });

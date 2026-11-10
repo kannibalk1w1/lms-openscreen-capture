@@ -25,7 +25,6 @@ import {
 export const GODOT_REFERENCE_MAX_ROWS = 200;
 export const GODOT_REFERENCE_MAX_ROW_BYTES = 256 * 1024;
 const MAX_TOLERANCE = 1;
-const SPATIAL = ["position3", "rotation3", "scale3"] as const;
 const FIELDS = [
 	"type",
 	"script",
@@ -34,8 +33,12 @@ const FIELDS = [
 	"rotation",
 	"scale",
 	"visible",
-	...SPATIAL,
+	"position3",
+	"rotation3",
+	"scale3",
 ] as const;
+/** v1/v2 journals never recorded Node3D transforms or Node3D visibility. */
+const LEGACY_UNRECORDED = ["visible", "position3", "rotation3", "scale3"] as const;
 type Field = (typeof FIELDS)[number] | "name";
 type SceneNode = GodotSceneSnapshotState["nodes"][number];
 type Path = string[];
@@ -47,15 +50,24 @@ type Unknown =
 	| "connections-partially-recorded";
 
 export type GodotReferenceSource = {
+	/** The take's header scene path (a Save As during the take is not reflected here). */
 	scene: string;
 	schemaVersion: number;
 	sessionId: string;
 	instanceId: string;
 	coverage: "sampled" | "limited";
 	stopReason: string;
-	checkpoint: { recordSequence: number; label: string; atMs: number };
+	checkpoint: { recordSequence: number; label: string; atMs: number; snapshotSequence: number };
 };
-type ConnectionRow = { from: Path; signal: string; to: Path; method: string };
+type ConnectionDetail = {
+	signal: string;
+	method: string;
+	boundArgs: number;
+	deferred: boolean;
+	oneShot: boolean;
+};
+type ConnectionRow = { from: Path; to: Path } & ConnectionDetail;
+type Lists = "referenceOnly" | "candidateOnly" | "differing" | "partiallyCompared" | "connections";
 
 export type GodotReferenceComparison = {
 	kind: "advisory-sampled-state-comparison";
@@ -65,7 +77,10 @@ export type GodotReferenceComparison = {
 	outcome: "sampled-fields-agree" | "sampled-fields-differ" | "partial-no-observed-difference";
 	unknowns: Unknown[];
 	counts: {
+		/** Matched paths whose every compared field agrees and none was unobservable. */
 		matched: number;
+		/** Matched paths with no observed difference but some fields one source could not record. */
+		partiallyCompared: number;
 		referenceOnly: number;
 		candidateOnly: number;
 		differing: number;
@@ -75,6 +90,7 @@ export type GodotReferenceComparison = {
 	referenceOnly: Array<{ path: Path; type: string }>;
 	candidateOnly: Array<{ path: Path; type: string }>;
 	differing: Array<{ path: Path; fields: Field[]; unobservedFields?: Field[] }>;
+	partiallyCompared: Array<{ path: Path; unobservedFields: Field[] }>;
 	connections:
 		| { status: "unobserved" }
 		| {
@@ -83,24 +99,54 @@ export type GodotReferenceComparison = {
 				candidateOnly: ConnectionRow[];
 				excluded: { reference: number; candidate: number };
 		  };
-	/** True when row lists were cut at the row or byte bound; counts stay complete. */
-	truncated: boolean;
+	/** Lists cut at the row or byte bound. Each list is a clean prefix; counts stay complete. */
+	truncated: Lists[];
 };
 
-function indexByPath(state: GodotSceneSnapshotState): Map<string, { path: Path; node: SceneNode }> {
-	const pathById = new Map<string, Path>();
-	const result = new Map<string, { path: Path; node: SceneNode }>();
-	for (const node of state.nodes) {
-		// Validated journals list parents before children.
-		const parent = node.parent === "" ? [] : pathById.get(node.parent);
-		if (!parent) throw new Error("Invalid scene hierarchy");
-		const path = node.parent === "" ? [] : [...parent, node.name];
-		const key = JSON.stringify(path);
-		if (result.has(key)) throw new Error("Ambiguous scene node path");
-		pathById.set(node.id, path);
-		result.set(key, { path, node });
+/**
+ * Canonical path identities shared by both sides: each path is interned from its parent's
+ * identity and its own name, so keys stay small however deep the hierarchy is.
+ */
+class PathTable {
+	private readonly ids = new Map<string, number>();
+	private readonly entries: Array<{ parent: number; name: string }> = [{ parent: -1, name: "" }];
+	intern(parent: number, name: string): number {
+		const key = `${parent}\u0000${name}`;
+		let id = this.ids.get(key);
+		if (id === undefined) {
+			id = this.entries.length;
+			this.entries.push({ parent, name });
+			this.ids.set(key, id);
+		}
+		return id;
 	}
-	return result;
+	/** Expanded only for rows that are actually kept. */
+	path(id: number): Path {
+		const names: string[] = [];
+		for (let at = id; at > 0; at = this.entries[at].parent) names.push(this.entries[at].name);
+		return names.reverse();
+	}
+}
+
+function indexByPath(
+	state: GodotSceneSnapshotState,
+	table: PathTable,
+): { byPath: Map<number, SceneNode>; pathById: Map<string, number> } {
+	const pathById = new Map<string, number>();
+	const byPath = new Map<number, SceneNode>();
+	for (const node of state.nodes) {
+		// Validated journals list parents before children; the root has path identity 0.
+		let id = 0;
+		if (node.parent !== "") {
+			const parent = pathById.get(node.parent);
+			if (parent === undefined) throw new Error("Invalid scene hierarchy");
+			id = table.intern(parent, node.name);
+		}
+		if (byPath.has(id)) throw new Error("Ambiguous scene node path");
+		pathById.set(node.id, id);
+		byPath.set(id, node);
+	}
+	return { byPath, pathById };
 }
 
 function sameValue(a: unknown, b: unknown, tolerance: number): boolean {
@@ -113,34 +159,36 @@ function sameValue(a: unknown, b: unknown, tolerance: number): boolean {
 	return a === b;
 }
 
-function fieldValue(node: SceneNode, field: (typeof FIELDS)[number]): unknown {
-	return field === "type" ? node.type : node.properties[field];
+function fieldValue(node: SceneNode, field: Field): unknown {
+	return field === "name" ? node.name : field === "type" ? node.type : node.properties[field];
 }
 
-/** v1/v2 journals never recorded Node3D transforms or Node3D visibility. */
-function unobservable(node: SceneNode, other: SceneNode, version: number, field: Field): boolean {
-	if (version >= 3 || node.properties[field as never] !== undefined) return false;
-	const isSpatial = other.properties.position3 !== undefined;
-	return (SPATIAL as readonly string[]).includes(field) || (field === "visible" && isSpatial);
+/**
+ * Fields a source of this version could not have recorded for this node. Inheritance is
+ * never inferred from type names: a legacy node without a 2D transform may be a Node3D.
+ */
+function unrecordable(node: SceneNode, version: number): readonly Field[] {
+	return version < 3 && node.properties.position === undefined ? LEGACY_UNRECORDED : [];
 }
+
+type IndexedConnection = { from: number; to: number; detail: ConnectionDetail };
 
 function connectionRows(
 	state: GodotSceneSnapshotState,
-	pathById: Map<string, Path>,
-): Map<string, ConnectionRow> {
-	const rows = new Map<string, ConnectionRow>();
+	pathById: Map<string, number>,
+): Map<string, IndexedConnection> {
+	const rows = new Map<string, IndexedConnection>();
 	for (const connection of state.connections ?? []) {
-		const row = {
-			from: pathById.get(connection.from) ?? [],
+		const from = pathById.get(connection.from) ?? -1;
+		const to = pathById.get(connection.to) ?? -1;
+		const detail = {
 			signal: connection.signal,
-			to: pathById.get(connection.to) ?? [],
 			method: connection.method,
+			boundArgs: connection.boundArgs,
+			deferred: connection.deferred,
+			oneShot: connection.oneShot,
 		};
-		// Flags and bound-argument counts belong to the connection's identity.
-		rows.set(
-			JSON.stringify([row, connection.boundArgs, connection.deferred, connection.oneShot]),
-			row,
-		);
+		rows.set(JSON.stringify([from, to, detail]), { from, to, detail });
 	}
 	return rows;
 }
@@ -157,21 +205,24 @@ export function compareGodotCheckpointToReference(
 		throw new Error("Choose an absolute tolerance between 0 and 1");
 	const reference = readGodotCheckpointSnapshot(referenceText, referenceRecordSequence);
 	const candidate = readGodotCheckpointSnapshot(candidateText, candidateRecordSequence);
-	const expected = indexByPath(reference.state);
-	const actual = indexByPath(candidate.state);
+	const table = new PathTable();
+	const expected = indexByPath(reference.state, table);
+	const actual = indexByPath(candidate.state, table);
 	const unknowns = new Set<Unknown>();
 	if (reference.coverage === "limited") unknowns.add("reference-coverage-limited");
 	if (candidate.coverage === "limited") unknowns.add("candidate-coverage-limited");
 
 	let rowBytes = 0;
-	let truncated = false;
-	const keep = <T>(list: T[], row: T) => {
+	const truncated = new Set<Lists>();
+	const keep = <T>(name: Lists, list: T[], make: () => T) => {
+		if (truncated.has(name)) return;
+		const row = make();
 		const bytes = new TextEncoder().encode(JSON.stringify(row)).byteLength;
 		if (
 			list.length >= GODOT_REFERENCE_MAX_ROWS ||
 			rowBytes + bytes > GODOT_REFERENCE_MAX_ROW_BYTES
 		) {
-			truncated = true;
+			truncated.add(name);
 			return;
 		}
 		rowBytes += bytes;
@@ -179,6 +230,7 @@ export function compareGodotCheckpointToReference(
 	};
 	const counts = {
 		matched: 0,
+		partiallyCompared: 0,
 		referenceOnly: 0,
 		candidateOnly: 0,
 		differing: 0,
@@ -188,67 +240,74 @@ export function compareGodotCheckpointToReference(
 	const referenceOnly: GodotReferenceComparison["referenceOnly"] = [];
 	const candidateOnly: GodotReferenceComparison["candidateOnly"] = [];
 	const differing: GodotReferenceComparison["differing"] = [];
+	const partiallyCompared: GodotReferenceComparison["partiallyCompared"] = [];
 
-	for (const [key, { path, node }] of expected) {
-		const other = actual.get(key)?.node;
+	for (const [id, node] of expected.byPath) {
+		const other = actual.byPath.get(id);
 		if (!other) {
 			counts.referenceOnly++;
-			keep(referenceOnly, { path, type: node.type });
+			keep("referenceOnly", referenceOnly, () => ({ path: table.path(id), type: node.type }));
 			continue;
 		}
-		const fields: Field[] = [];
-		const unobservedFields: Field[] = [];
-		const all: Field[] = path.length === 0 ? ["name", ...FIELDS] : [...FIELDS];
-		for (const field of all) {
-			const a = field === "name" ? node.name : fieldValue(node, field);
-			const b = field === "name" ? other.name : fieldValue(other, field);
-			if (sameValue(a, b, tolerance)) continue;
-			if (
-				unobservable(node, other, reference.schemaVersion, field) ||
-				unobservable(other, node, candidate.schemaVersion, field)
-			)
-				unobservedFields.push(field);
-			else fields.push(field);
-		}
+		const unobservable = new Set<Field>([
+			...unrecordable(node, reference.schemaVersion),
+			...unrecordable(other, candidate.schemaVersion),
+		]);
+		const compared: Field[] = id === 0 ? ["name", ...FIELDS] : [...FIELDS];
+		const fields = compared.filter(
+			(field) =>
+				!unobservable.has(field) &&
+				!sameValue(fieldValue(node, field), fieldValue(other, field), tolerance),
+		);
+		const unobservedFields = compared.filter((field) => unobservable.has(field));
 		if (unobservedFields.length) unknowns.add("node3d-fields-unobserved");
 		if (fields.length) {
 			counts.differing++;
-			keep(differing, {
-				path,
+			keep("differing", differing, () => ({
+				path: table.path(id),
 				fields,
 				...(unobservedFields.length ? { unobservedFields } : {}),
-			});
+			}));
+		} else if (unobservedFields.length) {
+			counts.partiallyCompared++;
+			keep("partiallyCompared", partiallyCompared, () => ({
+				path: table.path(id),
+				unobservedFields,
+			}));
 		} else counts.matched++;
 	}
-	for (const [key, { path, node }] of actual)
-		if (!expected.has(key)) {
+	for (const [id, node] of actual.byPath)
+		if (!expected.byPath.has(id)) {
 			counts.candidateOnly++;
-			keep(candidateOnly, { path, type: node.type });
+			keep("candidateOnly", candidateOnly, () => ({ path: table.path(id), type: node.type }));
 		}
 
 	let connections: GodotReferenceComparison["connections"] = { status: "unobserved" };
 	if (reference.state.connections === undefined || candidate.state.connections === undefined)
 		unknowns.add("connections-unobserved");
 	else {
-		const paths = (index: typeof expected) =>
-			new Map([...index.values()].map(({ path, node }) => [node.id, path]));
-		const want = connectionRows(reference.state, paths(expected));
-		const have = connectionRows(candidate.state, paths(actual));
+		const want = connectionRows(reference.state, expected.pathById);
+		const have = connectionRows(candidate.state, actual.pathById);
 		const excluded = {
 			reference: reference.state.excludedConnections ?? 0,
 			candidate: candidate.state.excludedConnections ?? 0,
 		};
 		const referenceRows: ConnectionRow[] = [];
 		const candidateRows: ConnectionRow[] = [];
-		for (const [key, row] of want)
+		const expand = ({ from, to, detail }: IndexedConnection): ConnectionRow => ({
+			from: table.path(from),
+			to: table.path(to),
+			...detail,
+		});
+		for (const [key, value] of want)
 			if (!have.has(key)) {
 				counts.connectionsReferenceOnly++;
-				keep(referenceRows, row);
+				keep("connections", referenceRows, () => expand(value));
 			}
-		for (const [key, row] of have)
+		for (const [key, value] of have)
 			if (!want.has(key)) {
 				counts.connectionsCandidateOnly++;
-				keep(candidateRows, row);
+				keep("connections", candidateRows, () => expand(value));
 			}
 		const partial = excluded.reference > 0 || excluded.candidate > 0;
 		if (partial) unknowns.add("connections-partially-recorded");
@@ -274,11 +333,7 @@ export function compareGodotCheckpointToReference(
 		instanceId: source.instanceId,
 		coverage: source.coverage,
 		stopReason: source.stopReason,
-		checkpoint: {
-			recordSequence: source.checkpoint.recordSequence,
-			label: source.checkpoint.label,
-			atMs: source.checkpoint.atMs,
-		},
+		checkpoint: { ...source.checkpoint },
 	});
 	return {
 		kind: "advisory-sampled-state-comparison",
@@ -295,7 +350,8 @@ export function compareGodotCheckpointToReference(
 		referenceOnly,
 		candidateOnly,
 		differing,
+		partiallyCompared,
 		connections,
-		truncated,
+		truncated: [...truncated],
 	};
 }

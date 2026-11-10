@@ -17,16 +17,19 @@ The within-take `compareGodotSceneCheckpoints` is unchanged.
 - Two explicit raw journals and two explicit checkpoint record sequences. Each journal is
   fully validated (all versions v1–v5, including corrupt tails). The same journal may be
   used for both.
-- Each side of the result keeps its source identity: scene path, raw schema version,
-  session and adapter-instance IDs, raw footer coverage and stop reason, and the
-  checkpoint's record sequence, label and elapsed time. Hashing and binding to inspected
+- Each side of the result keeps its source identity: the take's header scene path (a Save
+  As during the take is not reflected), raw schema version, session and adapter-instance
+  IDs, raw footer coverage and stop reason, and the checkpoint's record sequence, label,
+  elapsed time and snapshot sequence. Hashing and binding to inspected
   files are left to the later file tools.
 
 ## Matching policy
 
 - Session node IDs are never matched across takes.
-- Nodes are matched only by their **root-relative path**: an array of node names, keyed
-  as a JSON array, so a name containing "/" cannot collide with a nested path. Godot
+- Nodes are matched only by their **root-relative path**: an array of node names. The
+  comparison keys each path by interning (parent path identity, name), shared by both
+  sides, so a name containing "/" cannot collide with a nested path, and key size does not
+  grow with depth. Arrays are expanded only for rows that are kept. Godot
   keeps sibling names unique; a journal with duplicate sibling paths is refused as
   ambiguous.
 - Roots are matched by position (path `[]`). Root name and root type are compared as
@@ -43,7 +46,7 @@ The within-take `compareGodotSceneCheckpoints` is unchanged.
   `numbers: {mode: "absolute-tolerance", tolerance}`. Node3D values are sampled Euler and
   property values, not world poses.
 - Saved signal connections (v5) are compared by endpoint path, signal, method, flags and
-  bound-argument count.
+  bound-argument count; rows show all of them.
 
 ## Unknown and partial evidence
 
@@ -54,7 +57,11 @@ the evidence is partial:
 - `reference-coverage-limited` / `candidate-coverage-limited`: the raw take ended with a
   `limited` footer.
 - `node3d-fields-unobserved`: a v1/v2 source could not record Node3D transforms or
-  visibility. These fields are listed as `unobservedFields`, never as equal or different.
+  visibility. Inheritance is never inferred from type names. Instead, every node in a
+  v1/v2 source that has no 2D transform is treated as possibly 3D, so `visible`,
+  `position3`, `rotation3` and `scale3` are left uncompared for it. They are listed as
+  `unobservedFields`: in `differing` when another field differs, otherwise in
+  `partiallyCompared`, which `counts.partiallyCompared` counts separately from `matched`.
 - `connections-unobserved`: either source is below v5. `connections` is then
   `{status: "unobserved"}`, not an empty or equal list.
 - `connections-partially-recorded`: either source counted excluded connections.
@@ -63,7 +70,10 @@ the evidence is partial:
 
 The inputs are bounded by the raw journal limits (8 MiB, 512 nodes, depth 64, 200-character
 names). Output row lists are capped at 200 rows each and 256 KiB of row JSON in total.
-Counts stay complete and `truncated: true` is set. A deep-path test (64 levels of
+Once a list is cut, it takes no further rows, so every list is a clean prefix. `truncated`
+names the lists that were cut, and counts stay complete. Comparing two maximal
+512-node, 64-deep hierarchies of 200-character names takes well under a second; the first
+build's re-serialized ancestor keys took 2.4–4.1 s. A deep-path test (64 levels of
 200-character names plus 300 siblings) stays under 300 KiB of total output.
 
 ## Validation
@@ -85,6 +95,23 @@ Counts stay complete and `truncated: true` is set. A deep-path test (64 levels o
 - 13 guard mutants are all killed: ambiguity, slash keys, unobservable fields, both
   coverage flags, excluded and unobserved connections, exact default, connection flags,
   output bound, and root name.
+
+## Review
+
+[Independent review of `0777440c`](CLAUDE_GODOT_REFERENCE_COMPARISON_REVIEW_0777440C_2026-11-10.md)
+(also covering the label fix `47bc7c0a`, which it accepts): **accepted with Lows**. None
+could yield a false `agree`. The follow-up commit:
+
+- L1/L4: unobservable fields are now decided per node by version and the absence of a 2D
+  transform, never by type name.
+- L2: `partiallyCompared` rows and count.
+- L3: connection rows carry flags and the bound-argument count.
+- L5: interned path keys.
+- N1: row-count cap, version-gate and prefix tests.
+- N2: `snapshotSequence`, the scene-path note and clean-prefix, per-list `truncated`.
+
+Mutants for the new guards are killed: version gate, position gate, prefix, row cap,
+partial, row detail, ambiguity and interned-key separator. Awaiting recheck.
 
 ## Next
 
