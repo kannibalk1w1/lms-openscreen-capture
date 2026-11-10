@@ -173,6 +173,9 @@ export function registerLessonHandlers(
 			bounded(async () => {
 				const operation = beginFileOperation(event);
 				const saved = await service.saveEditable(input, async () => {
+					// Validation may have taken a while: never show a picker for a page that has gone
+					// or a request that a newer one superseded.
+					operation.assertCurrent();
 					const result = await saveDialog(event, {
 						title: "Save a new editable lesson",
 						defaultPath: path.join(app.getPath("documents"), "lesson.openscreen-lesson.json"),

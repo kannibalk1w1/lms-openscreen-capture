@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newLesson, newStep } from "../../src/lib/lesson/authoring";
+import { imageFixture } from "../../src/lib/lesson/fixtures.test-support";
 import { editorRangeSessions } from "../lesson/editorRangeSession";
 import { LessonService } from "../lesson/service";
 import { registerEditorLessonHandlers } from "./lesson";
@@ -330,4 +331,62 @@ it("a new copy written just before the page context ended is reported saved, wit
 	gate.resolve();
 	expect(await pending).toEqual({ success: true, result: { status: "saved", path: target } });
 	expect(JSON.parse(await fs.readFile(target, "utf8")).title).toBe("Copy");
+});
+
+/** Holds the n-th real WebCrypto digest (asynchronous lesson image validation) until released. */
+function gateDigest(at: number) {
+	const entered = deferred<void>(),
+		release = deferred<void>(),
+		real = crypto.subtle.digest.bind(crypto.subtle);
+	let count = 0;
+	const spy = vi
+		.spyOn(crypto.subtle, "digest")
+		.mockImplementation(async (...args: Parameters<typeof real>) => {
+			const bytes = await real(...args);
+			if (++count === at) {
+				entered.resolve();
+				await release.promise;
+			}
+			return bytes;
+		});
+	return { entered, release, restore: () => spy.mockRestore() };
+}
+it.each([
+	"hash-navigation",
+	"render-process-gone",
+	"superseded",
+])("a new-copy save whose image validation is still running never opens a picker once %s", async (change) => {
+	const w = editorWindow(),
+		lesson = { ...newLesson("Copy"), steps: [newStep("One")], assets: [await imageFixture()] },
+		gate = gateDigest(1);
+	electron.save.mockResolvedValue({ canceled: true });
+	try {
+		const pending = w.route("save", lesson);
+		await gate.entered.promise;
+		if (change === "superseded") {
+			electron.open.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+			expect(await w.route("open")).toEqual({ success: true, result: { status: "cancelled" } });
+		} else w.end(change);
+		gate.release.resolve();
+		expect(await pending).toEqual(STALE_OPEN);
+		expect(electron.save).not.toHaveBeenCalled();
+		expect(await fs.readdir(root)).toEqual([]);
+	} finally {
+		gate.restore();
+	}
+});
+it("the same gated new-copy save, left current, opens its picker once (positive control)", async () => {
+	const w = editorWindow(),
+		lesson = { ...newLesson("Copy"), steps: [newStep("One")], assets: [await imageFixture()] },
+		gate = gateDigest(1);
+	electron.save.mockResolvedValue({ canceled: true });
+	try {
+		const pending = w.route("save", lesson);
+		await gate.entered.promise;
+		gate.release.resolve();
+		expect(await pending).toEqual({ success: true, result: { status: "cancelled" } });
+		expect(electron.save).toHaveBeenCalledTimes(1);
+	} finally {
+		gate.restore();
+	}
 });
