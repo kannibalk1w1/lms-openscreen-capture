@@ -15,6 +15,14 @@ See [integration controls, contract, refactor seams and required tests](lesson-c
 Godot is the first deep integration; no additional adapters are being built now.
 Application presets and adapter enablement are separate.
 
+**Current owner direction — 10 November:** park the learner-player proof of concept
+and prioritize deeper Godot integration. The first [bounded scene-observation
+slice](LESSON_CAPTURE_GODOT_SCENES.md) adds explicit capture, offline review and
+selected evidence-backed lesson drafts. These changes are locally validated,
+not independently reviewed or pushed. Next: explicit semantic/recording clock
+association with pause/gap handling. Earlier checkpoint/review entries below
+retain their historical scope.
+
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).
 It covers all new proposals A–K, smaller editor improvements, dependencies, risks,
 acceptance/test strategies, relative complexity and now/later/experimental choices.
@@ -42,7 +50,7 @@ packs. Outputs share stable steps and source references; source evidence stays i
 | --- | --- | --- |
 | 0 Capture correctness and privacy | Input clocks/gaps, native reliability, allowlists/suppression/retention/privacy review, preflight, rolling buffer | Partial; privacy is critical before broader input/semantic collection |
 | 1 Structured lesson generation | Versioned steps, screenshot/guide drafts, editable ordering/numbering, manifests, portable course presets | [First editable manifest/HTML/Markdown guide slice](LESSON_CAPTURE_GUIDES.md); profiles/deeper generation remain open |
-| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; continuous edit mapping/semantics remain open |
+| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; bounded offline scene observations and selected draft steps now exist; continuous edit/media mapping and broader semantics remain open |
 | 3 Learner-facing delivery | Standalone offline HTML player, differentiated accessible profiles, troubleshooting | Planned; caption/font/theme controls are reusable partial foundations |
 | 4 Authoring efficiency | Script/checklist companion, QC/idle suggestions, object-linked arrows, local asset library | Partial existing notes/flags/diagnostics/styles; integrated workflows planned |
 | 5 Review and evidence | Local comments/approval/revisions and optional tutor-curated evidence packs | Planned; never infer achievement from activity alone |

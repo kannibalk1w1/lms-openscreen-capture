@@ -13,7 +13,7 @@ export const lmsReferenceSchema = z
 	.refine((value) => !/\p{Cc}/u.test(value));
 export const lessonEvidenceSchema = z
 	.object({
-		kind: z.enum(["recording-flag", "typing-section", "authored"]),
+		kind: z.enum(["recording-flag", "typing-section", "authored", "application-observation"]),
 		assetId: z.string().max(200).optional(),
 		takeId: z.string().max(200).optional(),
 		eventId: z.string().max(220).optional(),
@@ -21,8 +21,34 @@ export const lessonEvidenceSchema = z
 		clock: z.enum(["recording-control-active-ms", "typing-session-elapsed-ms", "unmapped"]),
 		atMs: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
 		provenance: z.enum(["observed", "authored"]),
+		application: z
+			.object({
+				adapterId: z.string().min(1).max(100),
+				instanceId: z.string().min(1).max(100).optional(),
+				scope: z.string().min(1).max(1000),
+				type: z.string().min(1).max(100),
+				payload: z
+					.json()
+					.refine((value) => new TextEncoder().encode(JSON.stringify(value)).byteLength <= 32768),
+			})
+			.strict()
+			.optional(),
 	})
-	.strict();
+	.strict()
+	.superRefine((evidence, ctx) => {
+		if (
+			evidence.kind === "application-observation"
+				? !evidence.application ||
+					!evidence.sessionId ||
+					!evidence.eventId ||
+					evidence.provenance !== "observed"
+				: evidence.application !== undefined
+		)
+			ctx.addIssue({
+				code: "custom",
+				message: "Application evidence requires observed provenance, session, event and payload",
+			});
+	});
 export const lessonSourceSchema = z
 	.object({
 		projectId: z.string().min(1).max(200),

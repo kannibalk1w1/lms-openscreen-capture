@@ -41,6 +41,7 @@ import {
 	validateLessonImage,
 } from "@/lib/lesson/schema";
 import { setLessonUnsavedWork } from "@/lib/lesson/unsavedWork";
+import { GodotSceneReview } from "./GodotSceneReview";
 import styles from "./LessonGuideDialog.module.css";
 import { LessonOutputControls } from "./LessonOutputControls";
 import { LessonPackagePanel } from "./LessonPackagePanel";
@@ -386,6 +387,15 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 							setBaseline(null);
 							setFile(null);
 							setNotice(t("lesson.drafts.restored"));
+						}}
+					/>
+
+					<GodotSceneReview
+						key={`${projectId}:${lesson.id}`}
+						lesson={lesson}
+						onAppend={(next) => {
+							replaceLesson(next);
+							setError(null);
 						}}
 					/>
 
@@ -811,11 +821,26 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 									</ul>
 								)}
 								{step.evidence.map((evidence, n) => (
-									<p key={`${evidence.kind}-${n}`}>
+									<div key={`${evidence.kind}-${n}`}>
 										<small>
 											{t("lesson.evidence", { kind: evidence.kind, clock: evidence.clock })}
 										</small>
-									</p>
+										{evidence.application && (
+											<details>
+												<summary>{t("lesson.scene.evidence")}</summary>
+												<pre
+													style={{
+														whiteSpace: "pre-wrap",
+														overflowWrap: "anywhere",
+														maxHeight: 240,
+														overflowY: "auto",
+													}}
+												>
+													{JSON.stringify(evidence.application, null, 2)}
+												</pre>
+											</details>
+										)}
+									</div>
 								))}
 								<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 									<button

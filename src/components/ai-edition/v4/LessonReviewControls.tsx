@@ -65,16 +65,19 @@ export function LessonReviewControls({
 							source === "all" ||
 							source === "authored" ||
 							source === "recording-flag" ||
-							source === "typing-section"
+							source === "typing-section" ||
+							source === "application-observation"
 						)
 							onQuery({ ...query, source });
 					}}
 				>
-					{["all", "authored", "recording-flag", "typing-section"].map((source) => (
-						<option key={source} value={source}>
-							{t(`lesson.query.${source}`)}
-						</option>
-					))}
+					{["all", "authored", "recording-flag", "typing-section", "application-observation"].map(
+						(source) => (
+							<option key={source} value={source}>
+								{t(`lesson.query.${source}`)}
+							</option>
+						),
+					)}
 				</select>
 			</label>
 			<label>

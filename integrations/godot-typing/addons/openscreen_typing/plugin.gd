@@ -3,6 +3,13 @@ extends EditorPlugin
 
 const Observer = preload("observer.gd")
 const ClockClient = preload("clock_client.gd")
+const SceneCapture = preload("scene_capture.gd")
+var _scene_capture: SceneCapture
+var _scene_button: Button
+var _scene_status: Label
+var _scene_picker: FileDialog
+var _scene_confirm: ConfirmationDialog
+var _pending_scene: Node
 var _clock_client: ClockClient
 var _clock_button: Button
 var _clock_status: Label
@@ -119,9 +126,62 @@ func _enter_tree() -> void:
 	_picker.title = "Save typing capture journal"
 	_picker.file_selected.connect(_begin_capture)
 	get_editor_interface().get_base_control().add_child(_picker)
+	_scene_capture = SceneCapture.new()
+	_scene_button = Button.new()
+	_scene_button.text = "Capture scene actions"
+	_scene_button.pressed.connect(func():
+		if _scene_capture.active():
+			_scene_capture.stop()
+		else:
+			_pending_scene = get_editor_interface().get_edited_scene_root()
+			if not is_instance_valid(_pending_scene):
+				_scene_status.text = "Open a scene first"
+				return
+			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Samples every 250 ms; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync.\n\nContinue to choose a new journal file." % _pending_scene.name
+			_scene_confirm.popup_centered(Vector2i(640, 300))
+	)
+	_bar.add_child(_scene_button)
+	_scene_status = Label.new()
+	_scene_status.text = "Scene capture off"
+	_scene_status.clip_text = true
+	_scene_status.custom_minimum_size.x = 180
+	_bar.add_child(_scene_status)
+	_scene_capture.status_changed.connect(func(message: String):
+		_scene_status.text = message
+		_scene_status.tooltip_text = message
+		_scene_button.text = "Stop scene capture" if _scene_capture.active() else "Capture scene actions"
+	)
+	_scene_confirm = ConfirmationDialog.new()
+	_scene_confirm.title = "Allow scene observations for this take"
+	_scene_confirm.confirmed.connect(func():
+		_scene_picker.current_file = "scene-%d.jsonl" % Time.get_unix_time_from_system()
+		_scene_picker.popup_centered_ratio(0.65)
+	)
+	get_editor_interface().get_base_control().add_child(_scene_confirm)
+	_scene_picker = FileDialog.new()
+	_scene_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_scene_picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	_scene_picker.add_filter("*.jsonl", "OpenScreen scene observations")
+	_scene_picker.title = "Save scene observations to a new journal"
+	_scene_picker.file_selected.connect(func(path: String):
+		if is_instance_valid(_pending_scene):
+			_scene_capture.begin(path, _pending_scene, get_editor_interface())
+		else:
+			_scene_status.text = "Scene capture off · choose the current scene again"
+		_pending_scene = null
+	)
+	get_editor_interface().get_base_control().add_child(_scene_picker)
+	scene_saved.connect(_scene_capture.saved)
+	scene_changed.connect(_scene_capture.scene_changed)
 
 func _exit_tree() -> void:
 	_stop_capture()
+	if _scene_capture:
+		_scene_capture.stop("plugin-disabled")
+	if is_instance_valid(_scene_picker):
+		_scene_picker.queue_free()
+	if is_instance_valid(_scene_confirm):
+		_scene_confirm.queue_free()
 	if is_instance_valid(_clock_client):
 		_clock_client.disconnect_clock()
 		_clock_client.queue_free()
@@ -171,6 +231,8 @@ func _begin_capture(file_path: String) -> void:
 	_status.text = "Capturing current script · " + file_path.get_file()
 
 func _process(_delta: float) -> void:
+	if _scene_capture:
+		_scene_capture.poll()
 	if _file and _observer and _current_editor() != _observer.editor:
 		_stop_capture()
 

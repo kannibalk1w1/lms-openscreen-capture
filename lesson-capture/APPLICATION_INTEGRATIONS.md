@@ -3,7 +3,7 @@
 Architectural requirement, 5 November 2026. [Slice 9](../LESSON_CAPTURE_INTEGRATIONS.md)
 implements a bounded first subset: optional selected-file Godot decoder, real durable
 control, instance/session/capability isolation and adapter-free normalized evidence
-reopen. [Slice 11](../LESSON_CAPTURE_CLOCK_BRIDGE.md) adds a separate explicit project-scoped, read-only native clock capability and portable sample inspection. Continuous text alignment, semantic capture and the broader application-scope manager below remain planned. Godot is the first deep integration,
+reopen. [Slice 11](../LESSON_CAPTURE_CLOCK_BRIDGE.md) adds a separate explicit project-scoped, read-only native clock capability and portable sample inspection. The [bounded scene journal](../LESSON_CAPTURE_GODOT_SCENES.md) adds explicit current-scene sampling and offline selected evidence review. Continuous text/media alignment and the broader application-scope manager below remain planned. Godot is the first deep integration,
 not a required installation, runtime or core data model. This is the proposed
 adapter boundary, not a shipped integration manager. See the [product map](PRODUCT_MAP.md),
 [architecture](ARCHITECTURE.md) and [refactor audit](CURRENT_STATE_AUDIT.md#application-agnostic-follow-up-audit).
@@ -110,3 +110,22 @@ not physical application behavior. Establish the minimal interface and regressio
 before deep semantic expansion. Future-adapter recipe: descriptor/subset → explicit
 setup/permissions → scoped connection → validated observations/clock relation →
 stored evidence → teardown/failure tests. Prove Godot first; do not build every adapter.
+
+## Current-scene journal subset — 10 November 2026
+
+The first semantic slice is an explicit file workflow, not a new live connection
+or registry provider. The addon asks permission per current-scene take; it never
+starts from a window choice, typing-import setting or clock grant. Each bounded
+record has a random instance/take identity, sequence and independent elapsed time.
+The strict decoder rejects mixed instance/session/root state and unauthorized
+property/path shapes, and derives observed before/after changes without claiming
+every action or media alignment. Only explicitly selected observations become
+generic optional `application-observation` evidence on lesson steps. They reopen
+offline without an adapter. No new application-specific requirement is placed
+on ordinary capture/edit/export or the mandatory lesson fields.
+
+This file workflow does not implement a general live semantic permission manager,
+continuous clock mapping, checkpoint comparison or semantic CLI/MCP commands. Those
+remain follow-ups. The real disposable Godot editor probe and strict malformed
+import/offline regressions cover this subset; they do not replace the broader
+physical/privacy acceptance matrix above.

@@ -1,3 +1,16 @@
+# Current owner direction — deeper Godot integration, 10 November 2026
+
+The learner-player proof of concept is parked. Root Codex owns implementation;
+there are no delegated workers. See [scene observation workflow and exact
+limits](../LESSON_CAPTURE_GODOT_SCENES.md) for the new explicitly scoped addon,
+strict offline importer, review controls and selected evidence-backed drafts.
+This slice is locally validated, not independently reviewed or pushed. Existing
+local player enhancements remain untouched and unreviewed. No real lesson project
+was modified. Next: explicit semantic/recording clock association and pause/gap
+handling; do not infer video time from Godot elapsed time.
+
+The sections below are retained historical acceptance records.
+
 # Accepted first offline learner player — 10 November 2026
 
 The [independent no-wait review](OFFLINE_PLAYER_MP2_CONTINUATION_REVIEW_2026-11-10.md)
@@ -956,3 +969,5 @@ fix, API/UI integration, timed player or further phase before user resumption.
 Actual review20 independent59focused/5,0skip,root/test TS/Biome35 and probes/
 mutations accepted125ec5de. Worker56/4focused+Vite/TS/lint/docs validate the narrow
 fix; full5609/425 belongs to f7b8ed4c before the Medium fix. Preserve all evidence.
+
+Validation: [6,437 tests, real Godot probe and exact scope](GODOT_SCENES_VALIDATION_2026-11-10.md).

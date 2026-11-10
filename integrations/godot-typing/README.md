@@ -79,3 +79,12 @@ save a new clock-only JSONL journal. Native pause state is sampled and delayed;
 this does not pause typing or map edits to video. Stop saving and disconnect are
 separate actions. Ordinary typing remains usable without any clock connection.
 See [scope, workflow and exact evidence](../../LESSON_CAPTURE_CLOCK_BRIDGE.md).
+
+## Optional scene observations
+
+The same addon now has a separate **Capture scene actions** control. It starts
+off and asks for current-scene permission and a new journal file. Review its
+bounded hierarchy/selection/2D transform/resource observations in **Lesson guide →
+Godot scene observations**, then turn explicitly selected observations into draft
+steps. Typing and read-only clock capture remain independent. See the
+[workflow, privacy, evidence and limits](../../LESSON_CAPTURE_GODOT_SCENES.md).

@@ -5,7 +5,9 @@ export const lessonQuerySchema = z
 	.object({
 		title: z.string().max(300).default(""),
 		status: z.enum(["all", "draft", "reviewed"]).default("all"),
-		source: z.enum(["all", "authored", "recording-flag", "typing-section"]).default("all"),
+		source: z
+			.enum(["all", "authored", "recording-flag", "typing-section", "application-observation"])
+			.default("all"),
 		problemsOnly: z.boolean().default(false),
 	})
 	.strict();
