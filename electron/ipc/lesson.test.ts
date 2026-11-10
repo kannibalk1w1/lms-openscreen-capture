@@ -18,14 +18,27 @@ vi.mock("electron", () => ({
 	dialog: { showOpenDialog: electron.open, showSaveDialog: electron.save },
 	ipcMain: { handle: electron.handle },
 }));
+// Stands in for the production "registered editor window still on its own page" check.
+const editors = new WeakSet<object>();
+const isEditor = (event: { sender: object }) => editors.has(event.sender);
+const editorEvent = () => {
+	const sender = Object.assign(new EventEmitter(), {
+		id: 1,
+		mainFrame: {},
+		isDestroyed: () => false,
+	});
+	editors.add(sender);
+	return { sender, senderFrame: sender.mainFrame };
+};
 it("actual lesson IPC returns fixed errors without exposing source exception contents", async () => {
 	const read = vi.fn(async () => {
 		throw new Error("PRIVATE_LESSON_SOURCE_CANARY");
 	});
-	registerLessonHandlers(new LessonService(read, async () => null), () => ({
-		projectId: "p",
-		assertCurrent: () => undefined,
-	}));
+	registerLessonHandlers(
+		new LessonService(read, async () => null),
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
+	);
 	const frame = electron.handle.mock.calls.find(([name]) => name === "lesson:frame")![1];
 	const sender = Object.assign(new EventEmitter(), {
 		id: 1,
@@ -52,28 +65,30 @@ it("routes explicit local recovery operations through the real bounded store wit
 			async () => null,
 		),
 		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
 	);
 	const callback = (channel: string) =>
 		electron.handle.mock.calls.find(([name]) => name === channel)![1];
+	const editor = editorEvent();
 	try {
-		expect((await callback("lesson:draft-status")()).result.copies).toBe(0);
+		expect((await callback("lesson:draft-status")(editor)).result.copies).toBe(0);
 		const lesson = {
 			...newLesson(),
 			steps: [{ ...newStep(), code: { language: "plain", text: "LOCAL_SOURCE_CANARY" } }],
 		};
-		const saved = await callback("lesson:draft-save")(null, lesson);
+		const saved = await callback("lesson:draft-save")(editor, lesson);
 		expect(saved.success).toBe(true);
-		const listing = await callback("lesson:draft-list")();
+		const listing = await callback("lesson:draft-list")(editor);
 		expect(listing.result).toHaveLength(1);
 		expect(JSON.stringify(listing)).not.toContain("LOCAL_SOURCE_CANARY");
 		expect(
-			(await callback("lesson:draft-read")(null, saved.result.id)).result.steps[0].code.text,
+			(await callback("lesson:draft-read")(editor, saved.result.id)).result.steps[0].code.text,
 		).toBe("LOCAL_SOURCE_CANARY");
-		const bad = await callback("lesson:draft-remove")(null, "../PRIVATE_PATH_CANARY");
+		const bad = await callback("lesson:draft-remove")(editor, "../PRIVATE_PATH_CANARY");
 		expect(bad).toEqual({ success: false, code: "lesson-operation-failed" });
 		expect(JSON.stringify(bad)).not.toContain("PRIVATE_PATH_CANARY");
-		expect((await callback("lesson:draft-read")(null, saved.result.id)).success).toBe(true);
-		expect((await callback("lesson:draft-remove")(null, saved.result.id)).result.removed).toBe(
+		expect((await callback("lesson:draft-read")(editor, saved.result.id)).success).toBe(true);
+		expect((await callback("lesson:draft-remove")(editor, saved.result.id)).result.removed).toBe(
 			true,
 		);
 	} finally {
@@ -86,17 +101,19 @@ it("range planning IPC validates the request before project reads and hides raw 
 		throw new Error("PRIVATE_RANGE_PROJECT_ERROR");
 	});
 	electron.handle.mockClear();
-	registerLessonHandlers(new LessonService(read, async () => null), () => ({
-		projectId: "p",
-		assertCurrent: () => undefined,
-	}));
+	registerLessonHandlers(
+		new LessonService(read, async () => null),
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
+	);
 	const plan = electron.handle.mock.calls.find(([name]) => name === "lesson:plan-range")![1];
+	const editor = editorEvent();
 	expect(
-		await plan(null, { projectId: "p", documentSha256: "a".repeat(64), startSec: 2, endSec: 1 }),
+		await plan(editor, { projectId: "p", documentSha256: "a".repeat(64), startSec: 2, endSec: 1 }),
 	).toEqual({ success: false, code: "lesson-operation-failed" });
 	expect(read).not.toHaveBeenCalled();
 	expect(
-		await plan(null, { projectId: "p", documentSha256: "a".repeat(64), startSec: 1, endSec: 2 }),
+		await plan(editor, { projectId: "p", documentSha256: "a".repeat(64), startSec: 1, endSec: 2 }),
 	).toEqual({ success: false, code: "lesson-operation-failed" });
 	expect(read).toHaveBeenCalledTimes(1);
 });
@@ -113,13 +130,11 @@ it("updates only the file this window explicitly opened, through a main-held per
 			async () => null,
 		),
 		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
 	);
 	const route = (name: string) =>
 		electron.handle.mock.calls.find(([value]) => value === `lesson:${name}`)![1];
-	const window = () => {
-		const sender = Object.assign(new EventEmitter(), { mainFrame: {}, isDestroyed: () => false });
-		return { sender, senderFrame: sender.mainFrame };
-	};
+	const window = editorEvent;
 	const editor = window(),
 		other = window(),
 		target = path.join(root, "lesson.json"),
@@ -178,10 +193,13 @@ it("updates only the file this window explicitly opened, through a main-held per
 		await save(editor, { token: saved.result.file.token, lesson: { ...final, revision: 4 } }),
 	).toEqual(refused);
 	expect((await fs.readdir(root)).sort()).toEqual(["copy.json", "lesson.json", "victim.json"]);
-	// A caller with no window identity still opens, with no update permission.
-	electron.open.mockResolvedValue({ canceled: false, filePaths: [copy] });
-	const plain = await route("open")(undefined);
-	expect(plain.result.file).toBeUndefined();
+	// A caller with no window identity is refused before any picker.
+	electron.open.mockClear();
+	expect(await route("open")(undefined)).toEqual({
+		success: false,
+		code: "lesson-operation-failed",
+	});
+	expect(electron.open).not.toHaveBeenCalled();
 	await fs.rm(root, { recursive: true, force: true });
 });
 
@@ -201,11 +219,14 @@ it("grants no file permission when the file on disk is not the lesson the window
 		async () => null,
 	);
 	service.openEditable = async () => ({ status: "opened" as const, path: target, lesson: given });
-	registerLessonHandlers(service, () => ({ projectId: "p", assertCurrent: () => undefined }));
+	registerLessonHandlers(
+		service,
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
+	);
 	const route = (name: string) =>
 		electron.handle.mock.calls.find(([value]) => value === `lesson:${name}`)![1];
-	const sender = Object.assign(new EventEmitter(), { mainFrame: {}, isDestroyed: () => false }),
-		editor = { sender, senderFrame: sender.mainFrame };
+	const editor = editorEvent();
 	const opened = await route("open")(editor);
 	expect(opened).toMatchObject({ success: true, result: { status: "opened", lesson: given } });
 	expect(opened.result.file).toBeUndefined();
@@ -221,4 +242,74 @@ it("grants no file permission when the file on disk is not the lesson the window
 	await fs.writeFile(target, JSON.stringify(given));
 	expect((await route("open")(editor)).result.file).toMatchObject({ path: target });
 	await fs.rm(root, { recursive: true, force: true });
+});
+
+it("refuses lesson-guide routes from any frame but a registered editor's main frame, before dialogs, recovery copies or project reads", async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-route-authority-"));
+	electron.getPath.mockReturnValue(root);
+	electron.handle.mockClear();
+	electron.open.mockReset();
+	electron.save.mockReset();
+	const read = vi.fn(async () => {
+		throw new Error("no project");
+	});
+	const service = new LessonService(read, async () => null);
+	const calls = {
+		save: vi.spyOn(service, "saveEditable"),
+		open: vi.spyOn(service, "openEditable"),
+		export: vi.spyOn(service, "exportGuide"),
+		plan: vi.spyOn(service, "planRange"),
+	};
+	registerLessonHandlers(
+		service,
+		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		isEditor,
+	);
+	const route = (name: string) =>
+		electron.handle.mock.calls.find(([value]) => value === `lesson:${name}`)![1];
+	const lesson = { ...newLesson("Guarded"), steps: [newStep("One")] };
+	const requests: [string, unknown[]][] = [
+		["draft-status", []],
+		["draft-save", [lesson]],
+		["draft-list", []],
+		["draft-read", [crypto.randomUUID()]],
+		["draft-remove", [crypto.randomUUID()]],
+		["plan-range", [{ projectId: "p", documentSha256: "a".repeat(64), startSec: 1, endSec: 2 }]],
+		["save", [lesson]],
+		["open", []],
+		["export", [lesson, [lesson.steps[0].id]]],
+	];
+	const editor = editorEvent();
+	const stranger = Object.assign(new EventEmitter(), {
+		mainFrame: {},
+		isDestroyed: () => false,
+	});
+	const senders = [
+		undefined,
+		null,
+		{ sender: stranger, senderFrame: stranger.mainFrame },
+		{ ...editor, senderFrame: {} },
+		{ ...editor, senderFrame: undefined },
+	];
+	try {
+		for (const event of senders)
+			for (const [name, args] of requests)
+				expect(await route(name)(event, ...args), `${name} ${senders.indexOf(event)}`).toEqual({
+					success: false,
+					code: "lesson-operation-failed",
+				});
+		expect(electron.open).not.toHaveBeenCalled();
+		expect(electron.save).not.toHaveBeenCalled();
+		expect(read).not.toHaveBeenCalled();
+		for (const spy of Object.values(calls)) expect(spy).not.toHaveBeenCalled();
+		expect(await fs.readdir(root)).toEqual([]);
+		// Positive control: the registered editor's main frame reaches the same routes.
+		expect((await route("draft-status")(editor)).success).toBe(true);
+		electron.open.mockResolvedValue({ canceled: true, filePaths: [] });
+		expect(await route("open")(editor)).toEqual({ success: true, result: { status: "cancelled" } });
+		expect(electron.open).toHaveBeenCalledTimes(1);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+		electron.getPath.mockReturnValue("/disposable");
+	}
 });

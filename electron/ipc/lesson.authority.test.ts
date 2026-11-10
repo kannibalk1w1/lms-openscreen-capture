@@ -115,3 +115,31 @@ it("maps logical owner invalidation to project-changed even while session author
 	finish(f.image);
 	expect(await pending).toEqual({ success: false, code: "project-changed" });
 });
+it("actual production registration serves lesson-guide routes only to a registered editor still on its own page", async () => {
+	const planRange = vi.fn(async () => ({ planned: true }));
+	registerEditorLessonHandlers({ planRange } as unknown as LessonService, () => false);
+	const plan = electron.handle.mock.calls.find(([name]) => name === "lesson:plan-range")![1];
+	const refused = { success: false, code: "lesson-operation-failed" };
+	let url = "file:///app?windowType=editor",
+		destroyed = false;
+	const editor = Object.assign(new EventEmitter(), {
+		id: 7,
+		mainFrame: {},
+		getURL: () => url,
+		isDestroyed: () => destroyed,
+	});
+	const call = (senderFrame: unknown = editor.mainFrame) =>
+		plan({ sender: editor, senderFrame }, { projectId: "p" });
+	// Not registered as an editor (a HUD, notes or other app window).
+	expect(await call()).toEqual(refused);
+	editorRangeSessions.register(editor, url);
+	// Registered, with no project selected: the lesson guide still works.
+	expect(await call()).toEqual({ success: true, result: { planned: true } });
+	expect(await call({})).toEqual(refused);
+	url = "https://example.invalid/";
+	expect(await call()).toEqual(refused);
+	url = "file:///app?windowType=editor";
+	destroyed = true;
+	expect(await call()).toEqual(refused);
+	expect(planRange).toHaveBeenCalledTimes(1);
+});

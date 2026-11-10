@@ -27,7 +27,12 @@ const createSchema = z
 	.object({
 		operationId: idSchema,
 		lesson: z.unknown(),
-		stepIds: z.array(idSchema).min(1).max(32),
+		// Same contract as headless create: each selected step once.
+		stepIds: z
+			.array(idSchema)
+			.min(1)
+			.max(32)
+			.refine((ids) => new Set(ids).size === ids.length),
 		includeCode: z.boolean(),
 		imagePolicy: z.enum(["exclude", "include-external-provenance"]),
 		includeVideos: z.boolean(),

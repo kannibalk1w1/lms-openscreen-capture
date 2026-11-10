@@ -1051,6 +1051,18 @@ it("creates a verified package from the authored lesson with a chosen exported v
 		]),
 	).toEqual(before);
 });
+it("refuses a package request naming the same step twice before any picker, matching headless create", async () => {
+	const f = await authored();
+	f.pickers([f.rendered.path], [f.destination]);
+	expect(await f.create({ stepIds: [f.step.id, f.step.id] })).toEqual({
+		success: false,
+		code: "lesson-package-invalid",
+	});
+	expect(host.open).not.toHaveBeenCalled();
+	expect(await fs.readdir(f.destination)).toEqual([]);
+	// The same request with the step once is accepted.
+	expect(await f.create()).toMatchObject({ success: true, result: { status: "packaged" } });
+});
 it("creates a text and image package with one destination picker when videos are not requested", async () => {
 	const f = await authored();
 	f.pickers([f.destination]);

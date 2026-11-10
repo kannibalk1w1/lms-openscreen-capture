@@ -116,8 +116,10 @@ async function fixture() {
 		...sessions.capture(event.sender, () => useProjectStore.getState().dirty),
 		canReadSource: (p) => allowed && p === source,
 	}));
-	registerLessonHandlers(new LessonService(read, renderFrames), (event) =>
-		sessions.capture(event.sender, () => useProjectStore.getState().dirty),
+	registerLessonHandlers(
+		new LessonService(read, renderFrames),
+		(event) => sessions.capture(event.sender, () => useProjectStore.getState().dirty),
+		(event) => sessions.isEditorPage(event.sender),
 	);
 	const invoke = (channel: string, ...args: unknown[]) =>
 		electron.handle.mock.calls.find(([name]) => name === channel)![1](event, ...args);

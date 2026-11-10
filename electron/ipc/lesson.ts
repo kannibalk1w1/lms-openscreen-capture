@@ -13,8 +13,9 @@ import { NativeRenderBusyError, NativeRenderInvalidatedError } from "./nativeRen
 export function registerLessonHandlers(
 	service: LessonService,
 	authorizeFrame: (event: IpcMainInvokeEvent) => { projectId: string; assertCurrent: () => void },
+	isEditorFrame: (event: IpcMainInvokeEvent) => boolean,
 ) {
-	if (typeof authorizeFrame !== "function")
+	if (typeof authorizeFrame !== "function" || typeof isEditorFrame !== "function")
 		throw new Error("Lesson frame authorization is required.");
 	const bounded = async <T>(run: () => Promise<T>) => {
 		try {
@@ -33,17 +34,40 @@ export function registerLessonHandlers(
 			return { success: false as const, code };
 		}
 	};
+	// Lesson-guide routes serve the editor's own main frame only: recovery copies, opened lessons and
+	// native file dialogs are never handed to another window or an embedded frame.
+	const editorOnly =
+		<T>(run: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<T>) =>
+		(event: IpcMainInvokeEvent, ...args: unknown[]) => {
+			if (!event?.sender || event.senderFrame !== event.sender.mainFrame || !isEditorFrame(event))
+				return { success: false as const, code: "lesson-operation-failed" as const };
+			return run(event, ...args);
+		};
 	const drafts = new LessonDraftStore(path.join(app.getPath("userData"), "lesson-recovery-copies"));
-	ipcMain.handle("lesson:draft-status", () => bounded(() => drafts.status()));
-	ipcMain.handle("lesson:draft-save", (_event, input: unknown) =>
-		bounded(() => drafts.save(input)),
+	ipcMain.handle(
+		"lesson:draft-status",
+		editorOnly(() => bounded(() => drafts.status())),
 	);
-	ipcMain.handle("lesson:draft-list", () => bounded(() => drafts.list()));
-	ipcMain.handle("lesson:draft-read", (_event, id: unknown) => bounded(() => drafts.read(id)));
-	ipcMain.handle("lesson:draft-remove", (_event, id: unknown) => bounded(() => drafts.remove(id)));
+	ipcMain.handle(
+		"lesson:draft-save",
+		editorOnly((_event, input) => bounded(() => drafts.save(input))),
+	);
+	ipcMain.handle(
+		"lesson:draft-list",
+		editorOnly(() => bounded(() => drafts.list())),
+	);
+	ipcMain.handle(
+		"lesson:draft-read",
+		editorOnly((_event, id) => bounded(() => drafts.read(id))),
+	);
+	ipcMain.handle(
+		"lesson:draft-remove",
+		editorOnly((_event, id) => bounded(() => drafts.remove(id))),
+	);
 
-	ipcMain.handle("lesson:plan-range", (_event, input: unknown) =>
-		bounded(() => service.planRange(input)),
+	ipcMain.handle(
+		"lesson:plan-range",
+		editorOnly((_event, input) => bounded(() => service.planRange(input))),
 	);
 	ipcMain.handle("lesson:frame", (event, input: unknown) =>
 		bounded(async () => {
@@ -104,20 +128,23 @@ export function registerLessonHandlers(
 		state.grant = granted.grant;
 		return { token: granted.grant.token, path: target };
 	};
-	ipcMain.handle("lesson:save", (event, input: unknown) =>
-		bounded(async () => {
-			const saved = await service.saveEditable(input, async () => {
-				const result = await dialog.showSaveDialog({
-					title: "Save a new editable lesson",
-					defaultPath: path.join(app.getPath("documents"), "lesson.openscreen-lesson.json"),
-					filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
+	ipcMain.handle(
+		"lesson:save",
+		editorOnly((event, input) =>
+			bounded(async () => {
+				const saved = await service.saveEditable(input, async () => {
+					const result = await dialog.showSaveDialog({
+						title: "Save a new editable lesson",
+						defaultPath: path.join(app.getPath("documents"), "lesson.openscreen-lesson.json"),
+						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
+					});
+					return result.canceled ? null : (result.filePath ?? null);
 				});
-				return result.canceled ? null : (result.filePath ?? null);
-			});
-			if (saved.status !== "saved") return saved;
-			const file = await remember(event, saved.path, saved.lesson);
-			return { status: saved.status, path: saved.path, ...(file ? { file } : {}) };
-		}),
+				if (saved.status !== "saved") return saved;
+				const file = await remember(event, saved.path, saved.lesson);
+				return { status: saved.status, path: saved.path, ...(file ? { file } : {}) };
+			}),
+		),
 	);
 	ipcMain.handle("lesson:save-current", (event, input: unknown) =>
 		bounded(async () => {
@@ -145,30 +172,36 @@ export function registerLessonHandlers(
 			}
 		}),
 	);
-	ipcMain.handle("lesson:open", (event) =>
-		bounded(async () => {
-			const opened = await service.openEditable(async () => {
-				const result = await dialog.showOpenDialog({
-					title: "Open editable lesson",
-					properties: ["openFile"],
-					filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
+	ipcMain.handle(
+		"lesson:open",
+		editorOnly((event) =>
+			bounded(async () => {
+				const opened = await service.openEditable(async () => {
+					const result = await dialog.showOpenDialog({
+						title: "Open editable lesson",
+						properties: ["openFile"],
+						filters: [{ name: "OpenScreen lesson", extensions: ["json"] }],
+					});
+					return result.canceled ? null : (result.filePaths[0] ?? null);
 				});
-				return result.canceled ? null : (result.filePaths[0] ?? null);
-			});
-			if (opened.status !== "opened") return opened;
-			const file = await remember(event, opened.path, opened.lesson);
-			return { status: opened.status, lesson: opened.lesson, ...(file ? { file } : {}) };
-		}),
-	);
-	ipcMain.handle("lesson:export", (_event, input: unknown, ids: unknown) =>
-		bounded(() =>
-			service.exportGuide(input, ids, async () => {
-				const result = await dialog.showOpenDialog({
-					title: "Choose parent folder for a new offline guide",
-					properties: ["openDirectory", "createDirectory"],
-				});
-				return result.canceled ? null : (result.filePaths[0] ?? null);
+				if (opened.status !== "opened") return opened;
+				const file = await remember(event, opened.path, opened.lesson);
+				return { status: opened.status, lesson: opened.lesson, ...(file ? { file } : {}) };
 			}),
+		),
+	);
+	ipcMain.handle(
+		"lesson:export",
+		editorOnly((_event, input, ids) =>
+			bounded(() =>
+				service.exportGuide(input, ids, async () => {
+					const result = await dialog.showOpenDialog({
+						title: "Choose parent folder for a new offline guide",
+						properties: ["openDirectory", "createDirectory"],
+					});
+					return result.canceled ? null : (result.filePaths[0] ?? null);
+				}),
+			),
 		),
 	);
 }
@@ -178,7 +211,9 @@ export function registerLessonHandlers(
 export function registerEditorLessonHandlers(service: LessonService, isEditorDirty: () => boolean) {
 	if (typeof isEditorDirty !== "function")
 		throw new Error("Editor dirty-state provider is required.");
-	registerLessonHandlers(service, (event) =>
-		editorRangeSessions.capture(event.sender, isEditorDirty),
+	registerLessonHandlers(
+		service,
+		(event) => editorRangeSessions.capture(event.sender, isEditorDirty),
+		(event) => editorRangeSessions.isEditorPage(event.sender),
 	);
 }

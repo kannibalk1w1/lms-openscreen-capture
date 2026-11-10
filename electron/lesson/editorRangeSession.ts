@@ -27,6 +27,11 @@ export class EditorRangeSessions {
 		// Replace even for the same ID: close/reopen must invalidate outstanding work.
 		this.editors.set(owner, { ...editor, projectId });
 	}
+	/** A registered editor window still on its exact app page; no project or saved-state claim. */
+	isEditorPage(owner: EditorOwner) {
+		const editor = this.editors.get(owner);
+		return !!editor && !owner.isDestroyed() && canonicalURL(owner.getURL()) === editor.url;
+	}
 	invalidate(owner: EditorOwner) {
 		const editor = this.editors.get(owner);
 		if (editor) this.editors.set(owner, { ...editor, projectId: null });

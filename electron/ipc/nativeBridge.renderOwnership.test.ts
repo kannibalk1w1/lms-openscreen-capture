@@ -127,6 +127,7 @@ it("serializes real production bridge and lesson-still registrations across comp
 			(...args) => service.renderFrames(...args),
 		),
 		() => ({ projectId: "p", assertCurrent: () => undefined }),
+		() => true,
 	);
 	const still = state.handle.mock.calls.find(([name]) => name === "lesson:frame")![1];
 	const input = { projectId: "p", rulerSec: 0, documentSha256: await lessonRenderFingerprint(doc) };
@@ -240,12 +241,16 @@ it("a still's project context is rechecked after native rendering and lifecycle 
 				}),
 		),
 	};
-	registerLessonHandlers(service as unknown as LessonService, () => ({
-		projectId: "p",
-		assertCurrent: () => {
-			if (!current) throw new Error("stale");
-		},
-	}));
+	registerLessonHandlers(
+		service as unknown as LessonService,
+		() => ({
+			projectId: "p",
+			assertCurrent: () => {
+				if (!current) throw new Error("stale");
+			},
+		}),
+		() => true,
+	);
 	const handler = state.handle.mock.calls.find(([name]) => name === "lesson:frame")![1];
 	const pending = handler({ sender, senderFrame: sender.mainFrame }, { projectId: "p" });
 	current = false;
