@@ -81,14 +81,36 @@ it("reports unrecorded connection counts without describing them", () => {
 	});
 });
 
-it("treats changed flags or bound-argument counts as a different connection", () => {
+it.each([
+	["deferred", { deferred: true }],
+	["oneShot", { oneShot: true }],
+	["boundArgs", { boundArgs: 2 }],
+	["signal", { signal: "ready" }],
+	["method", { method: "_on_ready" }],
+	["from", { from: "3", to: "2" }],
+])("treats a changed %s as a different connection", (_field, change) => {
 	const journal = parseGodotSceneJournal(
-		sceneSource(take([state([timeout]), state([{ ...timeout, deferred: true }])])),
+		sceneSource(take([state([timeout]), state([{ ...timeout, ...change }])])),
 	);
 	expect(journal.observations.map((entry) => entry.type)).toEqual([
 		"signal-connection-removed",
 		"signal-connection-added",
 	]);
+});
+
+it("keeps maximal names within the shared label limit and imports the whole take", () => {
+	const long = (id: string, parent: string) => ({ ...sceneNode(id, "N".repeat(200), parent) });
+	const nodes = [root, long("2", "1"), long("3", "1")];
+	const wide = { ...timeout, signal: "s".repeat(100), method: "m".repeat(100) };
+	const journal = parseGodotSceneJournal(
+		sceneSource(take([state([], 0, nodes), state([wide], 0, nodes), state([], 0, nodes)])),
+	);
+	const capture = godotSceneCapture(journal);
+	const labels = capture.observations.map((entry) => entry.label);
+	expect(labels).toHaveLength(2);
+	for (const label of labels) expect(label.length).toBeLessThanOrEqual(300);
+	expect(labels[0]).toContain("…");
+	expect(capture.observations[0].payload).toEqual({ after: wide });
 });
 
 it("compares saved connections between authored checkpoints", () => {
@@ -144,11 +166,13 @@ describe("rejects malformed, out-of-scope or cross-version connections", () => {
 		expect(() => parseGodotSceneJournal(sceneSource(take([state([connection])])))).toThrow();
 	});
 
-	it("rejects duplicate connections and over 1024 entries", () => {
+	it("rejects duplicate connections and over 256 entries", () => {
 		expect(() =>
 			parseGodotSceneJournal(sceneSource(take([state([timeout, { ...timeout }])]))),
 		).toThrow(/signal connections/);
-		const many = Array.from({ length: 1025 }, (_, i) => ({ ...timeout, method: `m${i}` }));
+		const cap = Array.from({ length: 256 }, (_, i) => ({ ...timeout, method: `m${i}` }));
+		expect(() => parseGodotSceneJournal(sceneSource(take([state(cap)])))).not.toThrow();
+		const many = Array.from({ length: 257 }, (_, i) => ({ ...timeout, method: `m${i}` }));
 		expect(() => parseGodotSceneJournal(sceneSource(take([state(many)])))).toThrow();
 	});
 

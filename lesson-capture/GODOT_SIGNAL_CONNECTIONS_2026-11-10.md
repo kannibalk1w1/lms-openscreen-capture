@@ -13,7 +13,9 @@ generic normalized application capture stays **v1**.
   (SceneTreeEditor, viewports) have no persist flag and target editor objects.
 - A bound callable (`.bind(...)`) is a **custom** callable (`is_standard() == false`) whose
   `get_object()/get_method()` report the wrapped method. `.unbind(n)` is also custom.
-- `Script.has_method()` does not see script-declared methods; `get_script_method_list()` does.
+- `bind`, `unbind`, `bind(...).unbind(...)` and lambdas are all custom callables. A bind
+  wrapper equals `Callable(target, method).bindv(binds)`; a lambda (even one named like a
+  declared method and bound) and any unbind do not.
 - `connect()` refuses a callable naming a method the target's script does not declare.
 - A lambda's object is the lambda's owner, so a lambda never appears as an incoming
   connection to a scene node unless that node's own script created it.
@@ -24,27 +26,35 @@ Consent: the start dialog adds "Records saved signal connections between nodes o
 scene (signal, source, target and method names, and how many arguments are bound, never
 their values)".
 
-Each state carries `connections` (sorted, unique, at most 1,024) and `excludedConnections`:
+Each state carries `connections` (sorted, unique, at most 256) and `excludedConnections`
+(capped at 1,000,000):
 
 - **Recorded** only when all hold: the persist flag is set; the source is an observed
   (root or owned) node of this scene; the callable's object is the observed target node;
-  the callable is a plain method, or a bound wrapper around a method declared in the
-  target's script (method table only, never source text); signal and method names are
+  the callable is a plain method, or a bind wrapper that equals `Callable(target, method)`
+  with the same binds and nothing unbound (bound values are held only for that in-memory
+  comparison, never serialized or invoked; script text is never read); signal and method names are
   identifiers of at most 100 characters. Fields: `signal`, `from`, `to` (session node
   IDs), `method`, `boundArgs` (count, 0–64), `deferred`, `oneShot`. Bound **values**,
   the callable object, other flags and script contents are never recorded, and no
   Callable is ever invoked.
 - **Counted, not described** (`excludedConnections`): persistent connections into an
   observed node whose source is outside the observed set (a non-owned/instanced node, a
-  resource, another object), whose callable is custom other than a method bind (e.g.
-  `unbind`, a lambda on the target), or whose names are unsupported.
+  resource, another object), whose callable is custom other than an exact method bind
+  (`unbind`, `bind().unbind()`, a lambda created by the target, bound or not), or whose
+  names are unsupported.
 - **Not seen**: connections from an observed node to an unobserved target (only incoming
   connections of observed nodes are enumerated), and non-persistent runtime connections.
 
 Bounds: each recorded connection is under 300 bytes, so one observation payload stays far
-below the shared 32 KiB limit. 1,024 connections add roughly 200 KiB to a state, inside
-the existing 8 MiB journal budget. Going over 1,024 stops the take with a valid `limited`
-footer, through the existing limit path.
+below the shared 32 KiB limit. Labels shorten node, signal and method names to 48
+characters so they fit the shared 300-character label; the payload keeps full names and
+node IDs (node names need not be unique, so labels can be ambiguous). 256 connections
+add about 33 KiB to every written state, and states are repeated whenever anything
+changes, so a scene at the cap reaches the 8 MiB journal budget after roughly 250 changed
+samples. Going over 256 stops the take with a valid `limited` footer. A full snapshot at
+the cap (259 nodes, 256 connections) took 11 ms in real Godot 4.7.1 on Linux; the first
+build's comparator sort took about 400 ms at 1,024 and was replaced by a keyed sort.
 
 ## What the decoder reports
 
@@ -71,13 +81,15 @@ even after the normalized observation cap.
   (35 existing warnings), docs, i18n pass.
 - Real Godot 4.7.1 editor/API probe, Linux and WinBoat Windows 11 (portable official
   Godot/Node, hashes in the Windows report): `CONNECTIONS_PASSED: baseline/add/remove/reopen;
-  3 out-of-scope or unsupported persistent connections counted, not described`.
+  5 out-of-scope or unsupported persistent connections counted, not described` and
+  `CONNECTION_LIMIT_PASSED` (257th connection → limited footer).
   - Scene-file connection as baseline.
   - Added: a deferred, one-shot, bound connection. Only `boundArgs: 1` is recorded; the
     `BOUND_VALUE_CANARY` value is absent.
   - Canaries:
-    - Excluded and counted: an unowned source node, a Resource source and an `unbind`
-      custom callable.
+    - Excluded and counted: an unowned source node, a Resource source, an `unbind`
+      wrapper, a `bind().unbind()` wrapper and a bound lambda created by the (tool) target
+      script under a declared method's name.
     - Not recorded (absent from the journal): a non-persistent connection, a lambda and a
       connection to an outside target.
     - Script text canary absent.
@@ -98,4 +110,11 @@ game run is claimed.
 
 ## Review
 
-Awaiting an independent Claude review of the immutable source commit.
+[Independent review of `e0786f0f`](CLAUDE_GODOT_SIGNAL_CONNECTIONS_REVIEW_E0786F0F_2026-11-10.md):
+**changes requested** — two Medium (F1 labels over 300 characters broke import of a valid
+take; F2 ~400 ms enumeration per poll at 1,024 connections), Lows F3 (bound same-name
+lambda recorded as a method), F4 (`bind().unbind()` recorded), L1/L2 test gaps, Nits N1–N4.
+The follow-up commit: F1 shortened label segments plus a maximal-name import test; F2 cap
+256 and keyed sort (11 ms measured); F3/F4 exact-bind equality and zero unbound
+arguments, both as real probe canaries; L1 identity tests for every key field; L2 real
+limit take (a GDScript mutation removing the equality guard fails the real probe; removing the unbound-count guard survives because equality already rejects `bind().unbind()` — kept as defence in depth); N1/N4 documented above; N2 producer cap; N3 messages. Awaiting recheck.

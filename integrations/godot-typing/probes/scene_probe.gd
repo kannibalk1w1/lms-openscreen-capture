@@ -427,6 +427,10 @@ func _probe_connections(editor: EditorInterface) -> bool:
 	unowned.connect("timeout", Callable(hitbox, "_on_timeout"), CONNECT_PERSIST)
 	# A custom (unbind) wrapper around a real method: excluded and counted, never described.
 	timer.connect("child_entered_tree", Callable(hitbox, "_on_timeout").unbind(1), CONNECT_PERSIST)
+	# A bound lambda created by the target itself, sharing a declared method's name, and a
+	# bind+unbind wrapper: custom callables that are not the plain method; counted only.
+	timer.connect("replacing_by", hitbox.make_lambda().bind(3), CONNECT_PERSIST)
+	timer.connect("editor_description_changed", Callable(hitbox, "_on_ready").bind(4).unbind(1), CONNECT_PERSIST)
 	var resource := Gradient.new()
 	resource.connect("changed", Callable(hitbox, "resource_canary"), CONNECT_PERSIST)
 	hitbox.connect("area_entered", Callable(get_tree().root, "OUTSIDE_TARGET_CANARY"), CONNECT_PERSIST)
@@ -441,8 +445,9 @@ func _probe_connections(editor: EditorInterface) -> bool:
 	unowned.free()
 	hitbox.disconnect("area_entered", Callable(get_tree().root, "OUTSIDE_TARGET_CANARY"))
 	timer.disconnect("tree_entered", Callable(hitbox, "nonpersistent_canary"))
-	for connection in timer.get_signal_connection_list("child_entered_tree"):
-		timer.disconnect("child_entered_tree", connection.callable)
+	for signal_name in ["child_entered_tree", "replacing_by", "editor_description_changed"]:
+		for connection in timer.get_signal_connection_list(signal_name):
+			timer.disconnect(signal_name, connection.callable)
 	for connection in timer.get_signal_connection_list("tree_exiting"):
 		if not connection.callable.is_standard():
 			timer.disconnect("tree_exiting", connection.callable)
@@ -457,9 +462,31 @@ func _probe_connections(editor: EditorInterface) -> bool:
 		return false
 	await _pump(again)
 	again.stop()
+	# Connection limit: going past 256 recorded connections stops with a limited footer.
+	var limit_take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(limit_take.begin("res://connections-limit.jsonl", reopened, editor, get_undo_redo()), "connection limit take start"):
+		return false
+	var limit_hitbox := reopened.get_node("Hitbox")
+	var sources: Array[Node] = []
+	for i in 256:
+		var source := Timer.new()
+		source.name = "LimitTimer%d" % i
+		reopened.add_child(source)
+		source.owner = reopened
+		source.connect("timeout", Callable(limit_hitbox, "_on_timeout"), CONNECT_PERSIST)
+		sources.append(source)
+	var started := Time.get_ticks_usec()
+	# Whole snapshot (hierarchy + connection enumeration) at the connection cap.
+	limit_take._snapshot()
+	print("CONNECTION_ENUMERATION_US ", Time.get_ticks_usec() - started)
+	await _pump(limit_take)
+	if not _require(not limit_take.active(), "connection limit stopped capture"):
+		return false
+	for source in sources:
+		source.free()
 	for name in ["connections.jsonl", "connections-reopen.jsonl"]:
 		var text := FileAccess.get_file_as_string("res://" + name)
-		for canary in ["BOUND_VALUE_CANARY", "nonpersistent_canary", "UNOWNED_SOURCE_CANARY", "resource_canary", "OUTSIDE_TARGET_CANARY", "PRIVATE_CONNECTION_SCRIPT_CANARY", "Gradient", "child_entered_tree", "_noop_lambda_target"]:
+		for canary in ["BOUND_VALUE_CANARY", "nonpersistent_canary", "UNOWNED_SOURCE_CANARY", "resource_canary", "OUTSIDE_TARGET_CANARY", "PRIVATE_CONNECTION_SCRIPT_CANARY", "Gradient", "child_entered_tree", "_noop_lambda_target", "replacing_by", "editor_description_changed"]:
 			if not _require(not text.contains(canary), name + " withholds " + canary):
 				return false
 	return true

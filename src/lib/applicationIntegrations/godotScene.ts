@@ -65,7 +65,7 @@ const stateSchema = z
 	.object({
 		nodes: z.array(nodeSchema).min(1).max(512),
 		selected: z.array(nodeId).max(512),
-		connections: z.array(connectionSchema).max(1024).optional(),
+		connections: z.array(connectionSchema).max(256).optional(),
 		excludedConnections: z.number().int().min(0).max(1000000).optional(),
 	})
 	.strict();
@@ -217,7 +217,7 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 		(state.connections !== undefined) !== schemaVersion >= 5 ||
 		(state.excludedConnections !== undefined) !== schemaVersion >= 5
 	)
-		throw new Error("Signal connections require exactly scene journal schema v5 or later");
+		throw new Error("Signal connections require scene journal schema v5 or later");
 	const connections = state.connections ?? [];
 	if (
 		new Set(connections.map(connectionKey)).size !== connections.length ||
@@ -236,9 +236,14 @@ function connectionKey(connection: SceneConnection): string {
 		connection.oneShot,
 	]);
 }
+// Labels stay within the shared 300-character observation label; the payload keeps the
+// full names and session node IDs (node names need not be unique).
+function shortName(value: string): string {
+	return value.length > 48 ? `${value.slice(0, 47)}…` : value;
+}
 function describeConnection(connection: SceneConnection, state: SceneState): string {
-	const name = (id: string) => state.nodes.find((node) => node.id === id)?.name ?? id;
-	return `${name(connection.from)}.${connection.signal} → ${name(connection.to)}.${connection.method}`;
+	const name = (id: string) => shortName(state.nodes.find((node) => node.id === id)?.name ?? id);
+	return `${name(connection.from)}.${shortName(connection.signal)} → ${name(connection.to)}.${shortName(connection.method)}`;
 }
 /** Pure offline decoder. Does not connect to Godot, read resource paths or map video time. */
 function decodeGodotSceneJournal(text: string): {
@@ -272,7 +277,7 @@ function decodeGodotSceneJournal(text: string): {
 		throw new Error("Checkpoint requires scene journal schema v2");
 	const v4 = first.schemaVersion >= 4;
 	if ((first.history !== undefined) !== v4 || (first.run !== undefined) !== v4)
-		throw new Error("Editor history/run context requires exactly scene journal schema v4 or later");
+		throw new Error("Editor history/run context requires scene journal schema v4 or later");
 	if (
 		!v4 &&
 		records.some(

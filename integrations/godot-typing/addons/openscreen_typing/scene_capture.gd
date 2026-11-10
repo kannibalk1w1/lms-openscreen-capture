@@ -4,7 +4,7 @@ extends RefCounted
 # Independent, explicitly started journal. Never watches files or enumerates properties.
 signal status_changed(message: String)
 const MAX_NODES := 512
-const MAX_CONNECTIONS := 1024
+const MAX_CONNECTIONS := 256
 const MAX_RECORDS := 4096
 const MAX_BYTES := 8 * 1024 * 1024
 const INTERVAL_MS := 250
@@ -292,7 +292,7 @@ func _snapshot() -> Dictionary:
 	selected.sort()
 	var excluded := [0]
 	var connections := _connections(nodes, allowed, excluded)
-	return {"nodes": nodes, "selected": selected, "connections": connections, "excludedConnections": excluded[0]}
+	return {"nodes": nodes, "selected": selected, "connections": connections, "excludedConnections": mini(excluded[0], 1000000)}
 
 # v5: persistent (scene-saved) signal connections whose source and target are both
 # observed nodes and whose target is a plain method on that node. Editor-internal,
@@ -333,25 +333,26 @@ func _connections(nodes: Array, allowed: Dictionary, excluded: Array) -> Array:
 				"deferred": (connection.flags & CONNECT_DEFERRED) != 0,
 				"oneShot": (connection.flags & CONNECT_ONE_SHOT) != 0,
 			})
-	connections.sort_custom(func(a, b): return JSON.stringify(a) < JSON.stringify(b))
-	return connections
+	# Sort once by precomputed keys; re-serializing inside the comparator cost ~400 ms at the cap.
+	var keyed: Array = []
+	for connection in connections:
+		keyed.append([JSON.stringify(connection), connection])
+	keyed.sort_custom(func(a, b): return a[0] < b[0])
+	var sorted: Array = []
+	for entry in keyed:
+		sorted.append(entry[1])
+	return sorted
 
-# A plain method callable, or a bound wrapper (custom in Godot) around a method that the
-# target's script declares. Lambdas and other custom callables are excluded. Only the
-# script's method table is consulted, never its source text.
+# A plain method callable, or a bind wrapper around exactly that method. Godot reports
+# binds, unbinds and lambdas all as custom callables, so a custom callable is accepted only
+# when it equals Callable(target, method) with the same binds and nothing unbound. The
+# bound values are held only for that in-memory comparison: never serialized or invoked.
 func _method_callable(callable: Callable, target: Node) -> bool:
 	if callable.is_standard():
 		return true
-	if callable.get_bound_arguments_count() < 1:
+	if callable.get_bound_arguments_count() < 1 or callable.get_unbound_arguments_count() != 0:
 		return false
-	var script := target.get_script() as Script
-	if script == null:
-		return false
-	var method := callable.get_method()
-	for entry in script.get_script_method_list():
-		if entry.name == method:
-			return true
-	return false
+	return callable == Callable(target, callable.get_method()).bindv(callable.get_bound_arguments())
 
 func _identifier(text: String) -> bool:
 	if text.is_empty() or text.length() > 100:

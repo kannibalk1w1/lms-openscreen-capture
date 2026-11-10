@@ -41,7 +41,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
 	path.join(fixture, "connections.gd"),
-	"extends Area2D\n# PRIVATE_CONNECTION_SCRIPT_CANARY\nfunc _on_timeout(): pass\nfunc _on_ready(_v = null): pass\nfunc nonpersistent_canary(): pass\nfunc resource_canary(): pass\n",
+	"@tool\nextends Area2D\n# PRIVATE_CONNECTION_SCRIPT_CANARY\nfunc _on_timeout(_a = null): pass\nfunc _on_ready(_v = null): pass\nfunc nonpersistent_canary(): pass\nfunc resource_canary(): pass\nfunc make_lambda():\n\treturn func _on_timeout(_x = null): print(self)\n",
 );
 fs.writeFileSync(
 	path.join(fixture, "connections.tscn"),
@@ -307,7 +307,7 @@ if (
 	added.payload.after.boundArgs !== 1 ||
 	!added.payload.after.deferred ||
 	!added.payload.after.oneShot ||
-	unrecorded.payload.after !== 3
+	unrecorded.payload.after !== 5
 )
 	throw new Error(
 		`Unexpected real connection observations: ${JSON.stringify(connectionsJournal.observations)}`,
@@ -321,6 +321,16 @@ if (
 	) !== JSON.stringify(["Timer.renamed->Hitbox._on_ready"])
 )
 	throw new Error("Reopened saved scene must carry the saved connection as baseline");
+const limited = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "connections-limit.jsonl"), "utf8"),
+);
+if (limited.coverage !== "limited" || limited.stopReason !== "limit")
+	throw new Error("Connection limit must stop with a valid limited footer");
+const enumeration = /CONNECTION_ENUMERATION_US (\d+)/.exec(output);
+if (!enumeration) throw new Error("Missing connection enumeration timing");
+console.log(
+	`CONNECTION_LIMIT_PASSED: limited footer; snapshot at the 256-connection cap ${enumeration[1]} us`,
+);
 fs.writeFileSync(
 	path.join(fixture, "connections-review.json"),
 	JSON.stringify({ connectionsJournal, reopenedConnections }, null, 2),
