@@ -55,6 +55,12 @@ func _probe() -> void:
 	var first_take: String = capture.active_session_id()
 	if not _require(not first_take.is_empty(), "active take token exposed"):
 		return
+	var before_invalid := FileAccess.get_file_as_string("res://scene.jsonl")
+	for blank in ["\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff", " \u3000\u00a0"]:
+		if not _require(not capture.mark_checkpoint(blank, first_take), "Unicode blank label refused"):
+			return
+	if not _require(FileAccess.get_file_as_string("res://scene.jsonl") == before_invalid, "Unicode blank refusal leaves take unchanged"):
+		return
 	if not _require(not capture.mark_checkpoint(" ", first_take), "blank label refused"):
 		return
 	if not _require(not capture.mark_checkpoint("😀".repeat(101), first_take), "UTF-16 label bound"):
@@ -92,7 +98,7 @@ func _probe() -> void:
 	sprite.set_script(load("res://enemy.gd"))
 	if not _require(capture.mark_checkpoint("Texture and scale set", first_take), "texture/scale milestone"):
 		return
-	if not _require(capture.mark_checkpoint("Script attached", first_take), "script milestone"):
+	if not _require(capture.mark_checkpoint("\u3000Script attached\u00a0", first_take), "script milestone"):
 		return
 	editor.get_selection().clear()
 	editor.get_selection().add_node(sprite)

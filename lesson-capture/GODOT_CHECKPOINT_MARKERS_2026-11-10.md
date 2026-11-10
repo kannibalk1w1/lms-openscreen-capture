@@ -1,6 +1,6 @@
 # Authored Godot scene checkpoint markers
 
-10 November 2026. Locally validated slice, independent Claude review pending.
+10 November 2026. Locally validated slice. Claude requested C1; the correction awaits recheck.
 
 ## Author workflow and scope
 
@@ -76,3 +76,23 @@ through the existing CLI/MCP authority model, with an inspected source fingerpri
 explicit IDs and a new output file. Then add bounded checkpoint-state comparison;
 full project restoration and execution diagnostics remain later work. The learner
 player stays parked.
+
+## Review correction C1: Unicode blank labels
+
+Claude's [original review of 9e9883dc](CLAUDE_GODOT_CHECKPOINT_REVIEW_9E9883DC_2026-11-10.md)
+found that Godot `strip_edges()` accepts Unicode-only whitespace while JavaScript
+`trim()` rejects it. A marker could report saved and then make its whole journal
+unimportable. The producer now uses the exact ECMAScript trim whitespace set to
+check for content before sampling or writing. Existing control/UTF-16 bounds stay
+in force. Nonblank labels keep their original surrounding whitespace.
+
+42 focused tests in two files pass, adding 11 Unicode-only blank cases and a
+nonblank Unicode-surrounded label case. Real Linux and WinBoat Windows Godot
+editor probes reran successfully: Unicode-only labels, including U+3000, are
+refused without changing journal bytes, and a subsequent nonblank Unicode label,
+normal markers, decode and selected draft reopen succeed. Final Windows addon,
+probe and runner bytes match the working tree. Both TypeScript checks pass.
+The original 6,469/472 full suite and Vite/lint/i18n results remain the base evidence;
+this narrow GDScript correction did not rerun the full suite or rebuild production
+TypeScript. The decoder production rule is unchanged. Separate correction evidence:
+`../openscreen-evaluation/godot-checkpoint-unicode-2026-11-10/`.

@@ -290,3 +290,27 @@ it("validates malformed v2 checkpoint tails after normalized observations reach 
 	}));
 	expect(() => parseGodotSceneJournal(sceneSource(malformedTail))).toThrow();
 });
+
+it.each([
+	"\u00a0",
+	"\u1680",
+	"\u2000",
+	"\u200a",
+	"\u2028",
+	"\u2029",
+	"\u202f",
+	"\u205f",
+	"\u3000",
+	"\ufeff",
+	" \u3000\u00a0",
+])("rejects Unicode-only blank checkpoint label %j", (label) => {
+	expect(() => parseGodotSceneJournal(v2CheckpointJournal(label))).toThrow();
+});
+it("retains authored nonblank text surrounded by Unicode whitespace", () => {
+	const label = "\u3000Texture set\u00a0";
+	expect(
+		parseGodotSceneJournal(v2CheckpointJournal(label)).observations.find(
+			(entry) => entry.type === "author-checkpoint",
+		)?.payload,
+	).toMatchObject({ label });
+});

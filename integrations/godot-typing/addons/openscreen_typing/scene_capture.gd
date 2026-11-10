@@ -37,7 +37,7 @@ func mark_checkpoint(label: String, expected_session_id: String) -> bool:
 	if _editor.get_edited_scene_root() != _root:
 		stop("scene-changed", false)
 		return false
-	if label.strip_edges().is_empty() or label.to_utf16_buffer().size() / 2 > 200 or _has_control(label):
+	if not _has_label_content(label) or label.to_utf16_buffer().size() / 2 > 200 or _has_control(label):
 		return false
 	# Sample synchronously first. A limit or write error can stop the take, so
 	# the authored marker is written only after that sample succeeds.
@@ -224,6 +224,16 @@ func _resource_path(path: String) -> String:
 	if not path.begins_with("res://") or path.to_utf16_buffer().size() > 2000 or ".." in path.trim_prefix("res://").split("/") or "\\" in path or "." in path.trim_prefix("res://").split("/") or _has_control(path):
 		return "external-or-unsupported"
 	return path
+
+# Match ECMAScript String.trim(), used by the offline decoder. Godot strip_edges()
+# only trims ASCII whitespace and would accept Unicode-only blank labels.
+func _has_label_content(text: String) -> bool:
+	for i in range(text.length()):
+		var code := text.unicode_at(i)
+		if code in [9, 10, 11, 12, 13, 32, 160, 5760, 8232, 8233, 8239, 8287, 12288, 65279] or (code >= 8192 and code <= 8202):
+			continue
+		return true
+	return false
 
 func _has_control(text: String) -> bool:
 	for i in range(text.length()):

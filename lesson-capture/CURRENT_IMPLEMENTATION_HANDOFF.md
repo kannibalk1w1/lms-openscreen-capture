@@ -1,3 +1,16 @@
+# Marker Unicode correction awaiting recheck — 10 November 2026
+
+Claude reviewed 9e9883dc and requested C1: Godot accepted Unicode-only blank marker
+labels which made the decoder reject the take. Root aligned the producer with the
+decoder's ECMAScript whitespace rule before any sampling/write.42 focused tests,
+both TypeScript checks and fresh real Linux/WinBoat Windows editor probes pass, including U+3000
+refusal with unchanged journal bytes and a later valid Unicode label. See
+[original review](CLAUDE_GODOT_CHECKPOINT_REVIEW_9E9883DC_2026-11-10.md) and the
+[correction evidence](GODOT_CHECKPOINT_MARKERS_2026-11-10.md#review-correction-c1-unicode-blank-labels).
+Recheck pending; previous 6,469/472 full suite/build remain base evidence, not rerun
+for the narrow GDScript/test-only correction. CLI/MCP prototype still isolated in
+/tmp, source integration next. Player parked, no push, weekly meter last 61%.
+
 # Godot authored markers awaiting review — 10 November 2026
 
 Claude [accepted eefec646](CLAUDE_APPLICATION_CALIBRATION_REVIEW_EEFEC646_2026-11-10.md)
@@ -23,7 +36,7 @@ Claude [accepted12474796](CLAUDE_APPLICATION_ASSOCIATION_REVIEW_12474796_2026-11
 with L1/L2. Root and cheaper workers built optional calibration controls, selected
 manual timing annotations, removal/offline persistence, stale-result guards and
 explicit endpoint/integer rules. [Report and exact scope](APPLICATION_CALIBRATION_2026-11-10.md):
-6,465 tests, bothTS/build/lint/i18n/docs/startup, plus12real Windows Edge frontend
+6,465 tests, both TypeScript checks/build/lint/i18n/docs/startup, plus12real Windows Edge frontend
 checks pass. Only final save IPC is stubbed; no packaged Electron/native capture
 acceptance. Independent review pending. Codex weekly57%/target~75%; player parked,
 main unchanged, no private push. Next: scoped authored Godot checkpoint markers,
@@ -170,7 +183,7 @@ Main keeps ownership until actual settlement; native picker cancel adds no file 
 Actual full production app/editor/CDP fills controls, refuses an invalid destination,
 preserves visible edits and retries successfully; fresh CLI verifies45samples/45frames/
 1.5s and original source/project data unchanged. Native dialogs stubbed, no physical
-input/picker/audio/platform claim. Final219focused/10 and6162full/454,0skips, bothTS,
+input/picker/audio/platform claim. Final219focused/10 and6162full/454,0skips, both TypeScript checks,
 Vite, lint35baseline/docs37/i18n15/1305 and required foreign-cwd CLI/MCP startup pass.
 Seven independent assertion kills restore source exactly; original report/evidence/
 user work/addon/main remain preserved. In-memory recovery is not crash autosave.
@@ -240,7 +253,7 @@ provider after open. Stale tokens refuse before the save picker, cannot resurrec
 when the project returns, and leave package/authored bytes unchanged; fresh open
 and copy succeeds. Production/format/API/native behavior is unchanged.
 
-Final170focused/9files,0skips, bothTS and lint35baseline/docs37 pass. Six controls
+Final170focused/9files,0skips, both TypeScript checks and lint35baseline/docs37 pass. Six controls
 produce3single assertion kills,1paired R10+R16 kill and2honest redundant single
 survivors, with exact source restoration. The paired mutant still refuses after
 the picker via pinned authority; the new no-picker assertion pins the earlier
@@ -269,7 +282,7 @@ copying rather than discard media. No HTML/file protocol/source grant or playbac
 Actual Electron/preload/production-workflow proof with stubbed dialogs opens copied
 packages without authoring sources, saves/reopens static copies, verifies45sample/
 45decoded-frame video/1.5s and refuses tampering/foreign/dirty callers. This is not
-GUI clicks/native-picker/physical/platform/audio acceptance. Final165focused/9files and6108full/453files pass,0skips; bothTS, Vite,
+GUI clicks/native-picker/physical/platform/audio acceptance. Final165focused/9files and6108full/453files pass,0skips; both TypeScript checks, Vite,
 lint35baseline/docs37/i18n15/1283 and mandatory real headless startup pass. Seven
 single-guard controls assertion-kill with exact source restoration. Honest initial
 harness/test-typing diagnostics and preservation details are linked in the report. This slice
@@ -311,7 +324,7 @@ kill, with exact source bytes restored. Benign code/image-provenance controls an
 the retained v1 fixture pass. Production/schema/format/error/native behavior stays
 unchanged; no GUI/player scope is added.
 
-Focused110/6,0skips and bothTS pass; lint/docs/evidence details are linked. Actual
+Focused110/6,0skips and both TypeScript checks pass; lint/docs/evidence details are linked. Actual
 original-build Electron CLI verifies the legitimate include package and refuses
 all7 re-signed privacy cases from a foreign cwd, with source bytes unchanged.
 No new full/Vite/native/startup repetition; prior6060/450 belongs to36d30d24.
@@ -339,7 +352,7 @@ original selected paths move away:45samples/45decoded frames/1.5s, audio flagsfa
 Missing assets, tampered manifest and re-signed corrupt bitstream refuse; originals
 and privacy canaries remain preserved. Final-build proof/evidence are linked.
 Current13 distinct controls (12single/1paired) assertion-kill with exact restore;
-final full6060/450,0skips (`--maxWorkers=4`), focused220/10, bothTS and
+final full6060/450,0skips (`--maxWorkers=4`), focused220/10, both TypeScript checks and
 lint35baseline/docs37/i18n15/1265 pass. Initial default-worker full6058pass/1
 unrelated clipboard load miss, unchanged4-test and adjacent rechecks pass; initial
 log remains. Final Vite and real non-root startup pass (63MCPtools, expected absent-project
@@ -390,7 +403,7 @@ cwd without FFmpeg or APP_ROOT hints, with unchanged originals; invalid explicit
 tool probes retain unverified MP4s without receipts and return the distinct error.
 Committed real headless startup smoke also passes from non-root after Vite.
 The previous root-only proof did not establish arbitrary-client-directory use.
-Final5991/447,0skips; focused279/12 plus real process/runtime18/2, bothTS,
+Final5991/447,0skips; focused279/12 plus real process/runtime18/2, both TypeScript checks,
 lint35baseline/docs37/i18n15/1265 pass. First full5986pass/5former-error assertions
 failed, corrected without weakening timeout/cleanup checks; final full passes and
 both logs are retained. Six single mutants assertion-kill with exact restore;
@@ -423,7 +436,7 @@ from GUI app/settings acceptance. Stateless HTTP cancellation requires aborting
 the active request; SDK cancel notification/timeout alone cannot address it.
 No GUI/picker/physical/audio/other-platform/player/package acceptance is claimed.
 
-Final5980/446,0skips (one full); focused195/12; bothTS/lint35baseline/docs37/
+Final5980/446,0skips (one full); focused195/12; both TypeScript checks/lint35baseline/docs37/
 i18n15/1265 pass. Vite and committed real startup smoke pass after final production
 build (61MCPtools, CLI registration/runner reached, expected missing-file error).
 Seven assertion-killed controls (six single/one paired), with a redundant top
@@ -478,7 +491,7 @@ and normal CLI registration/runner startup; mocked registration is insufficient.
 Current smoke passes on the original00bdbc77 build, with the CLI's deliberate
 missing-project validation failure distinguished from functional export acceptance.
 
-Final289focused/16,0skip; bothTS, lint35baseline/docs37/i18n15 pass;6assertion
+Final289focused/16,0skip; both TypeScript checks, lint35baseline/docs37/i18n15 pass;6assertion
 controls (1paired/5single) kill with sources restored; real startup smoke passes.
 Preservation112/675/70 and unchanged addon verified; exact evidence is linked; no full/build repeat for this test-only update. Prior5941/444
 and Vite are historical. Original review33/reports/proofs/initial logs/stale-inventory
@@ -515,7 +528,7 @@ Packaging/timed player and physical/platform/audio acceptance remain later.
 Real production Electron CLI and SDK stdio subprocess proofs confirm/save/reopen/
 explicitly refresh a disposable real-MP4 source with original hashes unchanged;
 this is source-content observation, no new headless native export acceptance.
-Final282focused/16 and5941full/444 pass,0skip; bothTS, productionVite,
+Final282focused/16 and5941full/444 pass,0skip; both TypeScript checks, productionVite,
 Biome35baseline/docs37/i18n15 pass;12single-guard assertion controls kill/restored.
 Preservation112/521/68 and unchanged addon verified. Exact commands and limits
 are in the linked report and unique evidence. Original reports/initial logs/user
