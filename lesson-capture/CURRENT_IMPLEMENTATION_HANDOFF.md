@@ -1,3 +1,13 @@
+# Manual association primitive; Godot review accepted — 10 November 2026
+
+Claude [accepts e65dc4ac](CLAUDE_GODOT_CAPTURE_RECHECK_E65DC4AC_2026-11-10.md),
+closing F1/F2/F3. The cheaper worker's [application-neutral manual timing primitive](APPLICATION_ASSOCIATION_2026-11-10.md)
+is locally validated (6,455 tests; 40 independent Linux/WinBoat checks), awaiting
+its own Claude review. It is library-only: source capture clock remains unmapped;
+control metadata is not encoder sync. Next is optional calibration UI with stale
+result guards, then selected authored timing persistence. User's autonomous target
+remains about75% Codex weekly usage, last meter50%; player parked, no private push.
+
 # Claude review corrections awaiting recheck — 10 November 2026
 
 Claude reviewed `170eb141` and requested F1/F2/F3. Root and a cheaper bounded worker
