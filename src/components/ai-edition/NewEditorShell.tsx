@@ -1807,6 +1807,18 @@ export function NewEditorShell() {
 								>
 									{tTimeline("lesson.title")}
 								</button>
+								<button
+									type="button"
+									className={styles.secondaryBtn}
+									// Read-only playback of a verified lesson package; needs no video project.
+									onClick={() => {
+										void window.electronAPI?.openLessonPlayer?.().then((result) => {
+											if (!result.success) toast.error(tTimeline("lesson.player.launchFailed"));
+										});
+									}}
+								>
+									{tTimeline("lesson.player.launch")}
+								</button>
 								{drawingArrow && (
 									<button
 										type="button"

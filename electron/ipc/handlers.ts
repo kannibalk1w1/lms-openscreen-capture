@@ -76,6 +76,8 @@ import { hideCountdownOverlay } from "../countdownOverlay";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
 import { getInstallChannel } from "../install-channel";
+import { editorRangeSessions } from "../lesson/editorRangeSession";
+import { createLessonPlayerWindow } from "../lessonPlayerWindow";
 import {
 	DEFAULT_RECORDINGS_DIR,
 	getRecordingsDirInfo,
@@ -174,6 +176,7 @@ import {
 } from "../windows-update";
 import { registerApplicationIntegrationHandlers } from "./applicationIntegrations";
 import { getSourcesByType, shouldEnumerateSourceTypesSeparately } from "./desktopSourceTypes";
+import { lessonPlayerOwners, registerLessonPlayerHandlers } from "./lessonPlayer";
 import { registerLessonWorkflow } from "./lessonWorkflow";
 import { LinuxCaptureStartup } from "./linuxCaptureStartup";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
@@ -5106,6 +5109,25 @@ export function registerIpcHandlers(
 		compositor: loudnessService,
 		editorHasUnsavedChanges,
 		readableApprovedPath,
+	});
+	// Read-only lesson player: launched only from the editor; its own window owns its package.
+	registerLessonPlayerHandlers({
+		owners: lessonPlayerOwners,
+		isEditorFrame: (event) => editorRangeSessions.isEditorPage(event.sender),
+		openWindow: () => {
+			createLessonPlayerWindow();
+		},
+		pickDirectory: async (event) => {
+			const options: Electron.OpenDialogOptions = {
+				title: "Open a lesson package to play",
+				properties: ["openDirectory"],
+			};
+			const parent = BrowserWindow.fromWebContents(event.sender);
+			const result = parent
+				? await dialog.showOpenDialog(parent, options)
+				: await dialog.showOpenDialog(options);
+			return result.canceled ? null : (result.filePaths[0] ?? null);
+		},
 	});
 
 	registerNativeBridgeHandlers({

@@ -8,10 +8,12 @@ import {
 	Menu,
 	nativeImage,
 	net,
+	protocol,
 	session,
 	shell,
 	Tray,
 } from "electron";
+import { LESSON_PLAYER_MEDIA_SCHEME } from "../src/lib/lesson/player";
 import { ShortcutBinding } from "../src/lib/shortcuts";
 import {
 	type AboutFacts,
@@ -58,7 +60,9 @@ import {
 	getSelectedDesktopSource,
 	registerIpcHandlers,
 } from "./ipc/handlers";
+import { lessonPlayerOwners, MAX_PLAYER_WINDOWS } from "./ipc/lessonPlayer";
 import { createLessonUnsavedWorkFlag } from "./lesson/unsavedWorkFlag";
+import { createLessonPlayerWindow } from "./lessonPlayerWindow";
 import { isOnlyLingeringOverlay } from "./lingeringOverlay";
 import { installMainProcessErrorGuards } from "./main-process-errors";
 import { serveAppChannel } from "./mcp/app-channel";
@@ -96,6 +100,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // CLI mode: `openscreen export|record|info|help ...` runs headless without
 // HUD/tray/menu. Parsed before any GUI side effects; see electron/cli/.
 const cliCommand = parseCliArgs(process.argv, app.isPackaged ? 1 : 2);
+
+// The lesson player's media scheme must be privileged before the app is ready. Its handler exists
+// only inside each player window's own in-memory session (electron/lessonPlayerWindow.ts).
+protocol.registerSchemesAsPrivileged([
+	{
+		scheme: LESSON_PLAYER_MEDIA_SCHEME,
+		privileges: { standard: true, secure: true, stream: true },
+	},
+]);
 
 // On every app launch, not only under OPENSCREEN_DIAGNOSTIC: these lines are the
 // `mainProcessLogs` of "Save Diagnostics", and a user who saves a bundle from the tray
@@ -346,6 +359,14 @@ function setupApplicationMenu() {
 					label: mainT("dialogs", "unsavedChanges.saveProjectAs") || "Save Project As…",
 					accelerator: "CmdOrCtrl+Shift+S",
 					click: () => sendEditorMenuAction("menu-save-project-as"),
+				},
+				{ type: "separator" as const },
+				{
+					// Read-only playback of a verified lesson package; needs no video project.
+					label: "Open Lesson Player…",
+					click: () => {
+						if (lessonPlayerOwners.count() < MAX_PLAYER_WINDOWS) createLessonPlayerWindow();
+					},
 				},
 				...(isMac
 					? []

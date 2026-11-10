@@ -23,6 +23,8 @@ declare namespace NodeJS {
 
 // Used in Renderer process, expose in `preload.ts`
 interface Window {
+	/** Present only in a read-only lesson player window (electron/lessonPlayerPreload.ts). */
+	lessonPlayer?: import("../src/lib/lesson/player").LessonPlayerApi;
 	electronAPI: {
 		invokeNativeBridge: <TData = unknown>(
 			request: import("../src/native/contracts").NativeBridgeRequest,
@@ -276,6 +278,9 @@ interface Window {
 		lessonPackageCancel?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageCancel"];
 		lessonPackageRelease?: import("../src/lib/lesson/packageOpen").LessonPackageOpenApi["lessonPackageRelease"];
 		lessonOpen?: import("../src/lib/lesson/api").LessonApi["lessonOpen"];
+		openLessonPlayer?: () => Promise<
+			import("../src/lib/lesson/player").LessonPlayerResult<{ status: "launched" }>
+		>;
 		lessonExport?: import("../src/lib/lesson/api").LessonApi["lessonExport"];
 		saveTypingExport?: (file: {
 			name: string;

@@ -47,7 +47,13 @@ export default defineConfig({
 				},
 			},
 			preload: {
-				input: path.join(__dirname, "electron/preload.ts"),
+				input: {
+					preload: path.join(__dirname, "electron/preload.ts"),
+					// The read-only lesson player's own minimal bridge (see electron/lessonPlayerWindow.ts).
+					lessonPlayerPreload: path.join(__dirname, "electron/lessonPlayerPreload.ts"),
+				},
+				// Two entries cannot share one inlined bundle; neither preload has dynamic imports.
+				vite: { build: { rollupOptions: { output: { inlineDynamicImports: false } } } },
 			},
 			renderer: process.env.NODE_ENV === "test" ? undefined : {},
 		}),
@@ -92,6 +98,11 @@ export default defineConfig({
 			},
 		},
 		rollupOptions: {
+			// The app, plus the lesson player's separate page with its own strict CSP.
+			input: {
+				main: path.resolve(__dirname, "index.html"),
+				lessonPlayer: path.resolve(__dirname, "lesson-player.html"),
+			},
 			output: {
 				manualChunks(id) {
 					if (id.includes("react-dom") || id.includes("/react/")) return "react-vendor";

@@ -518,6 +518,36 @@
 			"resume": "Reopen the same package and keep edits",
 			"resumed": "The same package inventory was checked again. Your edits are unchanged and you can save now.",
 			"differentPackage": "That package differs from the one this draft was started from. Your edits are kept, but saving stays blocked. Choose the original, unchanged package folder, or discard the draft."
+		},
+		"player": {
+			"launch": "Lesson player",
+			"launchFailed": "The lesson player could not open. Close a lesson player window and try again.",
+			"title": "Lesson player",
+			"scope": "Read-only. Open a lesson package folder to read its steps and play its step videos. Nothing is changed, saved or sent anywhere, and no video project is needed.",
+			"open": "Open lesson package…",
+			"opening": "Checking the package. Every file and video is checked before anything is shown.",
+			"cancel": "Cancel",
+			"close": "Close package",
+			"checked": "Checked when opened: every file matches the package's own checksums and each step video decodes. This is a local check, not a signature, and not an approved learning or assessment record. Audio is not checked.",
+			"steps": "Steps",
+			"stepOf": "Step {{number}} of {{total}}",
+			"previous": "Previous step",
+			"next": "Next step",
+			"replay": "Replay step video",
+			"speed": "Playback speed",
+			"video": "Step video: {{title}}",
+			"noVideo": "This step has no video.",
+			"code": "Code",
+			"empty": "No package is open.",
+			"errors": {
+				"unavailable": "This player window can no longer open packages. Close it and open a new lesson player.",
+				"busy": "A package is already being opened.",
+				"limit": "Too many lesson player windows are open. Close one first.",
+				"invalid": "This folder is not a complete, unchanged lesson package, so nothing from it is shown.",
+				"cancelled": "Opening was cancelled.",
+				"unsupported": "Lesson packages can only be played on Linux for now.",
+				"toolUnavailable": "The video checking tool is not available, so the package cannot be opened."
+			}
 		}
 	}
 }

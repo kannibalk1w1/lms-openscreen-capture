@@ -83,6 +83,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	lessonPackageCancel: (id: string) => ipcRenderer.invoke("lesson:package-cancel", id),
 	lessonPackageRelease: (token: string) => ipcRenderer.invoke("lesson:package-release", token),
 	lessonOpen: () => ipcRenderer.invoke("lesson:open"),
+	/** Opens a new read-only lesson player window (editor only; main refuses other callers). */
+	openLessonPlayer: () => ipcRenderer.invoke("lesson-player:launch"),
 	lessonExport: (input: unknown, ids: string[]) => ipcRenderer.invoke("lesson:export", input, ids),
 	assetBaseUrl,
 
