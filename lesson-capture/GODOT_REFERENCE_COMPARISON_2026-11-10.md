@@ -198,7 +198,10 @@ follow-up commit addresses:
 Mutants M4/M5 (currency checks) and M7 (instance identity) are now killed. Production CLI
 (relative cwd) + MCP rerun 15/15 and startup smoke pass. Full suite: 6,647 pass. One
 environmental failure was `diskSpaceCheck.test.ts`: `/tmp` (tmpfs) was 98% full from this
-run's review snapshots. After removing those, it passes 5/5. Awaiting recheck.
+run's review snapshots. After removing those, it passes 5/5. The [recheck of `d16220f4`](CLAUDE_GODOT_REFERENCE_FILE_TOOLS_RECHECK_D16220F4_2026-11-10.md)
+**accepts** it. Its nits are closed in `6af68314`: R-N1, a non-zero tolerance that underflows
+to 0 (`1e-400`), is now refused; R-N2 is a test for the CLI range message, which kills the
+range-check mutant.
 
 ## Next
 

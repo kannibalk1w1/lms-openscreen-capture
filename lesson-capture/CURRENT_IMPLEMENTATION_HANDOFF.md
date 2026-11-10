@@ -1,9 +1,10 @@
-# Godot reference comparison CLI/MCP awaiting review — 10 November 2026
+# Godot reference comparison CLI/MCP accepted — 10 November 2026
 
 Claude builder. `compare-godot-reference` CLI and `compareGodotReferenceFile` MCP tool bind
 both explicit raw journals to inspected SHA-256 before comparing; tolerance now limited to
 continuous transforms; same-take/same-checkpoint labelled not independent. Real production
-CLI (relative cwd) + MCP parity 15/15 and startup smoke pass. Independent review pending.
+CLI (relative cwd) + MCP parity 15/15 and startup smoke pass. Review 87cc7dac accepted with Lows;
+fixed in d16220f4, accepted on recheck; nits closed in 6af68314.
 [Details](GODOT_REFERENCE_COMPARISON_2026-11-10.md). No pushes; main fd2775e2.
 
 # Advisory cross-take reference comparison accepted — 10 November 2026
