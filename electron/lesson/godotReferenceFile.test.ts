@@ -340,4 +340,37 @@ describe("review 87cc7dac follow-up", () => {
 			await server.close();
 		}
 	});
+	it.each([
+		"2",
+		"5e-0",
+		"1e+1",
+		"1e-400",
+		"-0.1",
+		"NaN",
+	])("refuses tolerance %s with the range message", (value) => {
+		const command = parseCliArgs(
+			[
+				"electron",
+				"app",
+				"lesson",
+				"compare-godot-reference",
+				"linux take.jsonl",
+				"--reference-record",
+				"1",
+				"--reference-sha256",
+				"a".repeat(64),
+				"--candidate",
+				"windows take.jsonl",
+				"--candidate-record",
+				"1",
+				"--candidate-sha256",
+				"b".repeat(64),
+				"--tolerance",
+				value,
+			],
+			2,
+			root,
+		);
+		expect(JSON.stringify(command)).toContain("Choose a tolerance between 0 and 1");
+	});
 });

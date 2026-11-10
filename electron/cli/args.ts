@@ -767,7 +767,9 @@ function parseLessonCommand(args: string[], cwd: string): CliCommand {
 		if (
 			tolerance !== undefined &&
 			(!/^\+?(?:\d{1,12}(?:\.\d{0,12})?|\.\d{1,12})(?:[eE][+-]?\d{1,3})?$/.test(tolerance) ||
-				!(Number(tolerance) >= 0 && Number(tolerance) <= 1))
+				!(Number(tolerance) >= 0 && Number(tolerance) <= 1) ||
+				// A non-zero value that underflows to 0 would silently become exact.
+				(Number(tolerance) === 0 && /[1-9]/.test(tolerance.split(/[eE]/)[0])))
 		)
 			throw new Error("Choose a tolerance between 0 and 1");
 		const candidate = values["--candidate"];
