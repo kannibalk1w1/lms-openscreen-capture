@@ -1,3 +1,32 @@
+# Opus takeover and accepted illustration fix — 10 November 2026
+
+The user explicitly requested Fable write a handover and Opus pick up and act.
+Fable handover: [FABLE_TO_OPUS_HANDOVER_2026-11-10.md](FABLE_TO_OPUS_HANDOVER_2026-11-10.md).
+Fable is stopped. Claude Opus 5.5 is the sole next implementation writer; earlier
+read-only-relay restrictions are superseded by this user-authorized takeover.
+
+Opus independently reviewed Fable improvements at305ab1e3 against259534fe in
+[FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md](FABLE_IMPROVEMENTS_INDEPENDENT_REVIEW_2026-11-09.md),
+found MediumM42-1, and independently verifies fix9355933a at current
+6f16b4b8e2bae12232e013aff9a01ae36a8a48bb in
+[M42_FIX_INDEPENDENT_FOLLOWUP_REVIEW_2026-11-10.md](M42_FIX_INDEPENDENT_FOLLOWUP_REVIEW_2026-11-10.md).
+M42-1 CLOSED: real final-build CLI and stdio refuse six ungranted render dependency
+fixtures with no output, supported screen-only JPEG stays white, inputs unchanged.
+Independent204focused/10files,0skip,both TS,real startup smoke and11of11own
+mutants pass. Worker full6290/460 at9355933a is separate evidence; no physical/
+Windows/macOS/audio/picker or authenticated-history claim is inferred.
+
+Coordinator owns the private checkpoint push. Main remainsfd2775e2; user source,
+raw evidence, original reports and external workflow report must remain preserved.
+Current nits/disclosed review-depth limits remain in the two original reports.
+Remaining work includes uniform older-IPC sender checks, safe GUI improvements,
+roadmap status consolidation, standalone learner delivery, platform/hardware
+acceptance and translations. No automatic recovery writes without explicit user
+privacy decision; no Windows gate removal without actual platform acceptance.
+The root handoff retains all concrete decisions/limits; history below is preserved.
+
+## Historical pre-Opus checkpoint account
+
 # M41-1 retained package-draft recovery — 9 November 2026
 
 Actual [review41](CLAUDE_ROADMAP_REVIEW_41_2026-11-09.md) found reproduced MediumM41-1
