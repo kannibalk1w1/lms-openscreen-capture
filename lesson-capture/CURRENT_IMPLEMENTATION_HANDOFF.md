@@ -1,3 +1,12 @@
+# Advisory cross-take reference comparison awaiting review — 10 November 2026
+
+Claude builder. Signal connections accepted through abc342ad plus the UTF-16 label fix
+47bc7c0a (worst-case astral names; ledger in the connections report). New library-only
+slice: [advisory cross-take reference comparison](GODOT_REFERENCE_COMPARISON_2026-11-10.md)
+— path-keyed, exact by default, partial/unknown on capability gaps or limited coverage,
+bounded rows/bytes; real Linux-vs-Windows takes agree. Independent review pending before
+CLI/MCP file tools. No pushes; main fd2775e2; player parked.
+
 # Godot saved signal connections accepted — 10 November 2026
 
 Claude builder. History/run slice accepted (1372a9c2, follow-ups 03355303/6be3ae7f;

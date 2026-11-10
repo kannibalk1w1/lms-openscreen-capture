@@ -529,6 +529,53 @@ export function listGodotSceneCheckpoints(text: string): GodotSceneCheckpoint[] 
 	);
 }
 
+export type GodotCheckpointSnapshot = {
+	scene: string;
+	schemaVersion: number;
+	sessionId: string;
+	instanceId: string;
+	coverage: "sampled" | "limited";
+	stopReason: string;
+	checkpoint: GodotSceneCheckpoint;
+	state: SceneState;
+};
+
+/** The sampled scene state an authored checkpoint references, from a fully validated raw take. */
+export function readGodotCheckpointSnapshot(
+	text: string,
+	recordSequence: number,
+): GodotCheckpointSnapshot {
+	if (!Number.isInteger(recordSequence) || recordSequence < 0 || recordSequence > 4095)
+		throw new Error("Choose a checkpoint record sequence");
+	const { journal, records } = decodeGodotSceneJournal(text);
+	const record = records[recordSequence];
+	if (!record || record.sequence !== recordSequence || record.event !== "scene-checkpoint")
+		throw new Error(`Record ${recordSequence} is not an authored scene checkpoint`);
+	const snapshot = records[record.snapshotSequence];
+	if (!snapshot || (snapshot.event !== "scene-start" && snapshot.event !== "scene-state"))
+		throw new Error("Checkpoint references a missing scene snapshot");
+	const first = records[0];
+	const footer = records[records.length - 1];
+	return {
+		scene: first.event === "scene-start" ? first.scene : "",
+		schemaVersion: first.schemaVersion,
+		sessionId: journal.sessionId,
+		instanceId: journal.instanceId,
+		// Raw footer coverage: normalized-observation caps do not affect raw snapshots.
+		coverage: footer.event === "scene-stop" ? footer.coverage : "limited",
+		stopReason: footer.event === "scene-stop" ? footer.reason : "unknown",
+		checkpoint: {
+			recordSequence: record.sequence,
+			label: record.label,
+			atMs: record.atMs,
+			snapshotSequence: record.snapshotSequence,
+		},
+		state: snapshot.state,
+	};
+}
+
+export type GodotSceneSnapshotState = SceneState;
+
 export type GodotCheckpointComparison = {
 	from: GodotSceneCheckpoint;
 	to: GodotSceneCheckpoint;
