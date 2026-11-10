@@ -1,3 +1,19 @@
+# Godot checkpoint comparison awaiting review — 10 November 2026
+
+Claude [accepted bda9f8d2 capture parity](CLAUDE_APPLICATION_CAPTURE_PARITY_REVIEW_BDA9F8D2_2026-11-10.md)
+with no findings. Root integrated cheaper workers' pure comparison and review UI:
+[explicit From/To authored markers in one raw take](GODOT_CHECKPOINT_COMPARISON_2026-11-10.md).
+6,512 tests/478 files and61 final focused checks, bothTS, final Vite/lint35,
+i18n15/docs37 and real headless startup pass. Real Linux/WinBoat Node each20checks;
+actual Windows Edge frontend16checks with only final saveIPC stubbed. No physical,
+packaged Windows Electron, restore/run/outcome claims. Old results/raw source clear
+on choice/import/forget. Final source/coverage distinctions are in the report.
+
+Weekly meter66% at19:45 UTC, target roughly75%; no session meter. Main remains
+fd2775e2; player parked; no push. The next cheaper worker is preparing read-only
+original-file marker listing and fingerprint-bound comparison CLI/MCP under
+/tmp/godot-checkpoint-file-tools-prototype only. Not integrated yet. Review pending.
+
 # Application capture CLI/MCP parity awaiting review — 10 November 2026
 
 Claude [accepted d4682b4f and closed C1](CLAUDE_GODOT_CHECKPOINT_RECHECK_D4682B4F_2026-11-10.md),

@@ -4,6 +4,10 @@ import {
 	type ApplicationCapture,
 	MAX_APPLICATION_CAPTURE_BYTES,
 } from "@/lib/applicationIntegrations/capture";
+import {
+	type GodotSceneCheckpoint,
+	listGodotSceneCheckpoints,
+} from "@/lib/applicationIntegrations/godotScene";
 import { importApplicationCapture } from "@/lib/applicationIntegrations/importCapture";
 import {
 	ApplicationTimingSourceChangedError,
@@ -16,8 +20,10 @@ import {
 	type ApplicationAssociationSelection,
 	type ApplicationAssociationSource,
 } from "./ApplicationAssociationControls";
+import { GodotCheckpointComparison } from "./GodotCheckpointComparison";
 
 const NO_SOURCES: ApplicationAssociationSource[] = [];
+type CheckpointSource = { id: number; text: string; checkpoints: GodotSceneCheckpoint[] };
 
 export function ApplicationCaptureReview({
 	lesson,
@@ -35,6 +41,7 @@ export function ApplicationCaptureReview({
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState("");
 	const [calibration, setCalibration] = useState<ApplicationAssociationSelection | null>(null);
+	const [checkpointSource, setCheckpointSource] = useState<CheckpointSource | null>(null);
 	const latest = useRef({ lesson, selected, journal, calibration, sources });
 	latest.current = { lesson, selected, journal, calibration, sources };
 	const epoch = useRef(0);
@@ -49,14 +56,37 @@ export function ApplicationCaptureReview({
 		const current = ++epoch.current;
 		setBusy(true);
 		setJournal(null);
+		setCheckpointSource(null);
 		setSelected([]);
 		setCalibration(null);
 		setMessage("");
 		try {
 			if (file.size > MAX_APPLICATION_CAPTURE_BYTES) throw new Error("limit");
-			const parsed = importApplicationCapture(await file.text());
+			const sourceText = await file.text();
+			const parsed = importApplicationCapture(sourceText);
 			if (current !== epoch.current) return;
+			let checkpoints: GodotSceneCheckpoint[] = [];
+			if (parsed.adapterId === "godot-scene") {
+				let normalized = false;
+				try {
+					const value: unknown = JSON.parse(sourceText);
+					normalized = value !== null && typeof value === "object" && "format" in value;
+				} catch {
+					// A raw Godot journal is JSONL; its strict decoder below validates every record.
+				}
+				if (!normalized) {
+					try {
+						const found = listGodotSceneCheckpoints(sourceText);
+						if (found.length >= 2) checkpoints = found;
+					} catch {
+						// Generic review remains available if checkpoint enumeration rejects the raw journal.
+					}
+				}
+			}
 			setJournal(parsed);
+			setCheckpointSource(
+				checkpoints.length >= 2 ? { id: current, text: sourceText, checkpoints } : null,
+			);
 			setPage(0);
 		} catch {
 			if (current === epoch.current) setMessage(t("lesson.scene.invalid"));
@@ -161,6 +191,15 @@ export function ApplicationCaptureReview({
 							onPlan={setCalibration}
 						/>
 					</fieldset>
+					{checkpointSource && (
+						<fieldset disabled={busy} style={{ border: 0, padding: 0 }}>
+							<GodotCheckpointComparison
+								key={checkpointSource.id}
+								source={checkpointSource.text}
+								checkpoints={checkpointSource.checkpoints}
+							/>
+						</fieldset>
+					)}
 					{journal.coverage === "limited" && <p role="alert">{t("lesson.scene.limited")}</p>}
 					<details>
 						<summary>{t("lesson.scene.baseline")}</summary>
@@ -245,6 +284,7 @@ export function ApplicationCaptureReview({
 							epoch.current++;
 							setBusy(false);
 							setJournal(null);
+							setCheckpointSource(null);
 							setSelected([]);
 							setCalibration(null);
 							setMessage("");

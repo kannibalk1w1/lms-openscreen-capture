@@ -629,6 +629,24 @@
 			"previous": "Previous observations",
 			"next": "Next observations",
 			"forget": "Close journal review"
+		},
+		"checkpoints": {
+			"title": "Compare scene checkpoints",
+			"scope": "Compare two explicitly marked snapshots from this validated Godot journal in the order you choose. Reverse comparisons are allowed. This shows sampled changes only; it does not prove an action, run result, save state or completion. Times use the independent application clock.",
+			"from": "From checkpoint",
+			"to": "To checkpoint",
+			"choose": "Choose a checkpoint",
+			"compare": "Compare checkpoints",
+			"failed": "Could not compare these checkpoints. Reimport the journal and try again.",
+			"result": "Checkpoint comparison result",
+			"counts": "Added {{added}} · Removed {{removed}} · Changed {{changed}} · Changed fields {{changedFields}}",
+			"added": "Nodes added",
+			"removed": "Nodes removed",
+			"changed": "Nodes changed",
+			"node": "{{name}} ({{type}}) · ID {{id}} · parent {{parent}}",
+			"changedNode": "{{before}} → {{after}} · ID {{id}} · fields {{fields}}",
+			"selection": "Selected node IDs changed from {{before}} to {{after}}.",
+			"none": "none"
 		}
 	}
 }

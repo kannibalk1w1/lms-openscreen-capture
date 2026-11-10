@@ -43,7 +43,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | Universal core / optional integration manager | Partial | Core media independent; selected-file integration controls and explicit read-only Godot clock bridge; deeper adapter capabilities remain | Foundation before deeper adapters; settings planned |
 | C Privacy-safe capture, storage and export | Partial | Default-off Linux button gates, scope suppression, source-bound receipts/recovery exclusions; full redaction/allowlists remain | Critical, phase 0; broad capture gate |
 | A Illustrated lesson guides | [Partial first slice](../LESSON_CAPTURE_GUIDES.md) | Manual steps, neutral flag/typing drafts, native stills, editable source, selected HTML/Markdown and bounded print proof; semantic generation remains | Very high, phase 1 |
-| B Godot semantic recording | Partial | Opt-in actual unsaved CodeEdit capture; no semantic scene adapter | Very high, phase 2 after privacy/clock contracts |
+| B Godot semantic recording | Partial | Opt-in CodeEdit plus bounded scene signals/snapshots, markers and manual timing; wider semantics remain open | Very high, phase 2 after privacy/clock contracts |
 | D Offline interactive lessons | Partial prerequisites; timed player planned | Static keyboard navigation/print, authored references, Linux source confirmation, selected-step MP4 export and verified portable packages exist; timed player controls/progress remain ([plan](OFFLINE_LEARNER_PLAYER_PLAN_2026-11-10.md)) | High, phase 3; next user-facing slice after the coordinator gate |
 | E Accessible differentiated outputs | Partial | Unified lesson Standard/Large print/High contrast, language/direction and image/code exclusions; reviewed simplification/narration/slow profiles remain | High, phase 1 defaults + phase 3 delivery |
 | F Recording script/checklist | Planned | Notes and flags; no source-linked recording checklist established | Medium-high, phase 4; small earlier slice allowed |
@@ -316,6 +316,11 @@ by review41 with its follow-up; full editor/course packaging and timed output ac
 
 ### P2.1 B — opt-in Godot semantic adapter — Partial; very high/after privacy + clocks; XL
 
+**10 November update:** bounded current-scene hierarchy/selection/2D transforms,
+script/texture identities and save signals, authored markers, explicit manual
+recording timing and selected drafts are implemented. Linux/WinBoat editor API
+coverage is distinct from physical editor acceptance. [Current scope](../LESSON_CAPTURE_GODOT_SCENES.md).
+
 - **Purpose/reuse:** explain demonstrated editor actions; extend current opt-in
   plugin/CodeEdit adapter and versioned event journal rather than global hooks.
 - **Architecture gate:** [generic capabilities and integration settings](APPLICATION_INTEGRATIONS.md)
@@ -340,6 +345,10 @@ by review41 with its follow-up; full editor/course packaging and timed output ac
   API research precedes claims of full coverage; no external service needed.
 
 ### P2.2 Checkpoint comparison, retakes and bidirectional handoff — Partial; preserved; L
+
+**10 November update:** [read-only within-take authored checkpoint comparison](GODOT_CHECKPOINT_COMPARISON_2026-11-10.md)
+now exists. It compares sampled states from one original journal; application
+project snapshots/restoration, expected-state verification and retakes remain open.
 
 - **Purpose/reuse:** replace one failed step without rebuilding a lesson; reuse
   existing editor checkpoint/restore and CLI/MCP services, source links and spec.

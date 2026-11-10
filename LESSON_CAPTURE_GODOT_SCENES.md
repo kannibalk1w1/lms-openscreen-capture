@@ -136,3 +136,13 @@ needed to inspect its snapshot reference; the selected draft retains a small mar
 payload rather than copying a full scene or project.
 
 See [marker behavior and exact validation](lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md).
+
+## Compare authored scene checkpoints
+
+With the original raw v2 journal loaded and at least two markers, expand **Compare
+scene checkpoints**. Choose From/To markers explicitly and compare sampled node
+additions/removals and changed field names. Reverse direction is allowed; labels
+with identical text remain distinct by record/time. Changing choices or replacing/
+closing the journal clears old results. Normalized captures cannot supply missing
+raw snapshots. This is read-only endpoint comparison, not project restoration or
+outcome verification. [Exact scope and evidence](lesson-capture/GODOT_CHECKPOINT_COMPARISON_2026-11-10.md).

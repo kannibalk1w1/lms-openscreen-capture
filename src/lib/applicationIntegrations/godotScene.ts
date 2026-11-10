@@ -96,6 +96,7 @@ const recordSchema = z.discriminatedUnion("event", [
 		})
 		.strict(),
 ]);
+type SceneRecord = z.infer<typeof recordSchema>;
 type SceneNode = z.infer<typeof nodeSchema>;
 type SceneState = z.infer<typeof stateSchema>;
 export type SceneObservation = {
@@ -144,7 +145,10 @@ function validateState(state: SceneState, rootId?: string): void {
 		throw new Error("Invalid scene selection");
 }
 /** Pure offline decoder. Does not connect to Godot, read resource paths or map video time. */
-export function parseGodotSceneJournal(text: string): GodotSceneJournal {
+function decodeGodotSceneJournal(text: string): {
+	journal: GodotSceneJournal;
+	records: SceneRecord[];
+} {
 	if (
 		text.length > MAX_SCENE_JOURNAL_BYTES ||
 		new TextEncoder().encode(text).byteLength > MAX_SCENE_JOURNAL_BYTES
@@ -274,9 +278,155 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 	if (last.reason === "limit" && last.coverage !== "limited")
 		throw new Error("Invalid scene coverage");
 	return {
-		...journal,
-		coverage: omitted ? "limited" : last.coverage,
-		stopReason: omitted ? `decoder-${omitted}` : last.reason,
+		journal: {
+			...journal,
+			coverage: omitted ? "limited" : last.coverage,
+			stopReason: omitted ? `decoder-${omitted}` : last.reason,
+		},
+		records,
+	};
+}
+/** Pure offline decoder. Does not connect to Godot, read resource paths or map video time. */
+export function parseGodotSceneJournal(text: string): GodotSceneJournal {
+	return decodeGodotSceneJournal(text).journal;
+}
+
+export type GodotSceneCheckpoint = {
+	recordSequence: number;
+	label: string;
+	atMs: number;
+	snapshotSequence: number;
+};
+
+/** List authored markers from the original, fully validated raw journal only. */
+export function listGodotSceneCheckpoints(text: string): GodotSceneCheckpoint[] {
+	return decodeGodotSceneJournal(text).records.flatMap((record) =>
+		record.event === "scene-checkpoint"
+			? [
+					{
+						recordSequence: record.sequence,
+						label: record.label,
+						atMs: record.atMs,
+						snapshotSequence: record.snapshotSequence,
+					},
+				]
+			: [],
+	);
+}
+
+export type GodotCheckpointComparison = {
+	from: GodotSceneCheckpoint;
+	to: GodotSceneCheckpoint;
+	counts: { added: number; removed: number; changed: number; changedFields: number };
+	added: Array<{ id: string; name: string; type: string; parent: string }>;
+	removed: Array<{ id: string; name: string; type: string; parent: string }>;
+	changed: Array<{ id: string; nameBefore: string; nameAfter: string; fields: string[] }>;
+	selection?: { before: string[]; after: string[] };
+};
+
+/**
+ * Compare two authored checkpoint records in one fully validated raw Godot take.
+ * Arguments are raw record sequence numbers, not labels or normalized observation IDs.
+ */
+export function compareGodotSceneCheckpoints(
+	text: string,
+	fromRecordSequence: number,
+	toRecordSequence: number,
+): GodotCheckpointComparison {
+	if (
+		!Number.isInteger(fromRecordSequence) ||
+		!Number.isInteger(toRecordSequence) ||
+		fromRecordSequence < 0 ||
+		fromRecordSequence > 4095 ||
+		toRecordSequence < 0 ||
+		toRecordSequence > 4095 ||
+		fromRecordSequence === toRecordSequence
+	)
+		throw new Error("Choose two distinct checkpoint record sequences");
+	const { records } = decodeGodotSceneJournal(text);
+	const checkpoint = (sequence: number) => {
+		const record = records[sequence];
+		if (!record || record.sequence !== sequence || record.event !== "scene-checkpoint")
+			throw new Error(`Record ${sequence} is not an authored scene checkpoint`);
+		return record;
+	};
+	const fromRecord = checkpoint(fromRecordSequence);
+	const toRecord = checkpoint(toRecordSequence);
+	const snapshots = new Map<number, SceneState>();
+	for (const record of records) {
+		if (record.event === "scene-start") snapshots.set(record.sequence, record.state);
+		else if (record.event === "scene-state") snapshots.set(record.sequence, record.state);
+	}
+	const before = snapshots.get(fromRecord.snapshotSequence);
+	const after = snapshots.get(toRecord.snapshotSequence);
+	if (!before || !after) throw new Error("Checkpoint references a missing scene snapshot");
+	const beforeById = new Map(before.nodes.map((node) => [node.id, node]));
+	const afterById = new Map(after.nodes.map((node) => [node.id, node]));
+	const added = after.nodes
+		.filter((node) => !beforeById.has(node.id))
+		.map(({ id, name, type, parent }) => ({ id, name, type, parent }));
+	const removed = before.nodes
+		.filter((node) => !afterById.has(node.id))
+		.map(({ id, name, type, parent }) => ({ id, name, type, parent }));
+	const changed: GodotCheckpointComparison["changed"] = [];
+	const fields = [
+		"name",
+		"parent",
+		"position",
+		"rotation",
+		"scale",
+		"visible",
+		"script",
+		"texture",
+	] as const;
+	const valueFor = (node: SceneNode, field: (typeof fields)[number]) =>
+		field === "name" || field === "parent"
+			? node[field]
+			: node.properties[field] === undefined
+				? [false]
+				: [true, node.properties[field]];
+	for (const node of after.nodes) {
+		const previous = beforeById.get(node.id);
+		if (!previous) continue;
+		const changedFields = fields.filter(
+			(field) =>
+				JSON.stringify(valueFor(previous, field)) !== JSON.stringify(valueFor(node, field)),
+		);
+		if (changedFields.length)
+			changed.push({
+				id: node.id,
+				nameBefore: previous.name,
+				nameAfter: node.name,
+				fields: [...changedFields],
+			});
+	}
+	const selectionChanged =
+		JSON.stringify([...before.selected].sort()) !== JSON.stringify([...after.selected].sort());
+	return {
+		from: {
+			recordSequence: fromRecord.sequence,
+			label: fromRecord.label,
+			atMs: fromRecord.atMs,
+			snapshotSequence: fromRecord.snapshotSequence,
+		},
+		to: {
+			recordSequence: toRecord.sequence,
+			label: toRecord.label,
+			atMs: toRecord.atMs,
+			snapshotSequence: toRecord.snapshotSequence,
+		},
+		counts: {
+			added: added.length,
+			removed: removed.length,
+			changed: changed.length,
+			changedFields: changed.reduce((count, node) => count + node.fields.length, 0),
+		},
+		added,
+		removed,
+		changed,
+		...(selectionChanged
+			? { selection: { before: [...before.selected], after: [...after.selected] } }
+			: {}),
 	};
 }
 function describeNodeChange(before: SceneNode, after: SceneNode): string {

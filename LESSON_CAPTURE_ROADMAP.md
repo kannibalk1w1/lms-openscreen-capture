@@ -27,8 +27,11 @@ add selected milestone annotations, with real Linux and WinBoat editor/API cover
 the [marker correction is accepted](lesson-capture/CLAUDE_GODOT_CHECKPOINT_RECHECK_D4682B4F_2026-11-10.md). Native/physical recording acceptance,
 automatic clock synchronization, project checkpoint comparison/restoration and
 run-result verification remain open. [Selected-file CLI/MCP parity](lesson-capture/APPLICATION_CAPTURE_PARITY_2026-11-10.md)
-now adds capture inspection and explicitly selected draft creation, pending review.
-Next: bounded comparison of two authored Godot checkpoint states within one take. Earlier checkpoint/review entries below
+is [accepted by Claude](lesson-capture/CLAUDE_APPLICATION_CAPTURE_PARITY_REVIEW_BDA9F8D2_2026-11-10.md).
+[Within-take authored checkpoint comparison](lesson-capture/GODOT_CHECKPOINT_COMPARISON_2026-11-10.md)
+now has read-only review UI and real Windows frontend coverage, pending independent
+review. Next: original-file marker listing and fingerprint-bound comparison through
+read-only CLI/MCP tools. Earlier checkpoint/review entries below
 retain their historical scope.
 
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).
@@ -58,7 +61,7 @@ packs. Outputs share stable steps and source references; source evidence stays i
 | --- | --- | --- |
 | 0 Capture correctness and privacy | Input clocks/gaps, native reliability, allowlists/suppression/retention/privacy review, preflight, rolling buffer | Partial; privacy is critical before broader input/semantic collection |
 | 1 Structured lesson generation | Versioned steps, screenshot/guide drafts, editable ordering/numbering, manifests, portable course presets | [First editable manifest/HTML/Markdown guide slice](LESSON_CAPTURE_GUIDES.md); profiles/deeper generation remain open |
-| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; bounded offline scene observations and selected draft steps now exist; continuous edit/media mapping and broader semantics remain open |
+| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; bounded scene observations, authored markers, manual timing, selected drafts and within-take comparison now exist; project restoration, retakes and broader semantics remain open |
 | 3 Learner-facing delivery | Standalone offline HTML player, differentiated accessible profiles, troubleshooting | Planned; caption/font/theme controls are reusable partial foundations |
 | 4 Authoring efficiency | Script/checklist companion, QC/idle suggestions, object-linked arrows, local asset library | Partial existing notes/flags/diagnostics/styles; integrated workflows planned |
 | 5 Review and evidence | Local comments/approval/revisions and optional tutor-curated evidence packs | Planned; never infer achievement from activity alone |
