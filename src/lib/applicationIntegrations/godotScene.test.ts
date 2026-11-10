@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MAX_SCENE_JOURNAL_BYTES, parseGodotSceneJournal } from "./godotScene";
+import { godotSceneCapture, MAX_SCENE_JOURNAL_BYTES, parseGodotSceneJournal } from "./godotScene";
 import { sceneNode, sceneRecords, sceneSource } from "./godotScene.test-support";
 
 it("normalizes observed changes and keeps the starting state separate from action drafts", () => {
@@ -121,4 +121,65 @@ it("decodes the retained real Godot 4.7.1 editor journal", () => {
 		"scene-saved",
 	]);
 	expect(journal.observations.some((value) => value.label.includes("parent"))).toBe(true);
+});
+
+function boundedStressJournal(kind: "count" | "bytes", corruptTail = false): string {
+	const template = sceneRecords();
+	const base = sceneNode();
+	const children = Array.from({ length: kind === "count" ? 255 : 1 }, (_, index) => ({
+		...sceneNode(String(index + 2), "Child", "1"),
+		properties:
+			kind === "bytes"
+				? {
+						script: `res://${"s".repeat(980)}.gd`,
+						texture: `res://${"t".repeat(980)}.png`,
+						position: [0, 0],
+					}
+				: { script: null },
+	}));
+	const state = (index: number) => ({
+		nodes: [
+			base,
+			...(kind === "count" && index % 2
+				? []
+				: children.map((node) => ({
+						...node,
+						properties: {
+							...node.properties,
+							...(kind === "bytes" ? { position: [index, 0] } : {}),
+						},
+					}))),
+		],
+		selected: [],
+	});
+	const records: Record<string, unknown>[] = [{ ...template[0], state: state(0) }];
+	for (let index = 1; index <= (kind === "count" ? 44 : 2300); index++)
+		records.push({ ...template[1], state: state(index) });
+	if (corruptTail)
+		records.push({ ...template[1], state: { nodes: [sceneNode("999")], selected: [] } });
+	records.push(template[5]);
+	return sceneSource(
+		records.map((record, sequence) => ({ ...record, sequence, atMs: sequence * 250 })),
+	);
+}
+it("keeps an honest limited prefix when valid producer evidence expands beyond 10,000 observations", () => {
+	const source = boundedStressJournal("count");
+	expect(new TextEncoder().encode(source).byteLength).toBeLessThan(MAX_SCENE_JOURNAL_BYTES);
+	const parsed = parseGodotSceneJournal(source);
+	expect(parsed.coverage).toBe("limited");
+	expect(parsed.stopReason).toBe("decoder-observation-limit");
+	expect(parsed.observations).toHaveLength(10000);
+	expect(() => parseGodotSceneJournal(boundedStressJournal("count", true))).toThrow("scope");
+});
+it("limits normalized diff bytes while retaining valid evidence and validating the entire source", () => {
+	const source = boundedStressJournal("bytes");
+	expect(new TextEncoder().encode(source).byteLength).toBeLessThan(MAX_SCENE_JOURNAL_BYTES);
+	const parsed = parseGodotSceneJournal(source);
+	expect(parsed.coverage).toBe("limited");
+	expect(parsed.stopReason).toBe("decoder-size-limit");
+	expect(parsed.observations.length).toBeGreaterThan(100);
+	expect(
+		new TextEncoder().encode(JSON.stringify(godotSceneCapture(parsed))).byteLength,
+	).toBeLessThanOrEqual(MAX_SCENE_JOURNAL_BYTES);
+	expect(() => parseGodotSceneJournal(boundedStressJournal("bytes", true))).toThrow("scope");
 });

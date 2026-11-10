@@ -23,7 +23,7 @@ export function appendApplicationDrafts(
 		throw new Error("Invalid scene draft selection");
 	const additions = observations.map((observation) => ({
 		...newStep(observation.label.slice(0, 300)),
-		instructions: `Observed in ${journal.scope} at ${observation.atMs} ms on an independent application clock.\n${observation.label}.\nReview the before/after evidence and write the teaching instructions. Sampled observations (fallback polling ${journal.pollIntervalMs} ms); intermediate changes may be missing.${journal.coverage === "limited" ? " Capture ended at a limit." : ""}`,
+		instructions: `Observed in ${journal.scope} at ${observation.atMs} ms on an independent application clock.\n${observation.label}.\nReview the before/after evidence and write the teaching instructions. Sampled observations (fallback polling ${journal.pollIntervalMs} ms); intermediate changes may be missing.${journal.coverage === "limited" ? " Capture or import limit: later observations may be missing." : ""}`,
 		evidence: [
 			{
 				kind: "application-observation" as const,

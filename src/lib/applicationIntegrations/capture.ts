@@ -19,7 +19,7 @@ export const applicationCaptureSchema = z
 		stopReason: z.string().min(1).max(100),
 		pollIntervalMs: z.number().int().min(1).max(60000),
 		durationMs: ms,
-		baseline: boundedJson(2 * 1024 * 1024),
+		baseline: boundedJson(MAX_APPLICATION_CAPTURE_BYTES),
 		observations: z
 			.array(
 				z

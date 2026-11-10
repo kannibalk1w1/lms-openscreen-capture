@@ -72,7 +72,9 @@ text; the editable lesson retains structured evidence.
 ## Bounds and failures
 
 512 nodes, hierarchy depth 64, 4,096 records including the footer, 8 MiB JSONL,
-24-hour elapsed clock and 10,000 decoded observations. The importer validates tree,
+24-hour elapsed clock and up to 10,000 retained decoded observations within the
+normalized byte budget. Larger valid diffs retain a visibly limited prefix; the
+whole raw journal is still validated and corrupt tails are refused. The importer validates tree,
 selection, lifecycle, identities, clock order, paths and strict property allowlists.
 An oversized starting scene refuses capture. Hitting a runtime limit closes with
 `limited` coverage. Ordinary closure says `sampled`, never `complete`.

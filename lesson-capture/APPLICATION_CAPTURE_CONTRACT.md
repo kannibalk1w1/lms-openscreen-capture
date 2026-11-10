@@ -36,7 +36,7 @@ small `sceneDraft.ts` adapter convenience function.
 | `baseline` | Bounded application-specific JSON context; not automatically made into steps |
 | `observations` | Unique local IDs, elapsed time, producer-specific type, summary label and bounded JSON payload |
 
-8 MiB total, 2 MiB baseline, 10,000 observations, 32 KiB payload per observation,
+8 MiB total including baseline context, 10,000 observations, 32 KiB payload per observation,
 24-hour duration, ordered times and unique IDs per take. The decoder rejects
 unknown envelope fields and malformed/unsupported evidence. Baseline/payload data
 is opaque to shared authoring: an adapter can describe a block/workspace/resource
@@ -73,3 +73,14 @@ an MCreator or Roblox Studio compatibility claim.
 Next timing work belongs in an application-neutral association service with explicit
 clock relation, capture/interval identity and pause/gap handling. Godot-specific
 sampling signals must not define that common media contract.
+
+## Import-budget behavior
+
+Godot journals are validated in full even when their per-sample differences exceed
+the normalized count or byte budget. The decoder retains an ordered prefix, marks
+coverage `limited`, and gives stop reason `decoder-observation-limit` or
+`decoder-size-limit`. It never treats a malformed/corrupt tail as partial success.
+Original source journals are unchanged. Baseline context shares the total 8 MiB
+budget, so a producer-valid baseline is not refused by a smaller independent cap.
+Application instance identities use the same 200-character bound at import and
+lesson persistence.

@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { type ApplicationCapture, validateApplicationCapture } from "./capture";
+import {
+	type ApplicationCapture,
+	MAX_APPLICATION_CAPTURE_BYTES,
+	validateApplicationCapture,
+} from "./capture";
 
 type JsonValue = z.infer<ReturnType<typeof z.json>>;
 
@@ -139,6 +143,23 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 	let previous = first.state,
 		time = 0;
 	const observations: SceneObservation[] = [];
+	const journal: GodotSceneJournal = {
+		adapterId: "godot-scene",
+		sessionId: first.sessionId,
+		instanceId: first.instanceId,
+		scene: first.scene,
+		clock: "unmapped",
+		coverage: last.coverage,
+		stopReason: last.reason,
+		durationMs: last.atMs,
+		baseline: first.state,
+		observations,
+	};
+	// Diff expansion can exceed the source byte count. Keep a bounded prefix while
+	// validating every remaining raw record; never turn corrupt tails into partial success.
+	let normalizedBytes =
+		new TextEncoder().encode(JSON.stringify(godotSceneCapture(journal))).byteLength + 1024;
+	let omitted: "observation-limit" | "size-limit" | undefined;
 	for (const [index, record] of records.entries()) {
 		if (
 			record.sequence !== index ||
@@ -150,8 +171,12 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 		time = record.atMs;
 		if (index === 0 || index === records.length - 1) continue;
 		const add = (type: SceneObservation["type"], label: string, payload: JsonValue) => {
-			if (observations.length >= 10000) throw new Error("Too many scene observations");
-			observations.push({
+			if (omitted) return;
+			if (observations.length >= 10000) {
+				omitted = "observation-limit";
+				return;
+			}
+			const observation: SceneObservation = {
 				id: `${index}:${observations.length}`,
 				atMs: record.atMs,
 				type,
@@ -160,7 +185,14 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 					record.event === "scene-state" && record.trigger
 						? { ...(payload as Record<string, JsonValue>), samplingTrigger: record.trigger }
 						: payload,
-			});
+			};
+			const bytes = new TextEncoder().encode(JSON.stringify(observation)).byteLength + 1;
+			if (normalizedBytes + bytes > MAX_APPLICATION_CAPTURE_BYTES) {
+				omitted = "size-limit";
+				return;
+			}
+			normalizedBytes += bytes;
+			observations.push(observation);
 		};
 		if (record.event === "scene-state") {
 			validateState(record.state, rootId);
@@ -195,16 +227,9 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 	if (last.reason === "limit" && last.coverage !== "limited")
 		throw new Error("Invalid scene coverage");
 	return {
-		adapterId: "godot-scene",
-		sessionId: first.sessionId,
-		instanceId: first.instanceId,
-		scene: first.scene,
-		clock: "unmapped",
-		coverage: last.coverage,
-		stopReason: last.reason,
-		durationMs: last.atMs,
-		baseline: first.state,
-		observations,
+		...journal,
+		coverage: omitted ? "limited" : last.coverage,
+		stopReason: omitted ? `decoder-${omitted}` : last.reason,
 	};
 }
 function describeNodeChange(before: SceneNode, after: SceneNode): string {

@@ -24,7 +24,7 @@ export const lessonEvidenceSchema = z
 		application: z
 			.object({
 				adapterId: z.string().min(1).max(100),
-				instanceId: z.string().min(1).max(100).optional(),
+				instanceId: z.string().min(1).max(200).optional(),
 				scope: z.string().min(1).max(1000),
 				type: z.string().min(1).max(100),
 				payload: z

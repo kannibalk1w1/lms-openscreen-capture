@@ -51,7 +51,7 @@ it("rejects invalid versions, clocks, duplicate IDs, order and duration overflow
 		{ observations: [base.observations[0], base.observations[0]] },
 		{ observations: [...base.observations].reverse() },
 		{ durationMs: 0 },
-		{ baseline: "x".repeat(2 * 1024 * 1024 + 1) },
+		{ baseline: "x".repeat(8 * 1024 * 1024 + 1) },
 		{ observations: [{ ...base.observations[0], payload: "x".repeat(32769) }] },
 	])
 		expect(() => validateApplicationCapture({ ...base, ...changes })).toThrow();
@@ -67,4 +67,10 @@ it("retains sampling triggers as context without claiming action causality", () 
 	expect(capture.clock).toBe("unmapped");
 	expect(capture.observations[0].payload).toMatchObject({ samplingTrigger: "inspector" });
 	expect(capture.observations[0].label).toBe("Node appeared: Sprite2D");
+});
+it("accepts large baseline context inside the shared total byte budget", () => {
+	const capture = godotSceneCapture(parseGodotSceneJournal(sceneSource()));
+	capture.baseline = { context: "界".repeat(750000) };
+	const parsed = parseApplicationCapture(JSON.stringify(capture));
+	expect(parsed.baseline).toEqual(capture.baseline);
 });

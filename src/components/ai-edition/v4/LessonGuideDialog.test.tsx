@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/contexts/I18nContext";
 import { createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
+import { sceneSource } from "@/lib/applicationIntegrations/godotScene.test-support";
 import type { LessonApi } from "@/lib/lesson/api";
 import { newLesson, newStep } from "@/lib/lesson/authoring";
 import { imageFixture } from "@/lib/lesson/fixtures.test-support";
@@ -185,6 +186,37 @@ it("keeps a newly reviewed draft row visible until filters change", () => {
 	expect(
 		screen.getByText("The source step is marked reviewed and stays visible until filters change."),
 	).toBeTruthy();
+});
+
+it("appends imported drafts without resetting filters or changing prior selection", async () => {
+	vi.stubGlobal("electronAPI", undefined);
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getAllByLabelText("Step title")[0], { target: { value: "Keep this" } });
+	fireEvent.blur(screen.getAllByLabelText("Step title")[0]);
+	fireEvent.click(screen.getByRole("button", { name: "Add authored step" }));
+	fireEvent.change(screen.getAllByLabelText("Step title")[1], { target: { value: "Hide this" } });
+	fireEvent.blur(screen.getAllByLabelText("Step title")[1]);
+	fireEvent.click(screen.getByLabelText("Include step 2"));
+	fireEvent.change(screen.getByLabelText("Find by step title"), {
+		target: { value: "Keep" },
+	});
+
+	fireEvent.click(screen.getByText("Application capture observations"));
+	const file = new File(["fixture"], "capture.jsonl");
+	Object.defineProperty(file, "text", { value: async () => sceneSource() });
+	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
+		target: { files: [file] },
+	});
+	await screen.findByText(/6 observations/);
+	fireEvent.click(screen.getByRole("checkbox", { name: /Node changed: Slime/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Add selected observations as draft steps" }));
+
+	expect((screen.getByLabelText("Find by step title") as HTMLInputElement).value).toBe("Keep");
+	expect(screen.getByDisplayValue("Keep this")).toBeTruthy();
+	expect(screen.queryByDisplayValue("Hide this")).toBeNull();
+	expect((screen.getByLabelText("Include step 1") as HTMLInputElement).checked).toBe(true);
+	expect((screen.getByLabelText("Include step 3") as HTMLInputElement).checked).toBe(true);
 });
 
 it.each([

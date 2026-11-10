@@ -1,3 +1,14 @@
+# Claude review corrections awaiting recheck — 10 November 2026
+
+Claude reviewed `170eb141` and requested F1/F2/F3. Root and a cheaper bounded worker
+corrected all three; [exact changes and validation](GODOT_CAPTURE_REVIEW_FIXES_2026-11-10.md),
+[original review](CLAUDE_GODOT_CAPTURE_REVIEW_170EB141_2026-11-10.md). Full 6,448 tests
+pass; WinBoat reran changed decoder/authoring limits and identity persistence.
+Independent recheck remains pending. User directs autonomous roadmap progress to
+roughly 75% utilisation, using cheaper agents where possible and Claude reviews.
+Codex weekly meter at this checkpoint: 50%; no session meter. Next: explicit
+application-neutral timing association without claiming encoder sync. Player parked.
+
 # Godot capture and WinBoat follow-up — 10 November 2026
 
 The owner requested continued Godot capture, Windows testing through WinBoat and

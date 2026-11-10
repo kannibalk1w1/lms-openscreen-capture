@@ -394,8 +394,13 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						key={`${projectId}:${lesson.id}`}
 						lesson={lesson}
 						onAppend={(next) => {
-							replaceLesson(next);
-							setError(null);
+							const appended = next.steps.filter(
+								(step) => !lesson.steps.some((previous) => previous.id === step.id),
+							);
+							if (author(() => next)) {
+								setSelected((ids) => [...new Set([...ids, ...appended.map((step) => step.id)])]);
+								setPinned((ids) => [...new Set([...ids, ...appended.map((step) => step.id)])]);
+							}
 						}}
 					/>
 

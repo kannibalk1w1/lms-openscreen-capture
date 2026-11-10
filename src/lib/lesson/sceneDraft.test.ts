@@ -60,3 +60,14 @@ it("requires bounded application payloads and observed identities on reopen", as
 		await expect(parseLesson(JSON.stringify(invalid))).rejects.toThrow();
 	}
 });
+it("retains supported 200-character instance IDs through normalized import and lesson reopen", async () => {
+	vi.stubGlobal("crypto", webcrypto);
+	const journal = parseGodotSceneJournal(sceneSource());
+	journal.instanceId = "i".repeat(200);
+	const next = appendSceneDrafts(newLesson(), journal, [journal.observations[0].id]);
+	expect(
+		(await parseLesson(JSON.stringify(next))).steps[0].evidence[0].application?.instanceId,
+	).toBe(journal.instanceId);
+	journal.instanceId += "i";
+	expect(() => appendSceneDrafts(newLesson(), journal, [journal.observations[0].id])).toThrow();
+});
