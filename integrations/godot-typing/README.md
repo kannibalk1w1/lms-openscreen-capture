@@ -94,3 +94,10 @@ allowlisted current-scene state is sampled, with a 50 ms minimum interval betwee
 signal-requested samples. Sampling observers disconnect on stop/disable/scope
 change. Godot 4.7.1 real editor/API probes pass on Linux and WinBoat Windows 11;
 see [exact Windows coverage](../../lesson-capture/GODOT_CAPTURE_WINDOWS_REUSE_2026-11-10.md).
+
+During an active scene take, **Mark scene checkpoint** adds a short authored label
+(up to 200 UTF-16 code units, no controls or blank labels) after sampling the scene.
+A marker dialog belongs to that take only. Labels are included in the journal, so
+review them before sharing. This does not save, archive, restore or run a project.
+Raw scene journals now use v2; OpenScreen still reads legacy v1 journals. See
+[checkpoint scope and validation](../../lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md).

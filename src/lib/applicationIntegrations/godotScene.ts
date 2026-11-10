@@ -49,7 +49,7 @@ const stateSchema = z
 	})
 	.strict();
 const envelope = z.object({
-	schemaVersion: z.literal(1),
+	schemaVersion: z.union([z.literal(1), z.literal(2)]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
 	sequence: z.number().int().min(0).max(4095),
@@ -69,7 +69,9 @@ const recordSchema = z.discriminatedUnion("event", [
 		.extend({
 			event: z.literal("scene-state"),
 			state: stateSchema,
-			trigger: z.enum(["poll", "selection", "inspector", "tree", "save", "stop"]).optional(),
+			trigger: z
+				.enum(["poll", "selection", "inspector", "tree", "save", "stop", "checkpoint"])
+				.optional(),
 		})
 		.strict(),
 	envelope.extend({ event: z.literal("scene-saved"), scene: resourcePath }).strict(),
@@ -80,13 +82,32 @@ const recordSchema = z.discriminatedUnion("event", [
 			reason: z.enum(["user-stop", "scene-changed", "plugin-disabled", "limit"]),
 		})
 		.strict(),
+	envelope
+		.extend({
+			event: z.literal("scene-checkpoint"),
+			label: z
+				.string()
+				.min(1)
+				.max(200)
+				.refine((label) => label.trim().length > 0 && !/[\p{Cc}]/u.test(label)),
+			labelProvenance: z.literal("authored"),
+			nodeCount: z.number().int().min(1).max(512),
+			snapshotSequence: z.number().int().min(0).max(4095),
+		})
+		.strict(),
 ]);
 type SceneNode = z.infer<typeof nodeSchema>;
 type SceneState = z.infer<typeof stateSchema>;
 export type SceneObservation = {
 	id: string;
 	atMs: number;
-	type: "node-appeared" | "node-disappeared" | "node-changed" | "selection-changed" | "scene-saved";
+	type:
+		| "node-appeared"
+		| "node-disappeared"
+		| "node-changed"
+		| "selection-changed"
+		| "scene-saved"
+		| "author-checkpoint";
 	label: string;
 	payload: JsonValue;
 };
@@ -138,10 +159,22 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 	if (first.event !== "scene-start" || last.event !== "scene-stop" || first.atMs !== 0)
 		throw new Error("Scene journal requires a header and footer");
 	validateState(first.state);
+	if (records.some((record) => record.schemaVersion !== first.schemaVersion))
+		throw new Error("Scene journal schema version mismatch");
+	if (
+		first.schemaVersion === 1 &&
+		records.some(
+			(record) =>
+				record.event === "scene-checkpoint" ||
+				(record.event === "scene-state" && record.trigger === "checkpoint"),
+		)
+	)
+		throw new Error("Checkpoint requires scene journal schema v2");
 	const rootId = first.state.nodes[0].id;
 	const types = new Map(first.state.nodes.map((node) => [node.id, node.type]));
 	let previous = first.state,
 		time = 0;
+	let snapshotSequence = first.sequence;
 	const observations: SceneObservation[] = [];
 	const journal: GodotSceneJournal = {
 		adapterId: "godot-scene",
@@ -196,6 +229,7 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 		};
 		if (record.event === "scene-state") {
 			validateState(record.state, rootId);
+			snapshotSequence = record.sequence;
 			const before = new Map(previous.nodes.map((node) => [node.id, node]));
 			const after = new Map(record.state.nodes.map((node) => [node.id, node]));
 			for (const node of previous.nodes) {
@@ -222,6 +256,19 @@ export function parseGodotSceneJournal(text: string): GodotSceneJournal {
 			previous = record.state;
 		} else if (record.event === "scene-saved") {
 			add("scene-saved", "Scene save observed", { scene: record.scene });
+		} else if (record.event === "scene-checkpoint") {
+			if (
+				first.schemaVersion !== 2 ||
+				record.snapshotSequence !== snapshotSequence ||
+				record.nodeCount !== previous.nodes.length
+			)
+				throw new Error("Invalid checkpoint snapshot reference");
+			add("author-checkpoint", `Author checkpoint: ${record.label}`, {
+				label: record.label,
+				labelProvenance: "authored",
+				nodeCount: record.nodeCount,
+				snapshotSequence: record.snapshotSequence,
+			});
 		} else throw new Error("Unexpected scene lifecycle record");
 	}
 	if (last.reason === "limit" && last.coverage !== "limited")

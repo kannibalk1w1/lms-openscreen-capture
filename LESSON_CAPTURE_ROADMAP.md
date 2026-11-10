@@ -21,10 +21,13 @@ slice](LESSON_CAPTURE_GODOT_SCENES.md) adds explicit capture, offline review and
 selected evidence-backed lesson drafts. A follow-up adds signal-assisted sampling,
 [shared application capture/review/drafting](lesson-capture/APPLICATION_CAPTURE_CONTRACT.md)
 and a real WinBoat Windows 11 editor/API probe. [Manual calibration and selected timing persistence](lesson-capture/APPLICATION_CALIBRATION_2026-11-10.md)
-now also have real Windows browser component coverage; native/physical recording
-acceptance and automatic clock synchronization remain open. These changes are locally validated,
-not independently reviewed or pushed. Next: explicit semantic/recording clock
-association with pause/gap handling. Earlier checkpoint/review entries below
+now also have real Windows browser component coverage and [Claude acceptance](lesson-capture/CLAUDE_APPLICATION_CALIBRATION_REVIEW_EEFEC646_2026-11-10.md).
+[Authored Godot checkpoint markers](lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md)
+add selected milestone annotations, with real Linux and WinBoat editor/API coverage;
+the marker slice awaits independent review. Native/physical recording acceptance,
+automatic clock synchronization, project checkpoint comparison/restoration and
+run-result verification remain open. Next: selected-file CLI/MCP parity for offline
+application capture review and draft creation. Earlier checkpoint/review entries below
 retain their historical scope.
 
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).

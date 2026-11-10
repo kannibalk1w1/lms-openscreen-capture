@@ -19,9 +19,39 @@ var _previous := ""
 var _limited := false
 var _pending_trigger := ""
 var _scene_tree: SceneTree
+var _last_snapshot_sequence := 0
+var _last_snapshot_node_count := 0
 
 func active() -> bool:
 	return _file != null
+
+func active_session_id() -> String:
+	return _session if active() else ""
+
+func mark_checkpoint(label: String, expected_session_id: String) -> bool:
+	if not active() or expected_session_id.is_empty() or expected_session_id != _session:
+		return false
+	if not is_instance_valid(_root) or not is_instance_valid(_editor):
+		stop("scene-changed", false)
+		return false
+	if _editor.get_edited_scene_root() != _root:
+		stop("scene-changed", false)
+		return false
+	if label.strip_edges().is_empty() or label.to_utf16_buffer().size() / 2 > 200 or _has_control(label):
+		return false
+	# Sample synchronously first. A limit or write error can stop the take, so
+	# the authored marker is written only after that sample succeeds.
+	_sample("checkpoint")
+	if not active() or expected_session_id != _session:
+		return false
+	if not is_instance_valid(_root) or not is_instance_valid(_editor) or _editor.get_edited_scene_root() != _root:
+		stop("scene-changed", false)
+		return false
+	var snapshot_sequence := _last_snapshot_sequence
+	var node_count := _last_snapshot_node_count
+	if _limited or node_count < 1:
+		return false
+	return _write({"event": "scene-checkpoint", "label": label, "labelProvenance": "authored", "nodeCount": node_count, "snapshotSequence": snapshot_sequence})
 
 func begin(path: String, root: Node, editor: EditorInterface) -> bool:
 	if active() or not is_instance_valid(root) or editor.get_edited_scene_root() != root:
@@ -50,6 +80,8 @@ func begin(path: String, root: Node, editor: EditorInterface) -> bool:
 	_sequence = 0
 	_session = "godot-scene-" + Crypto.new().generate_random_bytes(16).hex_encode()
 	_previous = JSON.stringify(state)
+	_last_snapshot_sequence = 0
+	_last_snapshot_node_count = state.nodes.size()
 	_pending_trigger = ""
 	_write({"event": "scene-start", "producer": "godot-scene", "scene": _resource_path(root.scene_file_path), "state": state, "intervalMs": INTERVAL_MS})
 	if active():
@@ -106,7 +138,10 @@ func _sample(trigger: String = "poll") -> void:
 	var serialized := JSON.stringify(state)
 	if serialized != _previous:
 		_previous = serialized
-		_write({"event": "scene-state", "state": state, "trigger": trigger})
+		var snapshot_sequence := _sequence
+		if _write({"event": "scene-state", "state": state, "trigger": trigger}):
+			_last_snapshot_sequence = snapshot_sequence
+			_last_snapshot_node_count = state.nodes.size()
 
 func _connect_observers() -> void:
 	_editor.get_selection().selection_changed.connect(_selection_changed)
@@ -197,10 +232,10 @@ func _has_control(text: String) -> bool:
 			return true
 	return false
 
-func _write(payload: Dictionary) -> void:
+func _write(payload: Dictionary) -> bool:
 	if not active():
-		return
-	payload["schemaVersion"] = 1
+		return false
+	payload["schemaVersion"] = 2
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence
@@ -209,7 +244,7 @@ func _write(payload: Dictionary) -> void:
 	if payload.event != "scene-stop" and (_sequence >= MAX_RECORDS - 1 or _file.get_position() + line.to_utf8_buffer().size() + 1 > MAX_BYTES - 1024):
 		_limited = true
 		stop("limit", false)
-		return
+		return false
 	_file.store_line(line)
 	_file.flush()
 	_sequence += 1
@@ -220,3 +255,5 @@ func _write(payload: Dictionary) -> void:
 		_editor = null
 		_previous = ""
 		status_changed.emit("Scene journal write failed · stopped · incomplete file")
+		return false
+	return true

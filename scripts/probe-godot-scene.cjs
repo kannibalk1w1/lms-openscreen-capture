@@ -88,7 +88,7 @@ console.log(
 	`SCENE_PROBE_PASSED: ${records.length} records; scope/stop/privacy canaries passed. API-driven editor, no OS-input acceptance.`,
 );
 
-for (const name of ["record-limit.jsonl", "byte-limit.jsonl"]) {
+for (const name of ["record-limit.jsonl", "byte-limit.jsonl", "marker-limit.jsonl"]) {
 	const bytes = fs.readFileSync(path.join(fixture, name));
 	const entries = bytes.toString("utf8").trim().split("\n").map(JSON.parse);
 	const footer = entries.at(-1);
@@ -122,6 +122,7 @@ for (const kind of [
 	"node-disappeared",
 	"selection-changed",
 	"scene-saved",
+	"author-checkpoint",
 ]) {
 	if (!kinds.has(kind)) throw new Error(`Missing real editor evidence: ${kind}`);
 }
@@ -130,7 +131,12 @@ if (
 	!JSON.stringify(decoded).includes("res://slime.svg")
 )
 	throw new Error("Missing reparent/resource evidence");
-for (const name of ["disable.jsonl", "record-limit.jsonl", "byte-limit.jsonl"])
+for (const name of [
+	"disable.jsonl",
+	"record-limit.jsonl",
+	"byte-limit.jsonl",
+	"marker-limit.jsonl",
+])
 	parseGodotSceneJournal(fs.readFileSync(path.join(fixture, name), "utf8"));
 let incompleteRejected = false;
 try {
@@ -153,8 +159,11 @@ async function provePortableAuthoring() {
 	} = require(decoderPath);
 	const normalized = godotSceneCapture(decoded);
 	const reopenedCapture = parseApplicationCapture(JSON.stringify(normalized));
-	const chosen = reopenedCapture.observations.find((entry) => entry.type === "node-changed");
-	if (!chosen) throw new Error("Missing draft observation");
+	const chosen = reopenedCapture.observations.find(
+		(entry) =>
+			entry.type === "author-checkpoint" && entry.payload.label === "Texture and scale set",
+	);
+	if (!chosen) throw new Error("Missing authored checkpoint observation");
 	const lesson = appendApplicationDrafts(
 		newLesson("Disposable Godot scene proof"),
 		reopenedCapture,
@@ -164,7 +173,8 @@ async function provePortableAuthoring() {
 	if (
 		reopened.steps.length !== 1 ||
 		reopened.steps[0].evidence[0].application.adapterId !== "godot-scene" ||
-		reopened.steps[0].evidence[0].clock !== "unmapped"
+		reopened.steps[0].evidence[0].clock !== "unmapped" ||
+		reopened.steps[0].evidence[0].application.type !== "author-checkpoint"
 	)
 		throw new Error("Offline authoring lost evidence identity");
 	fs.writeFileSync(

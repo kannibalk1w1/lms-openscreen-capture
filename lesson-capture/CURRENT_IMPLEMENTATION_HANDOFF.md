@@ -1,3 +1,22 @@
+# Godot authored markers awaiting review — 10 November 2026
+
+Claude [accepted eefec646](CLAUDE_APPLICATION_CALIBRATION_REVIEW_EEFEC646_2026-11-10.md)
+with no findings and closed association L1/L2. The next bounded slice adds
+[authored Godot checkpoint markers](GODOT_CHECKPOINT_MARKERS_2026-11-10.md): active-take
+labels, synchronous allowlisted scene sampling, v2 raw journals with strict v1
+compatibility, offline review/selected draft persistence and stale-dialog guards.
+6,469 tests/472 files, both TypeScript configs, Vite, lint (35 baseline warnings),
+i18n15/docs37 and real Linux/WinBoat Godot4.7.1 editor/API probes pass. Both final
+probes include actual toolbar/dialog signals. No physical/native recording or
+project restoration/run-result claims. Marker slice awaits independent review.
+
+Codex weekly meter **61% at19:06 UTC**, target roughly75%; no session meter.
+A cheaper worker is preparing CLI/MCP selected-file capture parity only under
+`/tmp/application-capture-parity-prototype/`; it is not implemented in source yet.
+Next: integrate that parity slice after review, then bounded checkpoint comparison.
+Player remains parked, main fd2775e2 unchanged, no push. Evidence lives outsideGit
+in `../openscreen-evaluation/godot-checkpoint-markers-2026-11-10/`.
+
 # Calibration UI/persistence awaiting review — 10 November 2026
 
 Claude [accepted12474796](CLAUDE_APPLICATION_ASSOCIATION_REVIEW_12474796_2026-11-10.md)

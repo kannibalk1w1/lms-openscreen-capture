@@ -10,7 +10,10 @@ request. Deeper Godot integration is the current priority.
    settings. Nothing installs or enables it automatically.
 2. Open the scene to demonstrate. Choose **Capture scene actions**, read the scope
    confirmation and choose a **new** `.jsonl` file. Cancelling leaves capture off.
-3. Demonstrate scene edits. Stop with **Stop scene capture**. Switching/closing the
+3. Demonstrate scene edits. Optionally choose **Mark scene checkpoint** and enter
+   a short authored label such as “Texture and scale set”. This samples the current
+   allowlisted scene state and records the label; it does not save or run the project.
+   Stop with **Stop scene capture**. Switching/closing the
    scene or disabling the plugin ends the take. Each new take needs explicit start.
 4. In OpenScreen's **Lesson guide**, expand **Application capture observations** and choose
    **Import application capture or Godot journal**. Review the baseline and before/after evidence.
@@ -121,3 +124,15 @@ Validation: [6,437 tests, real Godot probe and exact scope](lesson-capture/GODOT
 
 The shared offline review and draft path now accepts a bounded application-neutral
 format; [adapter recipe and contract](lesson-capture/APPLICATION_CAPTURE_CONTRACT.md).
+
+## Authored checkpoint markers
+
+New takes use raw Godot scene journal v2; legacy v1 journals still import.
+Markers reference the latest bounded scene snapshot and carry an explicit authored
+label provenance. They normalize to `author-checkpoint` observations in the shared
+application capture v1 format and can be selected as editable lesson drafts.
+The label is an annotation, not proof of task completion. The original journal is
+needed to inspect its snapshot reference; the selected draft retains a small marker
+payload rather than copying a full scene or project.
+
+See [marker behavior and exact validation](lesson-capture/GODOT_CHECKPOINT_MARKERS_2026-11-10.md).

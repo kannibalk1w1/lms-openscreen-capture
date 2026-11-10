@@ -3,12 +3,13 @@ extends EditorPlugin
 
 class FooterFailure:
 	extends "res://addons/openscreen_typing/scene_capture.gd"
-	func _write(payload: Dictionary) -> void:
+	func _write(payload: Dictionary) -> bool:
 		if payload.event == "scene-stop":
 			_file = null
 			status_changed.emit("Simulated footer write failure")
+			return false
 		else:
-			super._write(payload)
+			return super._write(payload)
 
 # Enabled only by scripts/probe-godot-scene.cjs in a disposable project.
 func _enter_tree() -> void:
@@ -43,11 +44,32 @@ func _probe() -> void:
 	var capture = plugin.get("_scene_capture")
 	if not _require(not capture.active(), "default off"):
 		return
+	if not _require(plugin.get("_checkpoint_button").disabled, "marker UI disabled off"):
+		return
 	var root := editor.get_edited_scene_root()
 	root.set_meta("private", "PRIVATE_METADATA_CANARY")
 	editor.get_selection().clear()
 	await _wait()
 	if not _require(capture.begin("res://scene.jsonl", root, editor), "explicit start"):
+		return
+	var first_take: String = capture.active_session_id()
+	if not _require(not first_take.is_empty(), "active take token exposed"):
+		return
+	if not _require(not capture.mark_checkpoint(" ", first_take), "blank label refused"):
+		return
+	if not _require(not capture.mark_checkpoint("😀".repeat(101), first_take), "UTF-16 label bound"):
+		return
+	if not _require(not capture.mark_checkpoint("", first_take), "empty label refused"):
+		return
+	if not _require(not capture.mark_checkpoint("bad\u0001label", first_take), "control label refused"):
+		return
+	if not _require(not plugin.get("_checkpoint_button").disabled, "marker UI enabled active"):
+		return
+	plugin.get("_checkpoint_button").pressed.emit()
+	plugin.get("_checkpoint_label").text = "Scene opened"
+	plugin.get("_checkpoint_dialog").confirmed.emit()
+	plugin.get("_checkpoint_dialog").hide()
+	if not _require(plugin.get("_scene_status").text == "Authored checkpoint saved", "dialog marked initial checkpoint"):
 		return
 	# A short-lived selection must reach the signal path before the 250 ms fallback.
 	editor.get_selection().clear()
@@ -68,6 +90,10 @@ func _probe() -> void:
 	sprite.position = Vector2(12, 24)
 	sprite.texture = load("res://slime.svg")
 	sprite.set_script(load("res://enemy.gd"))
+	if not _require(capture.mark_checkpoint("Texture and scale set", first_take), "texture/scale milestone"):
+		return
+	if not _require(capture.mark_checkpoint("Script attached", first_take), "script milestone"):
+		return
 	editor.get_selection().clear()
 	editor.get_selection().add_node(sprite)
 	await _wait()
@@ -91,9 +117,24 @@ func _probe() -> void:
 	await _wait()
 	editor.save_scene()
 	await _wait()
+	if not _require(capture.mark_checkpoint("Scene saved", first_take), "save milestone"):
+		return
+	plugin.get("_checkpoint_button").pressed.emit()
+	plugin.get("_checkpoint_label").text = "Stale dialog must not write"
 	editor.open_scene_from_path("res://other.tscn")
 	await _wait()
 	if not _require(not capture.active(), "scene switch stopped capture"):
+		return
+	if not _require(plugin.get("_checkpoint_button").disabled and not plugin.get("_checkpoint_dialog").visible and plugin.get("_checkpoint_session").is_empty(), "stopped take closes and invalidates marker dialog"):
+		return
+	if not _require(not capture.mark_checkpoint("Stale dialog", first_take), "stale take token refused"):
+		return
+	if not _require(not capture.mark_checkpoint("off", first_take), "marker refused while off"):
+		return
+	var journal_text := FileAccess.get_file_as_string("res://scene.jsonl")
+	if not _require(journal_text.contains("Texture and scale set"), "marker label recorded"):
+		return
+	if not _require(not journal_text.contains("PRIVATE_METADATA_CANARY"), "no private metadata in marker journal"):
 		return
 	if not _require(not editor.get_selection().selection_changed.is_connected(capture._selection_changed), "selection observer disconnected"):
 		return
@@ -111,6 +152,12 @@ func _probe() -> void:
 	if not _require(FileAccess.get_file_as_string("res://scene.jsonl") == original, "no post-stop writes"):
 		return
 	if not _require(capture.begin("res://disable.jsonl", editor.get_edited_scene_root(), editor), "second explicit start"):
+		return
+	var new_take_before := FileAccess.get_file_as_string("res://disable.jsonl")
+	plugin.get("_checkpoint_dialog").confirmed.emit()
+	if not _require(FileAccess.get_file_as_string("res://disable.jsonl") == new_take_before, "stale dialog cannot mark new take"):
+		return
+	if not _require(not capture.mark_checkpoint("Stale take on new journal", first_take), "old token refused on new active take"):
 		return
 	editor.set_plugin_enabled("openscreen_typing", false)
 	await _wait()
@@ -137,6 +184,22 @@ func _probe() -> void:
 		oversized.position.x = i + 1
 		bounded._sample()
 	if not _require(not bounded.active(), "record budget stopped capture"):
+		return
+	# Exercise the actual reserved footer behavior without making thousands of slow scene edits.
+	var marker_limit = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(marker_limit.begin("res://marker-limit.jsonl", oversized, editor), "marker budget start"):
+		return
+	marker_limit._sample()
+	while marker_limit.get("_sequence") < 4094:
+		marker_limit._write({"event": "scene-saved", "scene": "res://enemy.tscn"})
+	if not _require(marker_limit.mark_checkpoint("Last available record", marker_limit.active_session_id()), "marker fits before reserved footer"):
+		return
+	if not _require(not marker_limit.mark_checkpoint("Must not claim", marker_limit.active_session_id()), "marker record limit refusal"):
+		return
+	var marker_limited_text := FileAccess.get_file_as_string("res://marker-limit.jsonl")
+	if not _require(marker_limited_text.contains("scene-stop"), "marker limit preserves footer"):
+		return
+	if not _require(not marker_limited_text.contains("Must not claim"), "failed marker not claimed"):
 		return
 	var failing := FooterFailure.new()
 	var statuses: Array[String] = []

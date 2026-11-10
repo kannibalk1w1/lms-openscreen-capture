@@ -7,6 +7,10 @@ const SceneCapture = preload("scene_capture.gd")
 var _scene_capture: SceneCapture
 var _scene_button: Button
 var _scene_status: Label
+var _checkpoint_button: Button
+var _checkpoint_dialog: AcceptDialog
+var _checkpoint_label: LineEdit
+var _checkpoint_session := ""
 var _scene_picker: FileDialog
 var _scene_confirm: ConfirmationDialog
 var _pending_scene: Node
@@ -137,10 +141,36 @@ func _enter_tree() -> void:
 			if not is_instance_valid(_pending_scene):
 				_scene_status.text = "Open a scene first"
 				return
-			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Uses editor signals plus 250 ms polling; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync.\n\nContinue to choose a new journal file." % _pending_scene.name
+			_scene_confirm.dialog_text = "Capture the current scene: %s\n\nRecords node names/types, hierarchy, selection, Node2D position/rotation/scale/visibility, and script/Sprite2D texture resource paths. No resource contents or other scenes. Uses editor signals plus 250 ms polling; rapid changes may be missed. Stops when you switch scenes. Independent clock, no video sync. You may also add authored checkpoint labels; labels are your annotations, not automatic milestones or proof of a saved/running project.\n\nContinue to choose a new journal file." % _pending_scene.name
 			_scene_confirm.popup_centered(Vector2i(640, 300))
 	)
 	_bar.add_child(_scene_button)
+	_checkpoint_button = Button.new()
+	_checkpoint_button.text = "Mark scene checkpoint"
+	_checkpoint_button.disabled = true
+	_checkpoint_button.tooltip_text = "Add an authored label to the active scene observation take"
+	_checkpoint_button.pressed.connect(func():
+		_checkpoint_session = _scene_capture.active_session_id()
+		if _checkpoint_session.is_empty():
+			return
+		_checkpoint_label.text = ""
+		_checkpoint_dialog.popup_centered(Vector2i(480, 150))
+		_checkpoint_label.grab_focus()
+	)
+	_bar.add_child(_checkpoint_button)
+	_checkpoint_dialog = AcceptDialog.new()
+	_checkpoint_dialog.title = "Mark authored scene checkpoint"
+	_checkpoint_dialog.confirmed.connect(func():
+		var marked := _scene_capture.mark_checkpoint(_checkpoint_label.text, _checkpoint_session)
+		_scene_status.text = "Authored checkpoint saved" if marked else "Checkpoint not saved · take changed or journal stopped"
+		_checkpoint_session = ""
+	)
+	_checkpoint_dialog.canceled.connect(func(): _checkpoint_session = "")
+	get_editor_interface().get_base_control().add_child(_checkpoint_dialog)
+	_checkpoint_label = LineEdit.new()
+	_checkpoint_label.placeholder_text = "Short checkpoint label"
+	_checkpoint_label.max_length = 200
+	_checkpoint_dialog.add_child(_checkpoint_label)
 	_scene_status = Label.new()
 	_scene_status.text = "Scene capture off"
 	_scene_status.clip_text = true
@@ -150,6 +180,10 @@ func _enter_tree() -> void:
 		_scene_status.text = message
 		_scene_status.tooltip_text = message
 		_scene_button.text = "Stop scene capture" if _scene_capture.active() else "Capture scene actions"
+		_checkpoint_button.disabled = not _scene_capture.active()
+		if not _scene_capture.active():
+			_checkpoint_session = ""
+			_checkpoint_dialog.hide()
 	)
 	_scene_confirm = ConfirmationDialog.new()
 	_scene_confirm.title = "Allow scene observations for this take"
@@ -182,6 +216,8 @@ func _exit_tree() -> void:
 		_scene_picker.queue_free()
 	if is_instance_valid(_scene_confirm):
 		_scene_confirm.queue_free()
+	if is_instance_valid(_checkpoint_dialog):
+		_checkpoint_dialog.queue_free()
 	if is_instance_valid(_clock_client):
 		_clock_client.disconnect_clock()
 		_clock_client.queue_free()
