@@ -79,9 +79,12 @@ Every review, follow-up and evidence report stays unchanged in `lesson-capture/`
   of `43b18c70` closes L1 (`cabaf30e`). It requests changes for two Medium player lifetime
   defects: MP1, a range could be answered after release; and MP2, a close did not end a pending
   open.
-- **Self-tested, not independently reviewed:** `71546046`, which fixes MP1 and MP2, and the
-  documentation commit after it. The player (`82f69ca0`) is not accepted until that reviewer
-  rechecks the fix.
+- **Player recheck:** the [lifetime-fix recheck](lesson-capture/OFFLINE_PLAYER_LIFETIME_FIX_REVIEW_2026-11-10.md)
+  of `5a304a4b` closes MP1 and DOC1. **MP2 remains open at Medium:** an open that waited for an
+  earlier released open could survive a later close or cancel.
+- **Self-tested, not independently reviewed:** `e2e31d32` (opens refused at once while an
+  earlier one unwinds; nothing waits) and the documentation commit after it. **MP2 is not
+  closed** until that reviewer rechecks it. The player (`82f69ca0`) is not accepted before then.
 
   Results and limits are in the [session handoff](lesson-capture/OPUS_SESSION_HANDOFF_2026-11-10.md).
 
@@ -151,7 +154,7 @@ no further permission.
 
 ### Next work, in order
 
-1. The reviewer rechecks the MP1/MP2 fix `71546046`, then the coordinator decides on a push.
+1. The reviewer rechecks the MP2 fix `e2e31d32`, then the coordinator decides on a push.
 2. The owner answers the remaining decisions below (D3 is decided).
 3. A manual learner pass of the player on real hardware: a real folder picker, keyboard only,
    and a screen reader (Orca). This is the evidence the automated probes cannot give.

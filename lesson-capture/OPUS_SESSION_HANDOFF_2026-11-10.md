@@ -536,3 +536,89 @@ token after close) are the bug-present control.
 - the log of the new tests against `43b18c70`;
 - the build log;
 - the fixture hashes.
+
+## Follow-up: MP2 continuation, opens no longer wait (10 November 2026, late)
+
+**Status:** self-tested, **not independently reviewed**. **MP2 is not closed** until the same
+reviewer rechecks it.
+
+**Coordinator task:** `task_10d95e626c8f`, dispatch `ctx_c9bd1dd8ba8c`.
+
+**Why:**
+- The [lifetime-fix recheck](OFFLINE_PLAYER_LIFETIME_FIX_REVIEW_2026-11-10.md) of `5a304a4b`
+  closes MP1 and DOC1. MP2 stays open at Medium.
+- My settlement wait let a new open sit waiting for an earlier released open. It captured its
+  epoch only after waiting, so a later Close or Cancel missed it, and it then opened a picker,
+  verified and installed a working view and token.
+- The report is committed unchanged (SHA256 `0e99f988…`). Its `/tmp` evidence was copied,
+  hash-verified, to `../openscreen-evaluation/player-lifetime-recheck-2026-11-10-retained/`; the
+  originals were left untouched.
+
+**Commits:** `e2e31d32` (the fix), then this documentation commit.
+
+### What changed
+
+I chose the simpler, honest contract the brief allowed: **nothing waits**.
+- While an earlier open is running, or is released or cancelled but still unwinding its picker
+  or verification, a new open is refused at once with `lesson-player-busy`.
+- No request can sit waiting where a later close or cancel would miss it.
+- No stale request can start a picker or verification, or install a view or capability.
+- The learner opens again once the earlier open has settled. That fresh open works as before.
+
+**Unchanged:** release (epoch, pending abort, capability), the separate new-folder revocation,
+the wrong-owner refusals, MP1, D3 scope, authoring checks, CSP, session isolation, budgets and
+formats.
+
+### Validation
+
+All runs used pinned Node 22.22.1 and npm 10.9.4.
+
+| Check | Result |
+| --- | --- |
+| Both `tsc`; lint (35 baseline warnings); `i18n:check`; `docs:check` | pass |
+| `lessonPlayer.test.ts` | 31 pass, including the reviewer's sequence at the picker and in verification: two overlapping requests refused within 200 ms, then a second close, cancel, navigation, crash or destroy. No further picker or verification follows. A fresh open works where the page is still the player, and is `unavailable` after navigation or destroy. Close and cancel abort the verifier's own signal at once |
+| Focused (player media/owner/UI, lifetime, package open, authority, lessonFile) | 188 pass / 7 files |
+| The new tests against the pre-fix `71546046` owner | **all 10 new sequence tests fail on assertions** ("still-waiting" instead of busy), then the fixed file was restored |
+| Vite build; required foreign-directory startup smoke | pass; `success: true` |
+| Full suite at `e2e31d32` | **6,383 / 464 files pass, 0 skipped** |
+
+**My mutants: 5, all killed by assertions, with no timeouts; sources restored byte for byte:**
+- no busy refusal;
+- busy only for opens not yet released;
+- cancel does nothing;
+- release does not abort the pending open (pinned by the new verifier-signal test);
+- release keeps the epoch and the capability (paired).
+
+### Full-app probe
+
+Production build, real preload, IPC, session, protocol and `<video>`. Deterministic gates only: a
+held native folder picker, and a held real WebCrypto digest inside the actual verification.
+
+| Probe | Result |
+| --- | --- |
+| Picker held → close → two opens → second **close** → picker resolves | earlier open `lesson-package-cancelled`; both later opens `lesson-player-busy` at once; only 1 picker ever opened; a fresh open then serves 206 |
+| The same with a second **cancel** | same |
+| Verification held (real digest) → close → two opens → second close / cancel → released | same in both variants; no new picker; fresh open 206 |
+| MP1: release during a held real descriptor close | 404, 0 bytes, 1 close; the unchanged control returns 206 and 10 bytes |
+| Baseline UI and `<video>` | 1.5 s 640×360, plays, seeks to 1.0, replays, 1.5×; editor authoring still served |
+
+The package copy and the original evidence are byte-identical afterwards. The reviewer's real
+reproductions at `5a304a4b` are the bug-present control.
+
+### Limits
+
+- **Not tested:** a physical picker, a screen reader, physical input, Windows or macOS, and
+  audio.
+- **Busy refusal after Close:** an open requested immediately after a Close or Cancel is refused
+  until the earlier open settles. The UI shows "A package is already being opened.", and opening
+  again once it has settled works.
+
+### Evidence
+
+`../openscreen-evaluation/opus-player-mp2-recheck-fix-2026-11-10/` holds:
+- the probe results;
+- the smoke;
+- the mutation script and results;
+- the log of the new tests against `71546046`;
+- the build log;
+- the fixture hashes.

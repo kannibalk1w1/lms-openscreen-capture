@@ -3,9 +3,10 @@
 **Status:** partly delivered, partly plan.
 - **Delivered:** slices 0 and 1 and a minimal slice 2, in `82f69ca0`. The
   [offline-player review](OFFLINE_PLAYER_INDEPENDENT_REVIEW_2026-11-10.md) found two Medium
-  lifetime defects, MP1 and MP2. Their fix (see the [session handoff](OPUS_SESSION_HANDOFF_2026-11-10.md))
-  is self-tested and awaits that reviewer's recheck. Nothing delivered here is independently
-  accepted yet.
+  lifetime defects, MP1 and MP2. The [recheck](OFFLINE_PLAYER_LIFETIME_FIX_REVIEW_2026-11-10.md)
+  closes MP1. MP2 stays open: its further fix `e2e31d32` (see the
+  [session handoff](OPUS_SESSION_HANDOFF_2026-11-10.md)) is self-tested and awaits that
+  reviewer's recheck. Nothing delivered here is independently accepted yet.
 - **Plan only:** slices 3 to 6 (progress, captions, accessibility acceptance, standalone player),
   and Loop and the keyboard shortcuts from slice 2. No code exists for them.
 
