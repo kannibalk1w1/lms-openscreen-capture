@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { applicationTimingBindingSchema } from "../applicationIntegrations/timingBinding";
 import { lessonMediaSelectionSchema } from "./mediaSelection";
 import { lessonOutputSchema } from "./output";
 
@@ -27,6 +28,7 @@ export const lessonEvidenceSchema = z
 				instanceId: z.string().min(1).max(200).optional(),
 				scope: z.string().min(1).max(1000),
 				type: z.string().min(1).max(100),
+				manualTiming: applicationTimingBindingSchema.optional(),
 				payload: z
 					.json()
 					.refine((value) => new TextEncoder().encode(JSON.stringify(value)).byteLength <= 32768),
@@ -36,6 +38,20 @@ export const lessonEvidenceSchema = z
 	})
 	.strict()
 	.superRefine((evidence, ctx) => {
+		const timing = evidence.application?.manualTiming;
+		if (
+			timing &&
+			(evidence.clock !== "unmapped" ||
+				evidence.atMs !== timing.applicationTimeMs ||
+				evidence.sessionId !== timing.source.sessionId ||
+				evidence.application?.adapterId !== timing.source.adapterId ||
+				evidence.application?.instanceId !== timing.source.instanceId ||
+				evidence.application?.scope !== timing.source.scope)
+		)
+			ctx.addIssue({
+				code: "custom",
+				message: "Timing annotation belongs to different application evidence",
+			});
 		if (
 			evidence.kind === "application-observation"
 				? !evidence.application ||

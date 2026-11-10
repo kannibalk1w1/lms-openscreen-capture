@@ -20,7 +20,9 @@ and prioritize deeper Godot integration. The first [bounded scene-observation
 slice](LESSON_CAPTURE_GODOT_SCENES.md) adds explicit capture, offline review and
 selected evidence-backed lesson drafts. A follow-up adds signal-assisted sampling,
 [shared application capture/review/drafting](lesson-capture/APPLICATION_CAPTURE_CONTRACT.md)
-and a real WinBoat Windows 11 editor/API probe. These changes are locally validated,
+and a real WinBoat Windows 11 editor/API probe. [Manual calibration and selected timing persistence](lesson-capture/APPLICATION_CALIBRATION_2026-11-10.md)
+now also have real Windows browser component coverage; native/physical recording
+acceptance and automatic clock synchronization remain open. These changes are locally validated,
 not independently reviewed or pushed. Next: explicit semantic/recording clock
 association with pause/gap handling. Earlier checkpoint/review entries below
 retain their historical scope.

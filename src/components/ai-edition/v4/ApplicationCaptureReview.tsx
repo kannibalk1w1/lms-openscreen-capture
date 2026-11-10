@@ -5,15 +5,28 @@ import {
 	MAX_APPLICATION_CAPTURE_BYTES,
 } from "@/lib/applicationIntegrations/capture";
 import { importApplicationCapture } from "@/lib/applicationIntegrations/importCapture";
+import {
+	ApplicationTimingSourceChangedError,
+	createApplicationTimingBindings,
+} from "@/lib/applicationIntegrations/timingBinding";
 import { appendApplicationDrafts } from "@/lib/lesson/applicationDraft";
 import type { LessonManifest } from "@/lib/lesson/schema";
+import {
+	ApplicationAssociationControls,
+	type ApplicationAssociationSelection,
+	type ApplicationAssociationSource,
+} from "./ApplicationAssociationControls";
+
+const NO_SOURCES: ApplicationAssociationSource[] = [];
 
 export function ApplicationCaptureReview({
 	lesson,
 	onAppend,
+	sources = NO_SOURCES,
 }: {
 	lesson: LessonManifest;
 	onAppend: (next: LessonManifest) => void;
+	sources?: ApplicationAssociationSource[];
 }) {
 	const t = useScopedT("timeline");
 	const [journal, setJournal] = useState<ApplicationCapture | null>(null);
@@ -21,6 +34,9 @@ export function ApplicationCaptureReview({
 	const [page, setPage] = useState(0);
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState("");
+	const [calibration, setCalibration] = useState<ApplicationAssociationSelection | null>(null);
+	const latest = useRef({ lesson, selected, journal, calibration, sources });
+	latest.current = { lesson, selected, journal, calibration, sources };
 	const epoch = useRef(0);
 	useEffect(
 		() => () => {
@@ -34,6 +50,7 @@ export function ApplicationCaptureReview({
 		setBusy(true);
 		setJournal(null);
 		setSelected([]);
+		setCalibration(null);
 		setMessage("");
 		try {
 			if (file.size > MAX_APPLICATION_CAPTURE_BYTES) throw new Error("limit");
@@ -43,6 +60,65 @@ export function ApplicationCaptureReview({
 			setPage(0);
 		} catch {
 			if (current === epoch.current) setMessage(t("lesson.scene.invalid"));
+		} finally {
+			if (current === epoch.current) setBusy(false);
+		}
+	}
+	async function append() {
+		if (!journal || busy) return;
+		const current = ++epoch.current;
+		const request = { lesson, selected, journal, calibration };
+		const source = sources.find((candidate) => candidate.id === calibration?.sourceId);
+		const sourceContext = source ? JSON.stringify([source.id, source.clock]) : "";
+		setBusy(true);
+		setMessage("");
+		try {
+			if (calibration && !source)
+				throw new ApplicationTimingSourceChangedError("Recording source removed");
+			const timings = calibration
+				? await createApplicationTimingBindings(
+						journal,
+						source?.clock,
+						calibration.plan,
+						calibration.sourceId,
+						selected,
+					)
+				: undefined;
+			if (current !== epoch.current) return;
+			const active = latest.current;
+			const activeSource = active.sources.find(
+				(candidate) => candidate.id === calibration?.sourceId,
+			);
+			if (
+				active.lesson !== request.lesson ||
+				active.journal !== request.journal ||
+				active.selected !== request.selected ||
+				active.calibration !== request.calibration ||
+				sourceContext !==
+					(activeSource ? JSON.stringify([activeSource.id, activeSource.clock]) : "")
+			) {
+				setMessage(t("lesson.association.stale"));
+				return;
+			}
+			onAppend(appendApplicationDrafts(lesson, journal, selected, timings));
+			setSelected([]);
+			setMessage(
+				calibration
+					? t("lesson.association.draftsAdded", {
+							mapped: timings?.size ?? 0,
+							total: selected.length,
+						})
+					: t("lesson.scene.appended"),
+			);
+		} catch (error) {
+			if (current === epoch.current)
+				setMessage(
+					t(
+						error instanceof ApplicationTimingSourceChangedError
+							? "lesson.association.stale"
+							: "lesson.scene.failed",
+					),
+				);
 		} finally {
 			if (current === epoch.current) setBusy(false);
 		}
@@ -78,6 +154,13 @@ export function ApplicationCaptureReview({
 						})}
 					</p>
 					<p>{t("lesson.scene.unverified", { interval: journal.pollIntervalMs })}</p>
+					<fieldset disabled={busy} style={{ border: 0, padding: 0 }}>
+						<ApplicationAssociationControls
+							capture={journal}
+							sources={sources}
+							onPlan={setCalibration}
+						/>
+					</fieldset>
 					{journal.coverage === "limited" && <p role="alert">{t("lesson.scene.limited")}</p>}
 					<details>
 						<summary>{t("lesson.scene.baseline")}</summary>
@@ -98,21 +181,13 @@ export function ApplicationCaptureReview({
 							remaining: 200 - lesson.steps.length,
 						})}
 					</p>
-					<button type="button" disabled={!selected.length} onClick={() => setSelected([])}>
+					<button type="button" disabled={busy || !selected.length} onClick={() => setSelected([])}>
 						{t("lesson.scene.clear")}
 					</button>
 					<button
 						type="button"
-						disabled={!selected.length || selected.length + lesson.steps.length > 200}
-						onClick={() => {
-							try {
-								onAppend(appendApplicationDrafts(lesson, journal, selected));
-								setSelected([]);
-								setMessage(t("lesson.scene.appended"));
-							} catch {
-								setMessage(t("lesson.scene.failed"));
-							}
-						}}
+						disabled={busy || !selected.length || selected.length + lesson.steps.length > 200}
+						onClick={() => void append()}
 					>
 						{t("lesson.scene.append")}
 					</button>
@@ -124,8 +199,9 @@ export function ApplicationCaptureReview({
 										type="checkbox"
 										checked={selected.includes(observation.id)}
 										disabled={
-											!selected.includes(observation.id) &&
-											selected.length >= Math.min(200 - lesson.steps.length, 200)
+											busy ||
+											(!selected.includes(observation.id) &&
+												selected.length >= Math.min(200 - lesson.steps.length, 200))
 										}
 										onChange={(event) =>
 											setSelected(
@@ -167,8 +243,10 @@ export function ApplicationCaptureReview({
 						type="button"
 						onClick={() => {
 							epoch.current++;
+							setBusy(false);
 							setJournal(null);
 							setSelected([]);
+							setCalibration(null);
 							setMessage("");
 						}}
 					>

@@ -3,12 +3,13 @@ import { webcrypto } from "node:crypto";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/contexts/I18nContext";
-import { createEmptyDocument } from "@/lib/ai-edition/schema";
+import { assetSchema, createEmptyDocument } from "@/lib/ai-edition/schema";
 import { useProjectStore } from "@/lib/ai-edition/store/projectStore";
 import { sceneSource } from "@/lib/applicationIntegrations/godotScene.test-support";
 import type { LessonApi } from "@/lib/lesson/api";
 import { newLesson, newStep } from "@/lib/lesson/authoring";
 import { imageFixture } from "@/lib/lesson/fixtures.test-support";
+import { recordingClockSchema } from "@/lib/recordingFlags";
 import { LessonGuideDialog } from "./LessonGuideDialog";
 
 beforeEach(() => {
@@ -29,6 +30,34 @@ function show() {
 		</I18nProvider>,
 	);
 }
+
+function applicationCaptureText() {
+	return JSON.stringify({
+		format: "openscreen-application-capture",
+		version: 1,
+		adapterId: "fixture-editor",
+		instanceId: "editor-instance",
+		sessionId: "capture-session",
+		scope: "fixture-document",
+		clock: "unmapped",
+		coverage: "sampled",
+		stopReason: "user-stop",
+		pollIntervalMs: 100,
+		durationMs: 5000,
+		baseline: { objects: [] },
+		observations: [
+			{
+				id: "mapped",
+				atMs: 1000,
+				type: "edit",
+				label: "Interior mapped event",
+				payload: { value: 1 },
+			},
+			{ id: "gap", atMs: 3000, type: "edit", label: "Gap event", payload: { value: 2 } },
+			{ id: "terminal", atMs: 5000, type: "edit", label: "Terminal event", payload: { value: 3 } },
+		],
+	});
+}
 it("authors and renumbers stable steps with every integration/API absent", () => {
 	vi.stubGlobal("electronAPI", undefined);
 	show();
@@ -46,6 +75,102 @@ it("authors and renumbers stable steps with every integration/API absent", () =>
 		(screen.getByRole("button", { name: "Export selected offline guide" }) as HTMLButtonElement)
 			.disabled,
 	).toBe(true);
+});
+
+it("imports, manually calibrates and saves timing annotations without changing raw evidence", async () => {
+	const clock = recordingClockSchema.parse({
+		sessionId: "a6b5f61e-00f4-42c1-8d4c-02abc4aa7326",
+		clock: "recording-control-active-ms",
+		segments: [{ id: "segment-a", startMs: 0, endMs: 10000 }],
+	});
+	const sourceAsset = assetSchema.parse({
+		id: "video-source",
+		kind: "video",
+		label: "Footage",
+		originalPath: "/tmp/offline-fixture.mp4",
+		cameraTrack: null,
+		recordingClock: clock,
+	});
+	const doc = createEmptyDocument({ projectId: "p", title: "Generic" });
+	useProjectStore.setState({
+		...useProjectStore.getState(),
+		document: { ...doc, assets: [sourceAsset] },
+	});
+	const lessonSave = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async () => ({
+		success: true,
+		result: { status: "saved", path: "/new/lesson.json" },
+	}));
+	vi.stubGlobal("electronAPI", { lessonSave });
+	show();
+	fireEvent.click(screen.getByText("Application capture observations"));
+	const file = new File(["fixture"], "capture.json");
+	Object.defineProperty(file, "text", { value: async () => applicationCaptureText() });
+	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
+		target: { files: [file] },
+	});
+	await screen.findByText(/fixture-editor · fixture-document · 3 observations/);
+	fireEvent.click(screen.getByText("Associate recording times"));
+	fireEvent.change(screen.getByLabelText("Recording source"), {
+		target: { value: "video-source" },
+	});
+	fireEvent.change(screen.getByLabelText("Uninterrupted recording interval"), {
+		target: { value: "segment-a" },
+	});
+	for (const [label, value] of [
+		["Capture start (seconds)", "0"],
+		["Capture end (seconds, exclusive)", "2"],
+		["Recording start (seconds)", "1"],
+		["Recording end (seconds, exclusive)", "3"],
+	] as const)
+		fireEvent.change(screen.getByLabelText(label), { target: { value } });
+	fireEvent.click(screen.getByRole("button", { name: "Add range" }));
+	await screen.findByText(/Current manual association: 1 ranges/);
+	fireEvent.click(screen.getByRole("checkbox", { name: /Interior mapped event/ }));
+	fireEvent.click(screen.getByRole("checkbox", { name: /Gap event/ }));
+	fireEvent.click(screen.getByRole("checkbox", { name: /Terminal event/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Add selected observations as draft steps" }));
+	await screen.findByText(/Added 3 drafts with 1 manual timings/);
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() => expect(lessonSave).toHaveBeenCalledTimes(1));
+	const saved = lessonSave.mock.calls[0][0];
+	const mappedEvidence = saved.steps[0].evidence[0];
+	const gapEvidence = saved.steps[1].evidence[0];
+	const terminalEvidence = saved.steps[2].evidence[0];
+	expect(mappedEvidence).toMatchObject({
+		kind: "application-observation",
+		eventId: "mapped",
+		clock: "unmapped",
+		atMs: 1000,
+		application: {
+			adapterId: "fixture-editor",
+			instanceId: "editor-instance",
+			scope: "fixture-document",
+			payload: { value: 1 },
+			manualTiming: {
+				method: "manual-two-point",
+				sourceAssetId: "video-source",
+				applicationTimeMs: 1000,
+				mediaTimeMs: 2000,
+				recordingClock: "recording-control-active-ms",
+			},
+		},
+	});
+	expect(Number.isInteger(mappedEvidence.application?.manualTiming?.mediaTimeMs)).toBe(true);
+	expect(gapEvidence).toMatchObject({ eventId: "gap", clock: "unmapped", atMs: 3000 });
+	expect(gapEvidence.application?.manualTiming).toBeUndefined();
+	expect(terminalEvidence).toMatchObject({ eventId: "terminal", clock: "unmapped", atMs: 5000 });
+	expect(terminalEvidence.application?.manualTiming).toBeUndefined();
+	expect(mappedEvidence.application?.manualTiming).not.toHaveProperty("path");
+	expect(mappedEvidence.application?.manualTiming).not.toHaveProperty("permission");
+	expect(saved.steps[0].mediaSelection).toBeUndefined();
+	fireEvent.click(screen.getByRole("button", { name: "Remove manual timing link" }));
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() => expect(lessonSave).toHaveBeenCalledTimes(2));
+	const withoutTiming = lessonSave.mock.calls[1][0].steps[0].evidence[0];
+	expect(withoutTiming.clock).toBe("unmapped");
+	expect(withoutTiming.atMs).toBe(1000);
+	expect(withoutTiming.application?.payload).toEqual({ value: 1 });
+	expect(withoutTiming.application?.manualTiming).toBeUndefined();
 });
 it("exports only included steps and keeps editable save separate", async () => {
 	const lessonSave = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async () => ({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -54,6 +54,15 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 	const document = useProjectStore((s) => s.document),
 		projectId = useProjectStore((s) => s.projectId);
 	const projectDirty = useProjectStore((s) => s.dirty);
+	const associationSources = useMemo(
+		() =>
+			document?.assets.flatMap((asset) =>
+				asset.kind === "video" && asset.id.length <= 200 && asset.recordingClock
+					? [{ id: asset.id, label: asset.label.slice(0, 300), clock: asset.recordingClock }]
+					: [],
+			) ?? [],
+		[document],
+	);
 	const [packageDraft, setPackageDraft] = useState(false);
 	const requestClose = () => {
 		if (!packageDraft || window.confirm(t("lesson.package.discardConfirm"))) onClose();
@@ -391,6 +400,7 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					/>
 
 					<ApplicationCaptureReview
+						sources={associationSources}
 						key={`${projectId}:${lesson.id}`}
 						lesson={lesson}
 						onAppend={(next) => {
@@ -830,6 +840,30 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 										<small>
 											{t("lesson.evidence", { kind: evidence.kind, clock: evidence.clock })}
 										</small>
+										{evidence.application?.manualTiming && (
+											<>
+												<p>
+													{t("lesson.association.savedTiming", {
+														time: (evidence.application.manualTiming.mediaTimeMs / 1000).toFixed(3),
+													})}
+												</p>
+												<button
+													type="button"
+													onClick={() => {
+														if (!evidence.application) return;
+														const application = { ...evidence.application };
+														delete application.manualTiming;
+														update(step.id, {
+															evidence: step.evidence.map((value, index) =>
+																index === n ? { ...value, application } : value,
+															),
+														});
+													}}
+												>
+													{t("lesson.association.removeTiming")}
+												</button>
+											</>
+										)}
 										{evidence.application && (
 											<details>
 												<summary>{t("lesson.scene.evidence")}</summary>

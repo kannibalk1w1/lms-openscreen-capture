@@ -2,6 +2,10 @@ import {
 	type ApplicationCapture,
 	validateApplicationCapture,
 } from "../applicationIntegrations/capture";
+import {
+	type ApplicationTimingBinding,
+	applicationTimingBindingSchema,
+} from "../applicationIntegrations/timingBinding";
 import { newStep } from "./authoring";
 import { type LessonManifest, lessonManifestSchema, MAX_LESSON_BYTES } from "./schema";
 
@@ -10,6 +14,7 @@ export function appendApplicationDrafts(
 	lesson: LessonManifest,
 	input: ApplicationCapture,
 	selected: string[],
+	timings: ReadonlyMap<string, ApplicationTimingBinding> = new Map(),
 ): LessonManifest {
 	const journal = validateApplicationCapture(input);
 	const ids = new Set(selected);
@@ -38,6 +43,9 @@ export function appendApplicationDrafts(
 					scope: journal.scope,
 					type: observation.type,
 					payload: observation.payload,
+					manualTiming: timings.has(observation.id)
+						? applicationTimingBindingSchema.parse(timings.get(observation.id))
+						: undefined,
 				},
 			},
 		],

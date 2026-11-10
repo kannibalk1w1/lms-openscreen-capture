@@ -244,3 +244,33 @@ it("does not mutate the caller capture, clock or spans", async () => {
 	(plan.spans[0] as { applicationStartMs: number }).applicationStartMs = 0;
 	expect({ source, clock, providedSpans }).toEqual(before);
 });
+it("identifies exact capture-end observations and floors fractional positions inside the same range", async () => {
+	const source = {
+		...capture(),
+		durationMs: 86400000,
+		observations: [
+			{ id: "last-interior", atMs: 86399999, type: "edit", label: "Interior", payload: null },
+			{ id: "terminal", atMs: 86400000, type: "edit", label: "Terminal", payload: null },
+		],
+	};
+	const clock = { ...recordingClock(), segments: [{ id: "long", startMs: 0, endMs: 86400000 }] };
+	const plan = await createApplicationAssociation(source, clock, [
+		{
+			...spans[0],
+			segmentId: "long",
+			applicationStartMs: 0,
+			applicationEndMs: 86400000,
+			recordingStartMs: 86399999,
+			recordingEndMs: 86400000,
+		},
+	]);
+	expect(await resolveApplicationObservation(source, clock, plan, "last-interior")).toMatchObject({
+		status: "mapped",
+		segmentId: "long",
+		mediaTimeMs: 86399999,
+	});
+	expect(await resolveApplicationObservation(source, clock, plan, "terminal")).toEqual({
+		status: "unmapped",
+		reason: "end-of-capture",
+	});
+});

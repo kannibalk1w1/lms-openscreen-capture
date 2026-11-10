@@ -4,7 +4,7 @@ import { type ApplicationCapture, validateApplicationCapture } from "./capture";
 
 const MAX_MS = 86400000;
 const identity = z.string().min(1).max(200);
-const spanSchema = z
+export const applicationAssociationSpanSchema = z
 	.object({
 		id: z.string().uuid(),
 		segmentId: identity,
@@ -21,8 +21,8 @@ const spanSchema = z
 		"Association spans must have positive ranges",
 	);
 
-export type ApplicationAssociationSpan = z.infer<typeof spanSchema>;
-const associationSchema = z
+export type ApplicationAssociationSpan = z.infer<typeof applicationAssociationSpanSchema>;
+export const applicationAssociationSchema = z
 	.object({
 		format: z.literal("openscreen-application-association"),
 		version: z.literal(1),
@@ -38,7 +38,7 @@ const associationSchema = z
 		recordingSessionId: z.string().uuid(),
 		recordingClock: z.literal("recording-control-active-ms"),
 		recordingFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-		spans: z.array(spanSchema).max(128),
+		spans: z.array(applicationAssociationSpanSchema).max(128),
 	})
 	.strict()
 	.superRefine((plan, ctx) => {
@@ -70,7 +70,7 @@ const associationSchema = z
 		}
 	});
 
-export type ApplicationAssociation = z.infer<typeof associationSchema>;
+export type ApplicationAssociation = z.infer<typeof applicationAssociationSchema>;
 export type ApplicationObservationResolution =
 	| {
 			status: "mapped";
@@ -108,7 +108,7 @@ function validateClock(input: unknown): RecordingClock {
 }
 
 function validateSpans(input: unknown, capture: ApplicationCapture, clock: RecordingClock) {
-	const spans = z.array(spanSchema).max(128).parse(input);
+	const spans = z.array(applicationAssociationSpanSchema).max(128).parse(input);
 	const ids = new Set<string>();
 	let applicationEnd = -1;
 	let recordingEnd = -1;
@@ -140,7 +140,7 @@ export async function createApplicationAssociation(
 	const capture = validateCapture(captureInput);
 	const recordingClock = validateClock(recordingClockInput);
 	const spans = validateSpans(spansInput, capture, recordingClock);
-	return associationSchema.parse({
+	return applicationAssociationSchema.parse({
 		format: "openscreen-application-association",
 		version: 1,
 		source: {
@@ -182,7 +182,7 @@ export async function resolveApplicationObservations(
 ): Promise<ApplicationObservationResolution[]> {
 	const capture = validateCapture(captureInput);
 	const recordingClock = validateClock(recordingClockInput);
-	const plan = associationSchema.parse(planInput);
+	const plan = applicationAssociationSchema.parse(planInput);
 	const observationIds = z.array(z.string().min(1).max(200)).max(10000).parse(observationIdsInput);
 	const source = plan.source;
 	let mismatch: string | undefined;
@@ -205,6 +205,8 @@ export async function resolveApplicationObservations(
 	return observationIds.map((observationId) => {
 		const observation = observations.get(observationId);
 		if (!observation) return { status: "unmapped", reason: "observation-missing" };
+		if (observation.atMs === capture.durationMs)
+			return { status: "unmapped", reason: "end-of-capture" };
 		const span = plan.spans.find(
 			(candidate) =>
 				observation.atMs >= candidate.applicationStartMs &&
@@ -219,7 +221,11 @@ export async function resolveApplicationObservations(
 			method: "manual-two-point",
 			recordingSessionId: recordingClock.sessionId,
 			segmentId: span.segmentId,
-			mediaTimeMs: span.recordingStartMs + ratio * (span.recordingEndMs - span.recordingStartMs),
+			// Persist whole milliseconds without rounding onto a pause/right boundary.
+			mediaTimeMs: Math.min(
+				span.recordingEndMs - 1,
+				Math.floor(span.recordingStartMs + ratio * (span.recordingEndMs - span.recordingStartMs)),
+			),
 		};
 	});
 }

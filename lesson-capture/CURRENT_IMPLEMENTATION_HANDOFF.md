@@ -1,3 +1,15 @@
+# Calibration UI/persistence awaiting review — 10 November 2026
+
+Claude [accepted12474796](CLAUDE_APPLICATION_ASSOCIATION_REVIEW_12474796_2026-11-10.md)
+with L1/L2. Root and cheaper workers built optional calibration controls, selected
+manual timing annotations, removal/offline persistence, stale-result guards and
+explicit endpoint/integer rules. [Report and exact scope](APPLICATION_CALIBRATION_2026-11-10.md):
+6,465 tests, bothTS/build/lint/i18n/docs/startup, plus12real Windows Edge frontend
+checks pass. Only final save IPC is stubbed; no packaged Electron/native capture
+acceptance. Independent review pending. Codex weekly57%/target~75%; player parked,
+main unchanged, no private push. Next: scoped authored Godot checkpoint markers,
+then offline comparison; not full project restoration or execution attestation.
+
 # Manual association primitive; Godot review accepted — 10 November 2026
 
 Claude [accepts e65dc4ac](CLAUDE_GODOT_CAPTURE_RECHECK_E65DC4AC_2026-11-10.md),
