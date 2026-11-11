@@ -123,3 +123,14 @@ Addressed in the follow-up commit:
 
 Both new guards are mutation-checked. The real Linux probe and the full suite (6,723 tests
 in 490 files) pass again.
+
+The [recheck of `ac715a7c`](CLAUDE_GODOT_MESH_REFERENCES_RECHECK_AC715A7C_2026-11-11.md) **accepts**
+it with no new findings.
+
+Accepted state:
+
+- source `c3e12647` + `ac715a7c`;
+- real Linux/WinBoat probes at `c3e12647`, and a Linux probe rerun at `ac715a7c`, whose
+  producer change is consent/comment text only;
+- production CLI/MCP 13/13 and the startup smoke at `c3e12647`;
+- full suite 6,723 tests in 490 files at `ac715a7c`.
