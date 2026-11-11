@@ -418,7 +418,9 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 					<LessonWorkflowControls
 						key={`${projectId}:${lesson.id}`}
 						lesson={lesson}
-						onChange={(next) => author(() => next)}
+						onChange={(next) => {
+							if (author(() => next)) generation.current++;
+						}}
 					/>
 					<LessonOutputControls
 						output={output}

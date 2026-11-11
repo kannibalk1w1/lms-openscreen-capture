@@ -9,6 +9,7 @@ import { sceneSource } from "@/lib/applicationIntegrations/godotScene.test-suppo
 import type { LessonApi } from "@/lib/lesson/api";
 import { newLesson, newStep } from "@/lib/lesson/authoring";
 import { imageFixture } from "@/lib/lesson/fixtures.test-support";
+import * as lessonWorkflow from "@/lib/lesson/workflow";
 import { recordingClockSchema } from "@/lib/recordingFlags";
 import { LessonGuideDialog } from "./LessonGuideDialog";
 
@@ -420,6 +421,84 @@ it.each([
 		screen.getAllByLabelText("Step title").map((input) => (input as HTMLInputElement).value),
 	).toEqual(["Restored one", "Restored two"]);
 	expect(document.querySelector("img")).toBeNull();
+});
+it("does not attach an old in-flight illustration after a replacement take commits", async () => {
+	const original = { ...newLesson(), steps: [newStep("Old take")] };
+	const candidate = { ...newLesson(), steps: [newStep("Replacement take")] };
+	const next = await lessonWorkflow.replaceLessonStep(
+		original,
+		original.steps[0].id,
+		candidate,
+		candidate.steps[0].id,
+		"Retake",
+	);
+	let finishReplacement: () => void = () => undefined,
+		finishFrame: () => void = () => undefined;
+	const replacement = vi.spyOn(lessonWorkflow, "replaceLessonStep").mockImplementation(
+		() =>
+			new Promise((resolve) => {
+				finishReplacement = () => resolve(next);
+			}),
+	);
+	const image = await imageFixture();
+	const frame = vi.fn<NonNullable<LessonApi["lessonFrame"]>>(
+		() =>
+			new Promise((resolve) => {
+				finishFrame = () => resolve({ success: true, result: image });
+			}),
+	);
+	const save = vi.fn<NonNullable<LessonApi["lessonSave"]>>(async () => ({
+		success: true,
+		result: { status: "saved", path: "/new/lesson.json" },
+	}));
+	vi.spyOn(window, "confirm").mockReturnValue(true);
+	vi.stubGlobal("electronAPI", {
+		lessonFrame: frame,
+		lessonSave: save,
+		lessonOpen: async () => ({ success: true, result: { status: "opened", lesson: original } }),
+	});
+	show();
+	fireEvent.click(screen.getByRole("button", { name: "Open editable lesson" }));
+	await waitFor(() =>
+		expect((screen.getByLabelText("Step title") as HTMLInputElement).value).toBe("Old take"),
+	);
+	fireEvent.change(screen.getByLabelText("Target step / next handoff step"), {
+		target: { value: original.steps[0].id },
+	});
+	const bytes = new TextEncoder().encode(JSON.stringify(candidate));
+	fireEvent.change(screen.getByLabelText("Replacement editable lesson file"), {
+		target: { files: [{ size: bytes.length, arrayBuffer: async () => bytes.buffer }] },
+	});
+	await screen.findByLabelText("Replacement step");
+	fireEvent.change(screen.getByLabelText("Replacement step"), {
+		target: { value: candidate.steps[0].id },
+	});
+	fireEvent.change(screen.getByLabelText("Reason for replacement or restore"), {
+		target: { value: "Retake" },
+	});
+	fireEvent.click(screen.getByText("Apply replacement take"));
+	await waitFor(() => expect(replacement).toHaveBeenCalledOnce());
+	fireEvent.click(
+		screen.getByRole("button", { name: /^Illustrate from current saved playhead: / }),
+	);
+	await waitFor(() => expect(frame).toHaveBeenCalledOnce());
+	await act(async () => finishReplacement());
+	await waitFor(() =>
+		expect((screen.getByLabelText("Step title") as HTMLInputElement).value).toBe(
+			"Replacement take",
+		),
+	);
+	await act(async () => finishFrame());
+	await waitFor(() =>
+		expect(
+			(screen.getByRole("button", { name: "Save new editable copy" }) as HTMLButtonElement)
+				.disabled,
+		).toBe(false),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Save new editable copy" }));
+	await waitFor(() => expect(save).toHaveBeenCalledOnce());
+	expect(save.mock.calls[0][0].steps[0].imageId).toBeUndefined();
+	expect(save.mock.calls[0][0].assets).toHaveLength(0);
 });
 it("preserves text edits delivered while an illustration is pending", async () => {
 	const image = await imageFixture();
