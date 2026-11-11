@@ -35,9 +35,13 @@ paths, built-in markers and no names or contents.
     explicit override) or a v6 identity reference `{type, path}`, using the same built-in
     marker and no `::` ids.
   - `truncated` is true when `count > 32`.
-- **`"unavailable"`**: Godot's override count disagreed with the mesh's surface count, or the
-  per-snapshot cap of 1,024 surface entries was exceeded. Exceeding the cap stops the take
-  with a valid `limited` footer, and a starting scene over the cap is refused.
+- **`"unavailable"`**: Godot's override count disagreed with the mesh's surface count. This is
+  reachable in real use: the reviewer reproduced it with `ArrayMesh.clear_surfaces()`, which
+  drops the surface count to 0 while the override count stays.
+
+  The per-snapshot cap of 1,024 surface entries works differently: a snapshot over the cap is
+  never written. The take stops with a valid `limited` footer, and a starting scene over the
+  cap is refused.
 
 Index meaning: entry *i* is surface *i* of **this node's current mesh**. Indices are never
 matched across different meshes or topologies. The Inspector signal for
@@ -46,15 +50,19 @@ matched across different meshes or topologies. The Inspector signal for
 ## Comparison and drafts
 
 - **Within-take comparison and drafts:** `surfaceOverrides` is a changed field name, with
-  before/after payloads.
+  before/after payloads. A change to or from `unavailable` is labelled `surfaceOverrides
+  unavailable`, a loss or return of information rather than an override change.
 - **Cross-take reference comparison:**
   - surface overrides compare as exact text, by index;
   - a different mesh on the same path also differs in `mesh`, and no surface matching is
     attempted;
   - a pre-v7 journal against a v7 one lists `surfaceOverrides` as unobserved, with the unknown
     `surface-overrides-unobserved`; it is never read as "no overrides";
-  - a truncated or `unavailable` list on either side adds `surface-overrides-partial`, so
-    agreement is only partial.
+  - missing surface information is **never** an observed difference. If either side is
+    `unavailable`, or both lists have the same count and identical observed entries but one
+    is truncated, the field is unobserved: the node appears in `partiallyCompared` and the
+    unknown is `surface-overrides-partial`. A different count or a different observed entry
+    is a real difference.
 - **Retake GUI:** policy and reason texts are updated in all 15 locales (English fallback).
 
 Identity, not equality: equal references mean the same assignment by class and path or
@@ -93,4 +101,25 @@ game-runtime acceptance is claimed.
 
 ## Review
 
-Awaiting an independent review of the immutable source commit.
+[Independent review of `86c9930d`](CLAUDE_GODOT_SURFACE_OVERRIDES_REVIEW_86C9930D_2026-11-11.md):
+**accepted with Lows**, plus one **Medium**. The reviewer's real Godot checks confirmed:
+
+- the override count follows surfaces added to the same ArrayMesh, and the poll captures them;
+- `clear_surfaces()` gives `unavailable`;
+- materials set on the mesh, and surface materials of an imported glTF, are never reported;
+- an explicit override on glTF surface 2 is recorded by index;
+- the per-snapshot counter reset, oversized-start refusal and limited mid-take footer work.
+
+Fixed in `320b4912`:
+
+- **Medium:** `unavailable` against a recorded list was reported as `sampled-fields-differ`.
+  Unavailable lists, and truncated lists with identical observed entries, are now unobserved
+  and partial; counts and observed entries still differ.
+- **Low:** such nodes now appear in `partiallyCompared`.
+- **Low:** within-take changes to or from `unavailable` get their own label.
+- **Low:** a strict-object test.
+- **Nits:** the decoder comment now says that a capped snapshot is never written, and the
+  consent bracket wording is fixed.
+
+All new guards are mutation-checked. The real Linux probe reruns cleanly (all 8 sections) and
+the full suite passes with 6,742 tests in 491 files.
