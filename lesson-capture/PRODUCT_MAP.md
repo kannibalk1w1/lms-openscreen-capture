@@ -59,7 +59,7 @@ when dependencies and privacy requirements are satisfied; phases are not release
 | Recording preflight | Partial | Platform/helper checks and live journal health | M, phase 0 |
 | Export manifest integrity | Partial | Validated static lesson assets/projection and hash receipts; range backend adds bounded Linux stored-sample timing/full video decode receipts; full editor/media/course packaging remains incomplete | L, phase 1 prerequisite |
 | Rolling buffer/save recent | Planned | Full recording, clips and source ranges | L/XL, preserved phase 0 reliability work |
-| Retakes/checkpoints/handoff | Partial | Existing editor checkpoints/CLI/MCP; no complete lesson retake workflow | L, phases 1–2/acceptance |
+| Retakes/checkpoints/handoff | Partial | Checkpoint comparisons, persisted step replacement/restore/history, manual run checks and local handoff through GUI/CLI/MCP; physical end-to-end acceptance open | L, phases 1–2/acceptance |
 
 ## Dependency plan and next work
 
@@ -345,6 +345,13 @@ coverage is distinct from physical editor acceptance. [Current scope](../LESSON_
   API research precedes claims of full coverage; no external service needed.
 
 ### P2.2 Checkpoint comparison, retakes and bidirectional handoff — Partial; preserved; L
+
+**11 November update:** [step replacement/history/restoration, author-reported run checks
+and file-carried tutor/agent/human handoff](GODOT_RETAKES_HANDOFF_2026-11-11.md) now persist
+through GUI and CLI/MCP. A real short Godot build was recorded with OpenScreen, with a
+raw journal and generated lesson. Physical WinBoat/learner-route acceptance still needs
+an accessible desktop; project archive/restore remains deferred. Manual checks do not
+supply automatic error capture or arbitrary expected-state grading.
 
 **10 November update:** [read-only within-take authored checkpoint comparison](GODOT_CHECKPOINT_COMPARISON_2026-11-10.md)
 now exists. It compares sampled states from one original journal; application

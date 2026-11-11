@@ -1,3 +1,31 @@
+# Godot sprint authoring completion and recorded demo — 11 November 2026
+
+Owner reassigned remaining work to Codex to minimize cost while Claude is limited.
+Claude's scheduled continuation is disabled; earlier automatic-resume instructions below
+are historical. Sprite import validation is fixed at `6da28267`. [Retake persistence,
+restoration, explicit manual run checks and file-carried tutor/agent/human handoffs](GODOT_RETAKES_HANDOFF_2026-11-11.md)
+are implemented at `8dba84d5`, through the lesson GUI and CLI/MCP. Unrelated reviewed steps
+and prior takes survive; learner guides omit private workflow history.
+
+[Independent Codex review and real recording evidence](CODEX_GODOT_WORKFLOW_REVIEW_2026-11-11.md)
+records a reproduced illustration race and its accepted generation-guard correction,
+plus the X11 source-restoration fix exposed by the real demo. Full suite 6,772/495
+before the final race correction; final correction has 30 GUI tests, both TS and build.
+Production workflow probe 12/12 and CLI/MCP startup pass; lint remains 35 baseline warnings.
+
+**Watch:** `../Godot sprint demo 2026-11-11/index.html` (outside this Git checkout).
+Real approximately 45-second OpenScreen GUI recording of an automated Godot build,
+raw action journal, eight-step editable draft/guide and finished example project.
+Read its README for API/CDP methodology and observed Godot warning limits.
+
+**Still blocked:** physical-style WinBoat acceptance (A1), needing the owner's logged-in
+visible VM desktop. Orca still reports no accessible apps. Archive/restore (B1), live KDE
+(A2), automatic Godot error/output collection and clock synchronization stay deferred.
+Run checks are explicit author reports, not automatic project attestation or grading.
+Learner player remains parked. No pushes; main remains `fd2775e2`.
+
+## Earlier checkpoints (historical status)
+
 # Sprite references independently reviewed — 11 November 2026
 
 Owner-requested [Codex review of d3a53e8b](CODEX_SPRITE_RESOURCE_REVIEW_D3A53E8B_2026-11-11.md)

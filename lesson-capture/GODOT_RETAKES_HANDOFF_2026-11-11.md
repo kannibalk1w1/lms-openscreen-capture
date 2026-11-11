@@ -98,3 +98,14 @@ reported no apps available at the start of this task. B1 project archive/restore
 KDE acceptance, automatic video-clock synchronization and the learner player stay
 deferred. Automatic Godot error/output collection and arbitrary expected-state grading
 are not implemented by these manual checks.
+
+
+## Final review and actual demo follow-up
+
+The later full regression run passes **6,772 tests / 495 files**. A separate read-only
+Codex review found the concurrent-illustration race, reproduced it and accepted the
+existing-generation guard correction; the final correction passes 30 GUI tests.
+See [review and actual recorded demo](CODEX_GODOT_WORKFLOW_REVIEW_2026-11-11.md) for exact
+coverage, X11 restoration follow-up, recording methodology and remaining access limits.
+The finished demo's editable lesson records a targeted visual-motion check with the
+observed Godot editor warning explicitly retained, followed by an agent-to-human handoff.

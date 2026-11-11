@@ -71,3 +71,12 @@ claimed. The Linux probe programmatically edits disposable Godot fixtures.
 Prioritize the decoder Low, then visible WinBoat acceptance and the retake/handoff
 workflow over accumulating additional resource classes. The learner player remains
 parked. Nothing was pushed by this review.
+
+
+## Follow-up
+
+L-SPRITE-1 is corrected in `6da28267`: native animated-sprite dimensions and complete 2D
+transform tuples are validated, with negative regressions for both swaps and an incomplete
+tuple. Subsequent full regression suites and production consumers pass. This follow-up
+was implemented by Codex under the owner's direct instruction; it does not change the
+original review evidence or imply a separate Claude review.

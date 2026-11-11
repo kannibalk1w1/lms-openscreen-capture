@@ -34,8 +34,7 @@ has [Claude acceptance](lesson-capture/CLAUDE_GODOT_CHECKPOINT_COMPARISON_REVIEW
 are [accepted by Claude](lesson-capture/CLAUDE_GODOT_CHECKPOINT_FILE_TOOLS_REVIEW_22EB61E4_2026-11-10.md).
 [Bounded Node3D transforms](lesson-capture/GODOT_NODE3D_CAPTURE_2026-11-10.md) now have
 real Linux/WinBoat editor/API coverage and generic draft/CLI/MCP reuse, with
-[Claude acceptance](lesson-capture/CLAUDE_GODOT_NODE3D_REVIEW_5A77AC5D_2026-11-10.md). Application-project checkpoints/restoration,
-retakes, broader editor/runtime diagnostics and physical acceptance remain open. Earlier checkpoint/review entries below
+[Claude acceptance](lesson-capture/CLAUDE_GODOT_NODE3D_REVIEW_5A77AC5D_2026-11-10.md). Application-project checkpoints/restoration, broader editor/runtime diagnostics and physical acceptance remain open; the 11 November follow-up below adds persisted retakes and handoff. Earlier checkpoint/review entries below
 retain their historical scope.
 
 Start with the [expanded product map and prioritised backlog](lesson-capture/PRODUCT_MAP.md).
@@ -53,7 +52,17 @@ and [10 November, before this status rewrite](LESSON_CAPTURE_ROADMAP_HISTORY_202
 near the owner's roughly 75% cap. All Godot slices through `5a77ac5d` are reviewed;
 no new push. [Resume checkpoint](lesson-capture/GODOT_CAPTURE_RESUME_2026-11-10.md).
 Claude then took over building: [Godot history and run-state observations](lesson-capture/GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md)
-(raw v4) are independently accepted; [saved signal connections](lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md) (raw v5) are independently accepted after one requested-changes round. An advisory cross-take [reference comparison](lesson-capture/GODOT_REFERENCE_COMPARISON_2026-11-10.md) (library + CLI/MCP) is accepted, and an opt-in [project manifest/drift check](lesson-capture/PROJECT_MANIFEST_DRIFT_2026-11-11.md) is independently accepted. [MeshInstance3D mesh/material identity references](lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md) (raw v6) are independently accepted; [per-surface material override references](lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md) (raw v7) are independently accepted; [Sprite3D texture and AnimatedSprite SpriteFrames references](lesson-capture/GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md) (raw v8) are implemented, review pending. An advisory [retake comparison GUI](lesson-capture/GODOT_RETAKE_COMPARISON_GUI_2026-11-11.md) is accepted with a real production Electron probe, and the manifest's fail-closed output boundary is accepted (with documented check-to-write residual). WinBoat GUI acceptance (A1) is prepared and waits for the owner's desktop session; archive/restore (B1) and live-KDE testing (A2) stay deferred. [Current handoff](lesson-capture/CURRENT_IMPLEMENTATION_HANDOFF.md).
+(raw v4) are independently accepted; [saved signal connections](lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md) (raw v5) are independently accepted after one requested-changes round. An advisory cross-take [reference comparison](lesson-capture/GODOT_REFERENCE_COMPARISON_2026-11-10.md) (library + CLI/MCP) is accepted, and an opt-in [project manifest/drift check](lesson-capture/PROJECT_MANIFEST_DRIFT_2026-11-11.md) is independently accepted. [MeshInstance3D mesh/material identity references](lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md) (raw v6) are independently accepted; [per-surface material override references](lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md) (raw v7) are independently accepted; [Sprite3D texture and AnimatedSprite SpriteFrames references](lesson-capture/GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md) (raw v8) are accepted with a Codex review Low, fixed at `6da28267`. An advisory [retake comparison GUI](lesson-capture/GODOT_RETAKE_COMPARISON_GUI_2026-11-11.md) is accepted with a real production Electron probe, and the manifest's fail-closed output boundary is accepted (with documented check-to-write residual). WinBoat GUI acceptance (A1) is prepared and waits for the owner's desktop session; archive/restore (B1) and live-KDE testing (A2) stay deferred. [Current handoff](lesson-capture/CURRENT_IMPLEMENTATION_HANDOFF.md).
+
+**11 November authoring follow-up:** [retake replacement/history/restoration, manual run
+checks and local tutor/agent/human handoff](lesson-capture/GODOT_RETAKES_HANDOFF_2026-11-11.md)
+now persist in editable lessons through GUI and CLI/MCP. A [separate Codex review](lesson-capture/CODEX_GODOT_WORKFLOW_REVIEW_2026-11-11.md)
+found an illustration race; its regression and correction pass recheck. A real OpenScreen
+GUI recording of a short automated Godot build is available outside the checkout at
+`../Godot sprint demo 2026-11-11/index.html`, with eight draft steps and raw evidence.
+WinBoat physical acceptance still needs desktop access. Automatic error/output collection,
+full expected-state grading and automatic video synchronization remain open; manual run
+checks do not supply those. Project archive/restore and live-KDE work remain deferred.
 
 ## Unified workflow
 
@@ -71,7 +80,7 @@ packs. Outputs share stable steps and source references; source evidence stays i
 | --- | --- | --- |
 | 0 Capture correctness and privacy | Input clocks/gaps, native reliability, allowlists/suppression/retention/privacy review, preflight, rolling buffer | Partial; privacy is critical before broader input/semantic collection |
 | 1 Structured lesson generation | Versioned steps, screenshot/guide drafts, editable ordering/numbering, manifests, portable course presets | [First editable manifest/HTML/Markdown guide slice](LESSON_CAPTURE_GUIDES.md); profiles/deeper generation remain open |
-| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; bounded scene observations, authored markers, manual timing, selected drafts and within-take comparison now exist; project restoration, retakes and broader semantics remain open |
+| 2 Application intelligence | Explicit Godot clocks, opt-in semantic editor events, checkpoint comparison, retake/handoff | Typing decoder, human onset calibration and explicit read-only native clock samples exist; bounded scene observations, authored markers, manual timing, selected drafts and within-take comparison now exist; project restoration, physical retake/handoff acceptance and broader diagnostics remain open; persisted step retakes and local handoff exist |
 | 3 Learner-facing delivery | Standalone offline HTML player, differentiated accessible profiles, troubleshooting | Planned; caption/font/theme controls are reusable partial foundations |
 | 4 Authoring efficiency | Script/checklist companion, QC/idle suggestions, object-linked arrows, local asset library | Partial existing notes/flags/diagnostics/styles; integrated workflows planned |
 | 5 Review and evidence | Local comments/approval/revisions and optional tutor-curated evidence packs | Planned; never infer achievement from activity alone |
