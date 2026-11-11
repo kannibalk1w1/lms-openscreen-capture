@@ -312,3 +312,137 @@ describe("checkProjectDriftFile", () => {
 		expect((await drift()).rootNameMatches).toBe(false);
 	});
 });
+
+describe("review c233dcc6 follow-up", () => {
+	it("refuses outputs inside the root whose names merely start with '..' (M-1)", async () => {
+		await fs.mkdir(path.join(project, "..sub"));
+		for (const output of [path.join(project, "..m.json"), path.join(project, "..sub", "m.json")])
+			expect(await code(createProjectManifestFile({ rootPath: project, outputPath: output }))).toBe(
+				"manifest-output-invalid",
+			);
+		expect(await fs.readdir(project)).not.toContain("..m.json");
+		expect(await fs.readdir(path.join(project, "..sub"))).toEqual([]);
+		// A sibling whose name starts with the root's name is still outside.
+		const sibling = `${project}..json`;
+		expect(await code(createProjectManifestFile({ rootPath: project, outputPath: sibling }))).toBe(
+			"ok",
+		);
+	});
+
+	it("stops at the entry limit with limited coverage instead of failing (L-1)", async () => {
+		const many = path.join(project, "links");
+		await fs.mkdir(many);
+		for (let i = 0; i < 20; i++)
+			await fs.symlink(path.join(tmp, `missing-${i}`), path.join(many, `l${i}`));
+		await create("entries.json", { maxFiles: 2 });
+		expect(await read("entries.json")).toMatchObject({
+			coverage: "limited",
+			limitReason: "entry-limit",
+		});
+	});
+
+	it("lists a file larger than the remaining byte budget and keeps scanning (L-2)", async () => {
+		await fs.writeFile(path.join(project, "aaa.bin"), Buffer.alloc(100));
+		await create("budget.json", { maxBytes: 80 });
+		const manifest = await read("budget.json");
+		expect(manifest).toMatchObject({ coverage: "limited", limitReason: "byte-limit" });
+		expect(manifest.unobserved).toContainEqual({ path: "aaa.bin", reason: "byte-limit" });
+		expect(manifest.files.length).toBeGreaterThan(0);
+	});
+
+	it("honours cancellation while hashing one large file (L-4)", async () => {
+		await fs.writeFile(path.join(project, "big.bin"), Buffer.alloc(5 * 1024 * 1024));
+		let calls = 0;
+		const stop = new Error("cancelled-during-hash");
+		await expect(
+			createProjectManifestFile({ rootPath: project, outputPath: path.join(out, "c.json") }, () => {
+				// Root checks plus entries before big.bin, then the first hashing chunks.
+				if (++calls > 6) throw stop;
+			}),
+		).rejects.toBe(stop);
+		expect(await fs.readdir(out)).toEqual([]);
+	});
+
+	it("reports the unobserved ancestor's reason for paths beneath it (L-5)", async () => {
+		await create();
+		const scenes = path.join(project, "scenes");
+		await fs.rename(scenes, path.join(tmp, "scenes-elsewhere"));
+		await fs.symlink(path.join(tmp, "scenes-elsewhere"), scenes);
+		const result = await drift();
+		expect(result.nowUnobserved.rows).toEqual([
+			{ path: "scenes/enemy.tscn", reason: "symbolic-link" },
+			{ path: "scenes/levels/one.tscn", reason: "symbolic-link" },
+		]);
+	});
+
+	it("rejects tampered manifests: unobserved order/duplicates, file order, exclusions, limits (N-1)", async () => {
+		await fs.symlink(path.join(tmp, "x"), path.join(project, "zlink"));
+		await create();
+		const manifestPath = path.join(out, "m.json");
+		const original = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+		const variants = [
+			{ ...original, unobserved: [...original.unobserved].reverse() },
+			{
+				...original,
+				unobserved: [...original.unobserved, original.unobserved[0]],
+				counts: { ...original.counts, unobserved: original.unobserved.length + 1 },
+			},
+			{ ...original, files: [...original.files].reverse() },
+			{ ...original, exclusions: [".git"] },
+			{ ...original, limits: { ...original.limits, maxBytes: 1 } },
+			{ ...original, limits: { ...original.limits, maxFiles: 3 } },
+		];
+		for (const [index, variant] of variants.entries()) {
+			const text = JSON.stringify(variant);
+			const file = path.join(out, `t${index}.json`);
+			await fs.writeFile(file, text);
+			expect(
+				await code(
+					checkProjectDriftFile({
+						rootPath: project,
+						manifestPath: file,
+						manifestSha256: createHash("sha256").update(text).digest("hex"),
+					}),
+				),
+			).toBe("manifest-invalid");
+		}
+	});
+
+	it("reports a write failure separately from an existing output (N-3)", async () => {
+		const locked = path.join(tmp, "locked");
+		await fs.mkdir(locked, { mode: 0o500 });
+		expect(
+			await code(
+				createProjectManifestFile({ rootPath: project, outputPath: path.join(locked, "m.json") }),
+			),
+		).toBe("manifest-write-failed");
+		await fs.chmod(locked, 0o700);
+	});
+
+	it("treats a ctime-only change during hashing as unstable", async () => {
+		const original = fsPromises.lstat.bind(fsPromises);
+		let calls = 0;
+		vi.spyOn(fsPromises, "lstat").mockImplementation((async (target: string) => {
+			const stats = await original(target);
+			if (String(target).endsWith("player.gd") && ++calls === 2)
+				Object.defineProperty(stats, "ctimeMs", { value: stats.ctimeMs + 1 });
+			return stats;
+		}) as typeof fsPromises.lstat);
+		await create();
+		expect((await read()).unobserved).toContainEqual({ path: "player.gd", reason: "unstable" });
+	});
+	it("checks currency on every hashing chunk of a single large file (L-4)", async () => {
+		const single = path.join(tmp, "Single");
+		await fs.mkdir(single);
+		await fs.writeFile(path.join(single, "big.bin"), Buffer.alloc(5 * 1024 * 1024));
+		let calls = 0;
+		await createProjectManifestFile(
+			{ rootPath: single, outputPath: path.join(out, "s.json") },
+			() => {
+				calls++;
+			},
+		);
+		// Request + one entry + final write check = 3; five 1 MiB chunks plus EOF add six more.
+		expect(calls).toBeGreaterThanOrEqual(9);
+	});
+});

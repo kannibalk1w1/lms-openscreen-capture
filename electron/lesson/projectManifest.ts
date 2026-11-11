@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { constants, promises as fs, realpathSync, type Stats } from "node:fs";
+import { constants, promises as fs, realpathSync, type Stats, statSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { readSelectedFileSnapshot } from "./selectedFile";
@@ -37,6 +37,7 @@ export class ProjectManifestError extends Error {
 			| "project-folder-unavailable"
 			| "manifest-output-invalid"
 			| "manifest-output-exists"
+			| "manifest-write-failed"
 			| "manifest-unavailable"
 			| "manifest-changed"
 			| "manifest-invalid",
@@ -66,6 +67,7 @@ const reason = z.enum([
 	"unstable",
 	"excluded-directory",
 	"depth-limit",
+	"byte-limit",
 ]);
 type Reason = z.infer<typeof reason>;
 const relativePath = z
@@ -90,7 +92,7 @@ const manifestSchema = z
 				maxDepth: z.literal(PROJECT_MANIFEST_MAX_DEPTH),
 			})
 			.strict(),
-		exclusions: z.array(z.string()).max(16),
+		exclusions: z.tuple([z.literal(".git"), z.literal(".godot"), z.literal(".import")]),
 		coverage: z.enum(["complete", "limited"]),
 		limitReason: z.enum(["file-limit", "byte-limit", "entry-limit"]).optional(),
 		counts: z
@@ -105,7 +107,7 @@ const manifestSchema = z
 			.max(PROJECT_MANIFEST_MAX_FILES),
 		unobserved: z
 			.array(z.object({ path: relativePath, reason }).strict())
-			.max(PROJECT_MANIFEST_MAX_FILES * 2),
+			.max(PROJECT_MANIFEST_MAX_FILES * 4),
 	})
 	.strict()
 	.superRefine((manifest, ctx) => {
@@ -117,12 +119,27 @@ const manifestSchema = z
 			seen.add(file.path);
 			previous = file.path;
 		}
-		for (const entry of manifest.unobserved)
-			if (seen.has(entry.path))
-				ctx.addIssue({ code: "custom", message: "Path both observed and unobserved" });
+		let previousUnobserved = "";
+		for (const entry of manifest.unobserved) {
+			if (seen.has(entry.path) || entry.path <= previousUnobserved)
+				ctx.addIssue({
+					code: "custom",
+					message: "Unsorted, duplicate or overlapping unobserved path",
+				});
+			seen.add(entry.path);
+			previousUnobserved = entry.path;
+		}
 		const limited =
 			manifest.limitReason !== undefined ||
 			manifest.unobserved.some((entry) => entry.reason === "depth-limit");
+		if (
+			manifest.files.length > manifest.limits.maxFiles ||
+			manifest.unobserved.length + manifest.files.length > manifest.limits.maxFiles * 4 ||
+			manifest.counts.bytes > manifest.limits.maxBytes ||
+			manifest.unobserved.some((entry) => entry.reason === "byte-limit") !==
+				(manifest.limitReason === "byte-limit")
+		)
+			ctx.addIssue({ code: "custom", message: "Manifest exceeds its own limits" });
 		if (
 			manifest.counts.files !== manifest.files.length ||
 			manifest.counts.unobserved !== manifest.unobserved.length ||
@@ -142,6 +159,8 @@ type Scan = {
 	limitReason?: "file-limit" | "byte-limit" | "entry-limit";
 };
 
+/** Errors raised by the caller's currency check: never downgraded to "unreadable". */
+const cancelled = new WeakSet<object>();
 const stable = (a: Stats, b: Stats) =>
 	a.dev === b.dev &&
 	a.ino === b.ino &&
@@ -150,7 +169,11 @@ const stable = (a: Stats, b: Stats) =>
 	a.ctimeMs === b.ctimeMs;
 
 /** Hash one regular file from a single descriptor; refuses links and changes during the read. */
-async function hashFile(absolutePath: string, named: Stats): Promise<string | Reason> {
+async function hashFile(
+	absolutePath: string,
+	named: Stats,
+	assertCurrent: () => void,
+): Promise<string | Reason> {
 	let handle: fs.FileHandle;
 	try {
 		handle = await fs.open(
@@ -167,6 +190,8 @@ async function hashFile(absolutePath: string, named: Stats): Promise<string | Re
 		const buffer = Buffer.alloc(CHUNK);
 		let total = 0;
 		for (;;) {
+			// Cancellation and consent revocation are honoured within a large file too.
+			assertCurrent();
 			const { bytesRead } = await handle.read(buffer, 0, CHUNK, null);
 			if (!bytesRead) break;
 			total += bytesRead;
@@ -178,7 +203,8 @@ async function hashFile(absolutePath: string, named: Stats): Promise<string | Re
 		if (total !== before.size || !stable(before, after) || !stable(after, current))
 			return "unstable";
 		return hash.digest("hex");
-	} catch {
+	} catch (error) {
+		if (typeof error === "object" && error !== null && cancelled.has(error)) throw error;
 		return "unreadable";
 	} finally {
 		await handle.close();
@@ -208,26 +234,43 @@ async function scanProject(
 	}
 	const files: FileRow[] = [];
 	const unobserved: UnobservedRow[] = [];
+	const current = () => {
+		try {
+			assertCurrent();
+		} catch (error) {
+			if (typeof error === "object" && error !== null) cancelled.add(error);
+			throw error;
+		}
+	};
 	let bytes = 0;
 	let entries = 0;
 	const maxEntries = limits.maxFiles * 4;
 	let limitReason: Scan["limitReason"];
+	// Read through a closure: nested walks may set a stopping limit.
+	const stopped = () => limitReason === "file-limit" || limitReason === "entry-limit";
 	const walk = async (directory: string, relative: string[], depth: number): Promise<void> => {
-		let names: string[];
+		// Streamed, so one huge directory cannot exceed the entry budget in memory.
+		const names: string[] = [];
 		try {
-			names = (await fs.readdir(directory)).sort();
+			const dir = await fs.opendir(directory);
+			for await (const entry of dir) {
+				if (entries + names.length >= maxEntries) {
+					limitReason = "entry-limit";
+					break;
+				}
+				names.push(entry.name);
+			}
 		} catch {
 			if (relative.length) unobserved.push({ path: relative.join("/"), reason: "unreadable" });
 			else throw new ProjectManifestError("project-folder-unavailable");
 			return;
 		}
+		if (stopped()) return;
+		names.sort();
 		for (const name of names) {
-			if (limitReason) return;
-			assertCurrent();
-			if (++entries > maxEntries) {
-				limitReason = "entry-limit";
-				return;
-			}
+			if (stopped()) return;
+			current();
+			entries++;
 			const parts = [...relative, name];
 			const rel = parts.join("/");
 			const absolutePath = path.join(directory, name);
@@ -247,9 +290,12 @@ async function scanProject(
 				else await walk(absolutePath, parts, depth + 1);
 			} else if (!named.isFile()) unobserved.push({ path: rel, reason: "special-file" });
 			else if (files.length >= limits.maxFiles) limitReason = "file-limit";
-			else if (bytes + named.size > limits.maxBytes) limitReason = "byte-limit";
-			else {
-				const digest = await hashFile(absolutePath, named);
+			else if (bytes + named.size > limits.maxBytes) {
+				// Too large for the remaining budget: listed, not hashed; the scan continues.
+				unobserved.push({ path: rel, reason: "byte-limit" });
+				limitReason ??= "byte-limit";
+			} else {
+				const digest = await hashFile(absolutePath, named, current);
 				if (digest.length === 64) {
 					files.push({ path: rel, size: named.size, sha256: digest });
 					bytes += named.size;
@@ -258,7 +304,7 @@ async function scanProject(
 		}
 	};
 	await walk(root, [], 0);
-	// Code-point order, independent of locale and of the directory order above.
+	// UTF-16 code-unit order (JavaScript string comparison), independent of locale.
 	const byPath = (a: { path: string }, b: { path: string }) =>
 		a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
 	files.sort(byPath);
@@ -283,9 +329,25 @@ function outputOutsideRoot(outputPath: string, root: string): string {
 		throw new ProjectManifestError("manifest-output-invalid");
 	}
 	if (parent !== path.dirname(target)) throw new ProjectManifestError("manifest-output-invalid");
-	const relative = path.relative(root, target);
-	if (!relative.startsWith("..") && !path.isAbsolute(relative))
-		throw new ProjectManifestError("manifest-output-invalid");
+	// Compare filesystem identities, not spellings: walk the real parent's ancestors and refuse
+	// if any is the selected root (case-insensitive volumes, short names and bind mounts too).
+	let rootStat: Stats;
+	try {
+		rootStat = statSync(root);
+	} catch {
+		throw new ProjectManifestError("project-folder-unavailable");
+	}
+	for (let at = parent; ; at = path.dirname(at)) {
+		let stat: Stats;
+		try {
+			stat = statSync(at);
+		} catch {
+			throw new ProjectManifestError("manifest-output-invalid");
+		}
+		if (stat.dev === rootStat.dev && stat.ino === rootStat.ino)
+			throw new ProjectManifestError("manifest-output-invalid");
+		if (path.dirname(at) === at) break;
+	}
 	return target;
 }
 
@@ -334,8 +396,12 @@ export async function createProjectManifestFile(
 	assertCurrent();
 	try {
 		await fs.writeFile(target, bytes, { flag: "wx", mode: 0o600 });
-	} catch {
-		throw new ProjectManifestError("manifest-output-exists");
+	} catch (error) {
+		throw new ProjectManifestError(
+			(error as NodeJS.ErrnoException).code === "EEXIST"
+				? "manifest-output-exists"
+				: "manifest-write-failed",
+		);
 	}
 	return {
 		format: "openscreen-project-manifest-receipt" as const,
@@ -401,11 +467,14 @@ export async function checkProjectDriftFile(
 	const beforeUnobserved = new Map(manifest.unobserved.map((entry) => [entry.path, entry.reason]));
 	const afterUnobserved = new Map(current.unobserved.map((entry) => [entry.path, entry.reason]));
 	// A path under an unobserved directory on one side is unknown there, not missing/added.
+	/** The reason of the path itself or its nearest unobserved ancestor, if any. */
 	const underUnobserved = (file: string, unobservedPaths: Map<string, Reason>) => {
 		const parts = file.split("/");
-		for (let i = 1; i < parts.length; i++)
-			if (unobservedPaths.has(parts.slice(0, i).join("/"))) return true;
-		return unobservedPaths.has(file);
+		for (let i = 1; i < parts.length; i++) {
+			const reason = unobservedPaths.get(parts.slice(0, i).join("/"));
+			if (reason) return reason;
+		}
+		return unobservedPaths.get(file);
 	};
 	const changed: Array<{ path: string; fields: Array<"size" | "sha256"> }> = [];
 	const missing: string[] = [];
@@ -423,14 +492,17 @@ export async function checkProjectDriftFile(
 			if (fields.length) changed.push({ path: file, fields });
 			else unchanged++;
 		} else if (underUnobserved(file, afterUnobserved))
-			nowUnobserved.push({ path: file, reason: afterUnobserved.get(file) ?? "unreadable" });
+			nowUnobserved.push({ path: file, reason: underUnobserved(file, afterUnobserved) as Reason });
 		else if (current.coverage === "limited") notReached.push(file);
 		else missing.push(file);
 	}
 	for (const [file] of after) {
 		if (before.has(file)) continue;
 		if (underUnobserved(file, beforeUnobserved))
-			previouslyUnobserved.push({ path: file, reason: beforeUnobserved.get(file) ?? "unreadable" });
+			previouslyUnobserved.push({
+				path: file,
+				reason: underUnobserved(file, beforeUnobserved) as Reason,
+			});
 		else if (manifest.coverage === "limited") notReached.push(file);
 		else added.push(file);
 	}

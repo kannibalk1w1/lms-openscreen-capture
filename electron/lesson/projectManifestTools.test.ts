@@ -54,7 +54,7 @@ describe("MCP project manifest tools", () => {
 			readOnlyHint: true,
 			destructiveHint: false,
 		});
-		const readdir = vi.spyOn(fsPromises, "readdir");
+		const readdir = vi.spyOn(fsPromises, "opendir");
 		const lstat = vi.spyOn(fsPromises, "lstat");
 		const create = await client.callTool({
 			name: "createProjectManifestFile",
@@ -116,13 +116,13 @@ describe("MCP project manifest tools", () => {
 	it("rechecks HTTP consent before returning a result", async () => {
 		allowed = true;
 		await connect("http");
-		const original = fsPromises.readdir.bind(fsPromises);
-		vi.spyOn(fsPromises, "readdir").mockImplementation((async (
+		const original = fsPromises.opendir.bind(fsPromises);
+		vi.spyOn(fsPromises, "opendir").mockImplementation((async (
 			...args: Parameters<typeof original>
 		) => {
 			allowed = false;
 			return original(...args);
-		}) as typeof fsPromises.readdir);
+		}) as typeof fsPromises.opendir);
 		const result = await client.callTool({
 			name: "createProjectManifestFile",
 			arguments: { rootPath: project, outputPath: path.join(tmp, "m.json") },

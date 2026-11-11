@@ -28,7 +28,7 @@ all adapters disabled.
 - **Fields:** `scope: "explicit-folder"`, `rootName` (the folder's base name only, never
   the absolute path), the limits, the exclusions, `coverage`, an optional `limitReason`
   and counts.
-- **`files`:** `{path, size, sha256}`, sorted in code-point order, using `/`-separated
+- **`files`:** `{path, size, sha256}`, sorted in UTF-16 code-unit order (JavaScript string comparison), using `/`-separated
   relative paths on every OS.
 - **`unobserved`:** `{path, reason}`.
 - **Deterministic:** no timestamps, and two scans of an unchanged folder produce
@@ -58,6 +58,9 @@ Path names are still sensitive metadata: review a manifest before sharing it.
     read with `O_NOFOLLOW`.
   - `excluded-directory`: `.git`, `.godot` and `.import` at the selected root only.
   - `depth-limit`.
+  - `byte-limit`: a file larger than the remaining byte budget is listed and skipped, and
+    the scan continues (`limitReason: "byte-limit"`, limited coverage). File and entry
+    limits still stop the scan.
 - **Selected root:** a root with a symlink in any component (checked with `realpath`), a
   non-directory, or an unreadable root is refused.
 
@@ -138,4 +141,51 @@ was scanned. No GUI is added in this slice.
 
 ## Review
 
-Awaiting an independent Claude review of the immutable source commit.
+[Independent review of `c233dcc6`](CLAUDE_PROJECT_MANIFEST_REVIEW_C233DCC6_2026-11-11.md):
+**changes requested**.
+
+- **M-1 (Medium):** an output named `<root>/..m.json` or `<root>/..sub/m.json` passed the
+  outside-root string check and was written inside the project. Nothing was overwritten,
+  because of `wx`.
+- **Lows L-1 to L-6:**
+  - L-1: an entry-limit overflow produced a schema error instead of limited coverage;
+  - L-2: one oversized file stopped the whole scan;
+  - L-3: `readdir` loaded a whole directory into memory;
+  - L-4: no cancellation inside a large file;
+  - L-5: a generic reason was given under an unobserved ancestor;
+  - L-6: the outside-root check compared path spellings.
+- **Nits N-1 to N-3.**
+
+Fixed in the follow-up commit:
+
+- M-1/L-6: the output's real parent and every ancestor are compared with the selected root
+  by device and inode identity, so `..`-prefixed names, case-insensitive spellings, 8.3
+  short names and bind mounts are refused. Regression tests cover both `..` forms and a
+  sibling `<root>..json`, which is allowed.
+- L-1: entries are counted while streaming; the schema caps unobserved rows at 4 × the
+  file limit; limited coverage is reported as `entry-limit`.
+- L-2: the `byte-limit` reason above.
+- L-3: `opendir` streaming, bounded by the entry budget.
+- L-4: a currency check on every 1 MiB hashing chunk. Cancellation errors propagate and
+  are never downgraded to `unreadable`.
+- L-5: the reason of the nearest unobserved ancestor is reported.
+- N-1: `unobserved` must be sorted, unique and disjoint from `files`; `exclusions` must
+  equal the fixed list; files, entries and bytes must be within the manifest's own limits;
+  `byte-limit` reasons must match `limitReason`.
+- N-2: the sort wording.
+- N-3: `manifest-write-failed` is now distinct from `manifest-output-exists`.
+- Stability: a ctime-only change is now tested.
+
+Mutants killed: identity walk, per-chunk currency, unobserved order, file-limit refinement,
+ctime, ancestor reason and EEXIST mapping. The early file-growth check stays as an
+optimisation; the final size check covers it.
+
+Revalidation:
+
+- Real WinBoat Windows 11: 16/16 checks. These add the `..`-prefixed, **case-variant** and
+  **8.3 short-name** outputs inside the root (all refused), an oversized file listed while
+  the scan continued, and nothing written into the project.
+- Production Linux CLI/MCP: 14/14. Startup smoke passes.
+- Full suite: 6,689 tests in 487 files.
+
+Awaiting recheck.
