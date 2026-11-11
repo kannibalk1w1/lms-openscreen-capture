@@ -1,4 +1,14 @@
-# Sprite references awaiting review — 11 November 2026
+# Sprite references independently reviewed — 11 November 2026
+
+Owner-requested [Codex review of d3a53e8b](CODEX_SPRITE_RESOURCE_REVIEW_D3A53E8B_2026-11-11.md)
+accepts the slice with one nonblocking Low: strengthen imported animated-sprite
+transform validation. Independent 90 tests, both TypeScript checks and real Linux
+Godot API probe pass. Claude is paused at its reported weekly limit (reset 16 November,
+06:00 Europe/London); scheduled continuation should address this Low before new
+features, then prioritize WinBoat acceptance and retake/handoff. The review below
+was pending at the builder's checkpoint and is now complete.
+
+## Builder checkpoint before review
 
 Claude builder, from accepted 320b4912 and tests/docs 4f7a175a/955a1355. New slice: [raw v8
 Sprite3D texture and AnimatedSprite SpriteFrames references](GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md).

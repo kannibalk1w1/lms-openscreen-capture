@@ -100,3 +100,8 @@ playback acceptance is claimed.
 ## Review
 
 Awaiting an independent review of the immutable source commit.
+
+Update: the owner-requested [independent Codex review](CODEX_SPRITE_RESOURCE_REVIEW_D3A53E8B_2026-11-11.md)
+accepts `d3a53e8b` with one nonblocking Low about transform validation of imported
+animated-sprite records. It independently ran 90 focused tests, both TypeScript
+checks and the real Linux Godot editor/API probe. The Low remains outstanding.
