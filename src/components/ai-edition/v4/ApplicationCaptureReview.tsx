@@ -21,6 +21,7 @@ import {
 	type ApplicationAssociationSource,
 } from "./ApplicationAssociationControls";
 import { GodotCheckpointComparison } from "./GodotCheckpointComparison";
+import { GodotRetakeComparison } from "./GodotRetakeComparison";
 
 const NO_SOURCES: ApplicationAssociationSource[] = [];
 type CheckpointSource = { id: number; text: string; checkpoints: GodotSceneCheckpoint[] };
@@ -77,7 +78,7 @@ export function ApplicationCaptureReview({
 				if (!normalized) {
 					try {
 						const found = listGodotSceneCheckpoints(sourceText);
-						if (found.length >= 2) checkpoints = found;
+						checkpoints = found;
 					} catch {
 						// Generic review remains available if checkpoint enumeration rejects the raw journal.
 					}
@@ -85,7 +86,7 @@ export function ApplicationCaptureReview({
 			}
 			setJournal(parsed);
 			setCheckpointSource(
-				checkpoints.length >= 2 ? { id: current, text: sourceText, checkpoints } : null,
+				checkpoints.length >= 1 ? { id: current, text: sourceText, checkpoints } : null,
 			);
 			setPage(0);
 		} catch {
@@ -191,12 +192,21 @@ export function ApplicationCaptureReview({
 							onPlan={setCalibration}
 						/>
 					</fieldset>
-					{checkpointSource && (
+					{checkpointSource && checkpointSource.checkpoints.length >= 2 && (
 						<fieldset disabled={busy} style={{ border: 0, padding: 0 }}>
 							<GodotCheckpointComparison
 								key={checkpointSource.id}
 								source={checkpointSource.text}
 								checkpoints={checkpointSource.checkpoints}
+							/>
+						</fieldset>
+					)}
+					{checkpointSource && (
+						<fieldset disabled={busy} style={{ border: 0, padding: 0 }}>
+							<GodotRetakeComparison
+								key={checkpointSource.id}
+								originalText={checkpointSource.text}
+								originalCheckpoints={checkpointSource.checkpoints}
 							/>
 						</fieldset>
 					)}
