@@ -222,4 +222,27 @@ describe("review 86c9930d follow-up", () => {
 	it("refuses extra keys in a surface override record", () => {
 		expect(() => parseGodotSceneJournal(one({ ...surfaces(1, [null]), effective: [] }))).toThrow();
 	});
+	it("labels a return from unavailable to a list the same way", () => {
+		const source = take([
+			state([world(0), crate(0, { surfaceOverrides: "unavailable" })]),
+			state([world(0), crate(0, { surfaceOverrides: surfaces(1, [red]) })]),
+		]);
+		expect(
+			parseGodotSceneJournal(source).observations.find((o) => o.type === "node-changed")?.label,
+		).toBe("Node changed: Crate (surfaceOverrides unavailable)");
+	});
+	it("reports a missing mesh against a recorded list as a difference in both fields", () => {
+		const withMesh = take(
+			[state([world(100), crate(100, { surfaceOverrides: surfaces(1, [red]) })])],
+			7,
+			"c",
+		);
+		const result = compareGodotCheckpointToReference(
+			take([state([world(0), crate(0, { mesh: null, surfaceOverrides: null })])]),
+			1,
+			withMesh,
+			1,
+		);
+		expect(result.differing).toEqual([{ path: ["Crate"], fields: ["mesh", "surfaceOverrides"] }]);
+	});
 });

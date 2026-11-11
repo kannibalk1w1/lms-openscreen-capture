@@ -123,3 +123,18 @@ Fixed in `320b4912`:
 
 All new guards are mutation-checked. The real Linux probe reruns cleanly (all 8 sections) and
 the full suite passes with 6,742 tests in 491 files.
+
+The [recheck of `320b4912`](CLAUDE_GODOT_SURFACE_OVERRIDES_RECHECK_320B4912_2026-11-11.md)
+**accepts** it. Its probes confirm honest results for no mesh against `unavailable`, no mesh
+against a recorded list, and v6 against an unavailable v7 list. Its two optional test gaps are
+closed in the next commit, and both mutants are killed:
+
+- the `unavailable` → list label;
+- a missing mesh against a recorded list differing in both `mesh` and `surfaceOverrides`.
+
+Accepted state:
+
+- source `86c9930d` + `320b4912`, plus a tests-only commit;
+- real Linux/WinBoat probes at `86c9930d`, and a Linux rerun at `320b4912`;
+- production CLI/MCP 17/17 and the startup smoke at `86c9930d`;
+- full suite 6,742 tests in 491 files at `320b4912`.
