@@ -652,19 +652,19 @@
 			"title": "Compare with a retake (advisory)",
 			"scope": "Choose a checkpoint in this original journal and one in a replacement raw Godot journal you select. Nodes are matched by their path from the scene root, never by session IDs; renamed or moved nodes appear as unmatched paths. This is a read-only comparison of sampled fields: it does not replace step media, change the lesson or timeline, grade, confirm completion or restore anything.",
 			"original": "Original checkpoint",
-			"choose": "Choose replacement journal (.jsonl)",
+			"choose": "Choose replacement journal (.jsonl or .ndjson)",
 			"replacement": "Replacement journal: {{name}}",
 			"replacementCheckpoint": "Replacement checkpoint",
 			"compare": "Compare original and replacement",
 			"invalid": "That file is not a valid raw Godot journal with at least one checkpoint.",
 			"failed": "These checkpoints could not be compared.",
 			"result": "Retake comparison",
-			"policy": "Field policy: node type, script and texture paths (as text), visibility and transforms compared exactly; selection ignored; saved connections compared by endpoint path, signal, method, flags and bound-argument count.",
+			"policy": "Field policy: the scene root's name, and every matched node's type, script and texture paths (compared as text), visibility and 2D/3D transforms, are compared exactly. Selection, the journal's scene path and stop reason are not compared. Saved connections are compared by endpoint path, signal, method, flags and bound-argument count.",
 			"sameTake": "Both checkpoints come from the same take: this is a consistency check, not independent confirmation.",
 			"unknowns": "Unknown or partial evidence",
 			"source": "{{label}} · {{scene}} · journal v{{version}} · take …{{session}} · coverage {{coverage}} · SHA-256 {{sha}}…",
 			"counts": "Matched {{matched}}, partially compared {{partial}}, differing {{differing}}, only in original {{originalOnly}}, only in replacement {{replacementOnly}}",
-			"truncated": "Some lists were shortened to keep this view bounded; the counts are complete.",
+			"truncated": "Some lists were shortened to keep this view bounded ({{lists}}); the counts are complete.",
 			"differing": "Differing fields",
 			"differingRow": "{{path}}: {{fields}}",
 			"originalOnly": "Only in the original",
@@ -687,6 +687,18 @@
 			"connection": {
 				"original": "Only in original: {{from}}.{{signal}} → {{to}}.{{method}}",
 				"replacement": "Only in replacement: {{from}}.{{signal}} → {{to}}.{{method}}"
+			},
+			"replacementCheckpointFor": "Replacement checkpoint in {{name}}",
+			"loading": "Reading the replacement journal…",
+			"connectionCounts": "Saved connections only in original {{originalOnly}}, only in replacement {{replacementOnly}}",
+			"differingRowPartial": "{{path}}: {{fields}} (not recorded by one journal: {{unobserved}})",
+			"list": {
+				"referenceOnly": "only in original",
+				"candidateOnly": "only in replacement",
+				"differing": "differing",
+				"partiallyCompared": "partially compared",
+				"connectionsReferenceOnly": "connections only in original",
+				"connectionsCandidateOnly": "connections only in replacement"
 			}
 		}
 	}

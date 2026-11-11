@@ -17,8 +17,9 @@ type Replacement = {
 	checkpoints: GodotSceneCheckpoint[];
 };
 
-async function sha256(text: string): Promise<string> {
-	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+/** SHA-256 of the exact file bytes (what `sha256sum` reports). */
+export async function bytesSha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+	const digest = await crypto.subtle.digest("SHA-256", bytes);
 	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -30,13 +31,15 @@ async function sha256(text: string): Promise<string> {
  */
 export function GodotRetakeComparison({
 	originalText,
+	originalSha256,
 	originalCheckpoints,
 }: {
+	/** Deterministic decoding of the original file bytes hashed as `originalSha256`. */
 	originalText: string;
+	originalSha256: string;
 	originalCheckpoints: GodotSceneCheckpoint[];
 }) {
 	const t = useScopedT("timeline");
-	const [originalSha, setOriginalSha] = useState("");
 	const [originalSequence, setOriginalSequence] = useState("");
 	const [replacement, setReplacement] = useState<Replacement | null>(null);
 	const [replacementSequence, setReplacementSequence] = useState("");
@@ -44,13 +47,16 @@ export function GodotRetakeComparison({
 	const [error, setError] = useState("");
 	const [busy, setBusy] = useState(false);
 	const epoch = useRef(0);
+	// A different original resets everything, including any pending replacement read.
 	useEffect(() => {
-		let live = true;
-		void sha256(originalText).then((value) => {
-			if (live) setOriginalSha(value);
-		});
+		void originalText;
+		setOriginalSequence("");
+		setReplacement(null);
+		setReplacementSequence("");
+		setResult(null);
+		setError("");
+		setBusy(false);
 		return () => {
-			live = false;
 			epoch.current++;
 		};
 	}, [originalText]);
@@ -69,10 +75,11 @@ export function GodotRetakeComparison({
 		clear();
 		try {
 			if (file.size > MAX_SCENE_JOURNAL_BYTES) throw new Error("limit");
-			const text = await file.text();
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			const text = new TextDecoder().decode(bytes);
 			const checkpoints = listGodotSceneCheckpoints(text);
 			if (!checkpoints.length) throw new Error("no checkpoints");
-			const digest = await sha256(text);
+			const digest = await bytesSha256(bytes);
 			if (current !== epoch.current) return;
 			setReplacement({ name: file.name, text, sha256: digest, checkpoints });
 		} catch {
@@ -83,7 +90,7 @@ export function GodotRetakeComparison({
 	}
 
 	function compare() {
-		if (!replacement || originalSequence === "" || replacementSequence === "") return;
+		if (!replacement || originalSequence === "" || replacementSequence === "" || busy) return;
 		clear();
 		try {
 			setResult(
@@ -153,7 +160,7 @@ export function GodotRetakeComparison({
 				<label>
 					{t("lesson.retake.replacement", { name: replacement.name })}
 					<select
-						aria-label={t("lesson.retake.replacementCheckpoint")}
+						aria-label={t("lesson.retake.replacementCheckpointFor", { name: replacement.name })}
 						value={replacementSequence}
 						onChange={(event) => {
 							setReplacementSequence(event.target.value);
@@ -172,6 +179,9 @@ export function GodotRetakeComparison({
 			<button type="button" disabled={!canCompare} onClick={compare}>
 				{t("lesson.retake.compare")}
 			</button>
+			<p role="status" aria-live="polite">
+				{busy ? t("lesson.retake.loading") : ""}
+			</p>
 			{error && <p role="alert">{error}</p>}
 			{result && replacement && (
 				<section aria-label={t("lesson.retake.result")} aria-live="polite">
@@ -185,7 +195,7 @@ export function GodotRetakeComparison({
 							))}
 						</ul>
 					)}
-					<p>{source(result.reference, originalSha)}</p>
+					<p>{source(result.reference, originalSha256)}</p>
 					<p>{source(result.candidate, replacement.sha256)}</p>
 					<p>
 						{t("lesson.retake.counts", {
@@ -196,7 +206,21 @@ export function GodotRetakeComparison({
 							replacementOnly: result.counts.candidateOnly,
 						})}
 					</p>
-					{result.truncated.length > 0 && <p role="note">{t("lesson.retake.truncated")}</p>}
+					{result.connections.status !== "unobserved" && (
+						<p>
+							{t("lesson.retake.connectionCounts", {
+								originalOnly: result.counts.connectionsReferenceOnly,
+								replacementOnly: result.counts.connectionsCandidateOnly,
+							})}
+						</p>
+					)}
+					{result.truncated.length > 0 && (
+						<p role="note">
+							{t("lesson.retake.truncated", {
+								lists: result.truncated.map((name) => t(`lesson.retake.list.${name}`)).join(", "),
+							})}
+						</p>
+					)}
 					<div
 						style={{
 							maxHeight: 280,
@@ -211,10 +235,16 @@ export function GodotRetakeComparison({
 								<ul>
 									{result.differing.map((row) => (
 										<li key={JSON.stringify(row.path)}>
-											{t("lesson.retake.differingRow", {
-												path: path(row.path),
-												fields: row.fields.join(", "),
-											})}
+											{row.unobservedFields?.length
+												? t("lesson.retake.differingRowPartial", {
+														path: path(row.path),
+														fields: row.fields.join(", "),
+														unobserved: row.unobservedFields.join(", "),
+													})
+												: t("lesson.retake.differingRow", {
+														path: path(row.path),
+														fields: row.fields.join(", "),
+													})}
 										</li>
 									))}
 								</ul>

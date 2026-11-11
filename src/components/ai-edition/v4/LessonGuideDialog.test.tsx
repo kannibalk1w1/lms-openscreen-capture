@@ -105,6 +105,9 @@ it("imports, manually calibrates and saves timing annotations without changing r
 	fireEvent.click(screen.getByText("Application capture observations"));
 	const file = new File(["fixture"], "capture.json");
 	Object.defineProperty(file, "text", { value: async () => applicationCaptureText() });
+	Object.defineProperty(file, "arrayBuffer", {
+		value: async () => new TextEncoder().encode(applicationCaptureText()).buffer,
+	});
 	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
 		target: { files: [file] },
 	});
@@ -330,6 +333,9 @@ it("appends imported drafts without resetting filters or changing prior selectio
 	fireEvent.click(screen.getByText("Application capture observations"));
 	const file = new File(["fixture"], "capture.jsonl");
 	Object.defineProperty(file, "text", { value: async () => sceneSource() });
+	Object.defineProperty(file, "arrayBuffer", {
+		value: async () => new TextEncoder().encode(sceneSource()).buffer,
+	});
 	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
 		target: { files: [file] },
 	});

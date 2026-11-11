@@ -21,10 +21,15 @@ import {
 	type ApplicationAssociationSource,
 } from "./ApplicationAssociationControls";
 import { GodotCheckpointComparison } from "./GodotCheckpointComparison";
-import { GodotRetakeComparison } from "./GodotRetakeComparison";
+import { bytesSha256, GodotRetakeComparison } from "./GodotRetakeComparison";
 
 const NO_SOURCES: ApplicationAssociationSource[] = [];
-type CheckpointSource = { id: number; text: string; checkpoints: GodotSceneCheckpoint[] };
+type CheckpointSource = {
+	id: number;
+	text: string;
+	sha256: string;
+	checkpoints: GodotSceneCheckpoint[];
+};
 
 export function ApplicationCaptureReview({
 	lesson,
@@ -63,7 +68,9 @@ export function ApplicationCaptureReview({
 		setMessage("");
 		try {
 			if (file.size > MAX_APPLICATION_CAPTURE_BYTES) throw new Error("limit");
-			const sourceText = await file.text();
+			// One read: the text is the deterministic decoding of exactly these bytes.
+			const sourceBytes = new Uint8Array(await file.arrayBuffer());
+			const sourceText = new TextDecoder().decode(sourceBytes);
 			const parsed = importApplicationCapture(sourceText);
 			if (current !== epoch.current) return;
 			let checkpoints: GodotSceneCheckpoint[] = [];
@@ -84,9 +91,14 @@ export function ApplicationCaptureReview({
 					}
 				}
 			}
+			// Hash before showing anything, so the journal and its checkpoint panels appear together.
+			const sourceSha256 = checkpoints.length >= 1 ? await bytesSha256(sourceBytes) : "";
+			if (current !== epoch.current) return;
 			setJournal(parsed);
 			setCheckpointSource(
-				checkpoints.length >= 1 ? { id: current, text: sourceText, checkpoints } : null,
+				checkpoints.length >= 1
+					? { id: current, text: sourceText, sha256: sourceSha256, checkpoints }
+					: null,
 			);
 			setPage(0);
 		} catch {
@@ -206,6 +218,7 @@ export function ApplicationCaptureReview({
 							<GodotRetakeComparison
 								key={checkpointSource.id}
 								originalText={checkpointSource.text}
+								originalSha256={checkpointSource.sha256}
 								originalCheckpoints={checkpointSource.checkpoints}
 							/>
 						</fieldset>

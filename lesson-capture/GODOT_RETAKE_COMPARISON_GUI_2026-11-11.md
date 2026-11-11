@@ -66,4 +66,38 @@ physical input pass has been done for this panel yet.
 
 ## Review
 
-Awaiting an independent review of the immutable commit.
+[Independent review of `aea7f3fa`](CLAUDE_RETAKE_GUI_REVIEW_AEA7F3FA_2026-11-11.md):
+**accepted with Lows**, no High or Medium; all coordinator gates pass. Addressed in the
+follow-up commit:
+
+- **L1:** each SHA-256 is now of the exact **file bytes** (what `sha256sum` reports). The
+  journal is read once with `arrayBuffer()`, and the compared text is the deterministic
+  UTF-8 decoding of those same bytes, for both the original (hashed in the capture review)
+  and the replacement.
+- **L2:** a different original resets every selection, the result and the busy state.
+- **L3:** the policy text now states that the root name is compared and that selection, the
+  scene path and the stop reason are not.
+- **L4:**
+  - differing rows show fields one journal could not record;
+  - saved-connection counts are shown;
+  - the truncation note names the shortened lists.
+- **L5:** tests now check both hash values against `sha256` of the fixture bytes, and race a
+  slower earlier replacement read against a newer file. Both mutants (shared hash; no
+  stale-read guard) are killed. Compare is also refused while a read is busy.
+- **Nits:**
+  - the replacement select's accessible name includes the file name;
+  - a busy status line;
+  - the help text mentions `.ndjson`.
+- **Hashing order:** the capture review now hashes before showing the journal, so the
+  journal and its checkpoint panels appear together. This removes a load-dependent ordering
+  that made one existing test flaky. The existing capture-review and Lesson-guide tests now
+  stub the single `arrayBuffer()` read.
+
+Validation:
+
+- 5 retake tests.
+- The combined capture-review, Lesson-guide and retake tests: 42/42, three times in a row.
+- i18n, lint and both `tsc` configs pass.
+- Full suite: 6,702 tests in 488 files.
+
+These are still jsdom-only tests.

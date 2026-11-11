@@ -26,6 +26,10 @@ function show() {
 function importFile(text: () => Promise<string>, size?: number) {
 	const file = new File(["fixture"], "scene.jsonl");
 	Object.defineProperty(file, "text", { value: text });
+	// The review reads bytes once; the text it decodes comes from these same bytes.
+	Object.defineProperty(file, "arrayBuffer", {
+		value: async () => new TextEncoder().encode(await text()).buffer,
+	});
 	if (size !== undefined) Object.defineProperty(file, "size", { value: size });
 	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
 		target: { files: [file] },
@@ -146,6 +150,9 @@ it("ignores calibrated drafts when the lesson changes while selected timings res
 	fireEvent.click(screen.getByText("Application capture observations"));
 	const file = new File(["fixture"], "capture.json");
 	Object.defineProperty(file, "text", { value: async () => JSON.stringify(inputCapture) });
+	Object.defineProperty(file, "arrayBuffer", {
+		value: async () => new TextEncoder().encode(JSON.stringify(inputCapture)).buffer,
+	});
 	fireEvent.change(screen.getByLabelText("Import application capture or Godot journal"), {
 		target: { files: [file] },
 	});
@@ -237,6 +244,9 @@ it("closes safely during timing resolution and can import again", async () => {
 	fireEvent.click(screen.getByText("Application capture observations"));
 	const file = new File(["fixture"], "capture.json");
 	Object.defineProperty(file, "text", { value: async () => JSON.stringify(inputCapture) });
+	Object.defineProperty(file, "arrayBuffer", {
+		value: async () => new TextEncoder().encode(JSON.stringify(inputCapture)).buffer,
+	});
 	const importInput = screen.getByLabelText("Import application capture or Godot journal");
 	fireEvent.change(importInput, { target: { files: [file] } });
 	await screen.findByText(/fixture-editor · fixture-document · 1 observations/);
