@@ -2137,11 +2137,15 @@ export function registerIpcHandlers(
 			options,
 			{
 				getSources: () =>
-					desktopCapturer.getSources({
-						types: ["screen", "window"],
-						thumbnailSize: { width: 0, height: 0 },
-						fetchWindowIcons: true,
-					}),
+					getSourcesByType(
+						{
+							types: ["screen", "window"],
+							thumbnailSize: { width: 0, height: 0 },
+							fetchWindowIcons: true,
+						},
+						(opts) => desktopCapturer.getSources(opts),
+						shouldEnumerateSourceTypesSeparately(process.platform, process.env),
+					),
 				persist: (live) => {
 					appSettings.setLastSource(
 						describeRecordingSource(process.platform, live as Required<SelectedSource>),
@@ -2280,11 +2284,15 @@ export function registerIpcHandlers(
 			return selectedSource;
 		}
 		const sources = await withDeadline(
-			desktopCapturer.getSources({
-				types: ["screen", "window"],
-				thumbnailSize: { width: 0, height: 0 },
-				fetchWindowIcons: false,
-			}),
+			getSourcesByType(
+				{
+					types: ["screen", "window"],
+					thumbnailSize: { width: 0, height: 0 },
+					fetchWindowIcons: false,
+				},
+				(opts) => desktopCapturer.getSources(opts),
+				shouldEnumerateSourceTypesSeparately(process.platform, process.env),
+			),
 			GET_SOURCES_TIMEOUT_MS,
 			`Desktop source restoration did not return within ${GET_SOURCES_TIMEOUT_MS}ms.`,
 		);
