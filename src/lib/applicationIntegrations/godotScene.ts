@@ -40,7 +40,8 @@ const identityRef = z
 	.strict();
 // v7: explicit per-surface material overrides of a MeshInstance3D, by surface index. null means
 // no mesh (no surfaces to describe); "unavailable" means Godot's override count disagreed with the
-// mesh's surface count, or the per-snapshot entry cap was reached.
+// mesh's surface count (for example after ArrayMesh.clear_surfaces()). A snapshot over the entry
+// cap is never written: the take stops with a limited footer instead.
 const surfaceOverrides = z.union([
 	z.literal("unavailable"),
 	z
@@ -730,7 +731,7 @@ export function compareGodotSceneCheckpoints(
 				id: node.id,
 				nameBefore: previous.name,
 				nameAfter: node.name,
-				fields: [...changedFields],
+				fields: changedFields.map((field) => surfaceFieldName(field, previous, node)),
 			});
 	}
 	const selectionChanged =
@@ -773,13 +774,22 @@ export function compareGodotSceneCheckpoints(
 			: {}),
 	};
 }
+/** A change to or from "unavailable" is a loss or return of information, not an override change. */
+function surfaceFieldName(field: string, before: SceneNode, after: SceneNode): string {
+	return field === "surfaceOverrides" &&
+		(before.properties.surfaceOverrides === "unavailable" ||
+			after.properties.surfaceOverrides === "unavailable")
+		? "surfaceOverrides unavailable"
+		: field;
+}
+
 function describeNodeChange(before: SceneNode, after: SceneNode): string {
 	const changes: string[] = [];
 	if (before.name !== after.name) changes.push("name");
 	if (before.parent !== after.parent) changes.push("parent");
 	for (const key of Object.keys(after.properties) as (keyof SceneNode["properties"])[]) {
 		if (JSON.stringify(before.properties[key]) !== JSON.stringify(after.properties[key]))
-			changes.push(key);
+			changes.push(surfaceFieldName(key, before, after));
 	}
 	return `Node changed: ${after.name} (${changes.join(", ") || "properties"})`;
 }

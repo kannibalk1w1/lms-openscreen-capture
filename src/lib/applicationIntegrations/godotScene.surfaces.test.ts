@@ -177,3 +177,49 @@ describe("reference comparison with surface overrides", () => {
 		expect(compare(unavailable, unavailable).unknowns).toEqual(["surface-overrides-partial"]);
 	});
 });
+
+describe("review 86c9930d follow-up", () => {
+	const compare = (a: string, b: string) => compareGodotCheckpointToReference(a, 1, b, 1);
+	const one = (value: unknown, session = "a") =>
+		take([state([world(0), crate(0, { surfaceOverrides: value })])], 7, session);
+	it("never reports unavailable surface information as a difference", () => {
+		const result = compare(one("unavailable"), one(surfaces(2, [red, null]), "c"));
+		expect(result.outcome).toBe("partial-no-observed-difference");
+		expect(result.counts.differing).toBe(0);
+		expect(result.partiallyCompared).toEqual([
+			{ path: ["Crate"], unobservedFields: ["surfaceOverrides"] },
+		]);
+		expect(result.unknowns).toEqual(["surface-overrides-partial"]);
+	});
+	it("still reports an observed difference inside truncated lists", () => {
+		const wide = (first: unknown) => ({
+			count: 40,
+			overrides: [first, ...Array(31).fill(null)],
+			truncated: true,
+		});
+		const result = compare(one(wide(red)), one(wide(null), "c"));
+		expect(result.differing).toEqual([{ path: ["Crate"], fields: ["surfaceOverrides"] }]);
+		const counts = compare(
+			one(surfaces(2, [null, null])),
+			one(surfaces(3, [null, null, null]), "c"),
+		);
+		expect(counts.differing).toEqual([{ path: ["Crate"], fields: ["surfaceOverrides"] }]);
+	});
+	it("labels a within-take change to unavailable as lost information", () => {
+		const source = take([
+			state([world(0), crate(0, { surfaceOverrides: surfaces(2, [null, null]) })]),
+			state([world(0), crate(0, { surfaceOverrides: "unavailable" })]),
+		]);
+		expect(
+			parseGodotSceneJournal(source).observations.find((o) => o.type === "node-changed")?.label,
+		).toBe("Node changed: Crate (surfaceOverrides unavailable)");
+		const markers = listGodotSceneCheckpoints(source);
+		expect(
+			compareGodotSceneCheckpoints(source, markers[0].recordSequence, markers[1].recordSequence)
+				.changed[0].fields,
+		).toEqual(["surfaceOverrides unavailable"]);
+	});
+	it("refuses extra keys in a surface override record", () => {
+		expect(() => parseGodotSceneJournal(one({ ...surfaces(1, [null]), effective: [] }))).toThrow();
+	});
+});

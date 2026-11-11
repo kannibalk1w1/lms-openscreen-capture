@@ -225,6 +225,21 @@ function unrecordable(node: SceneNode, version: number, other: SceneNode): reado
 
 type IndexedConnection = { from: number; to: number; detail: ConnectionDetail };
 
+type SurfaceOverrides = SceneNode["properties"]["surfaceOverrides"];
+/**
+ * True when two surface override lists can only be partly compared: either is "unavailable", or
+ * both are recorded with the same count and identical observed entries but at least one is
+ * truncated. A count or observed-entry difference is an observed difference instead.
+ */
+function partialSurfaces(a: SurfaceOverrides, b: SurfaceOverrides): boolean {
+	if (a === undefined || b === undefined) return false;
+	if (a === "unavailable" || b === "unavailable") return true;
+	if (a === null || b === null) return false;
+	if (a.count !== b.count || JSON.stringify(a.overrides) !== JSON.stringify(b.overrides))
+		return false;
+	return a.truncated || b.truncated;
+}
+
 function connectionRows(
 	state: GodotSceneSnapshotState,
 	pathById: Map<string, number>,
@@ -305,6 +320,13 @@ export function compareGodotCheckpointToReference(
 			...unrecordable(node, reference.schemaVersion, other),
 			...unrecordable(other, candidate.schemaVersion, node),
 		]);
+		// Missing surface information is never an observed difference: unavailable lists, or
+		// truncated lists whose observed entries agree, are only partly compared.
+		const surfacesPartial = partialSurfaces(
+			node.properties.surfaceOverrides,
+			other.properties.surfaceOverrides,
+		);
+		if (surfacesPartial) unobservable.add("surfaceOverrides");
 		const compared: Field[] = id === 0 ? ["name", ...FIELDS] : [...FIELDS];
 		const fields = compared.filter(
 			(field) =>
@@ -324,11 +346,8 @@ export function compareGodotCheckpointToReference(
 			)
 		)
 			unknowns.add("node3d-fields-unobserved");
-		if (unobservedFields.includes("surfaceOverrides")) unknowns.add("surface-overrides-unobserved");
-		// Truncated or unavailable surface lists were only partly observed on that side.
-		for (const value of [node.properties.surfaceOverrides, other.properties.surfaceOverrides])
-			if (value === "unavailable" || (value && typeof value === "object" && value.truncated))
-				unknowns.add("surface-overrides-partial");
+		if (unobservedFields.includes("surfaceOverrides"))
+			unknowns.add(surfacesPartial ? "surface-overrides-partial" : "surface-overrides-unobserved");
 		if (
 			unobservedFields.some((field) => (MESH_REFERENCE_FIELDS as readonly string[]).includes(field))
 		)
