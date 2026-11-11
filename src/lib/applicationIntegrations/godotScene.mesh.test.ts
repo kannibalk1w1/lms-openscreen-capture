@@ -112,9 +112,17 @@ describe("rejects malformed or cross-version mesh references", () => {
 			{ mesh: { type: "Box Mesh", path: "res://cube.tres" }, materialOverride: null },
 		],
 		["mesh without materialOverride", { mesh: box }],
+		[
+			"a sub-resource id",
+			{ mesh: { type: "ArrayMesh", path: "res://ship.glb::ArrayMesh_1" }, materialOverride: null },
+		],
 	];
 	it.each(variants)("%s", (_name, refs) => {
 		expect(() => parseGodotSceneJournal(take([state([world(0), crate(0, refs)])]))).toThrow();
+	});
+	it("requires both references on a v6 MeshInstance3D", () => {
+		const bare = { ...crate(0), properties: { script: null, ...spatial } };
+		expect(() => parseGodotSceneJournal(take([state([world(0), bare])]))).toThrow(/both mesh/);
 	});
 	it("requires a complete 3D node", () => {
 		const flat = {
@@ -175,7 +183,8 @@ describe("reference comparison with mesh references", () => {
 			1,
 		);
 		expect(result.outcome).toBe("partial-no-observed-difference");
-		expect(result.unknowns).toContain("mesh-references-unobserved");
+		// Exactly the mesh reason: no misleading "some 3D fields" reason for mesh-only gaps.
+		expect(result.unknowns).toEqual(["mesh-references-unobserved"]);
 		expect(result.partiallyCompared).toEqual([
 			{ path: ["Crate"], unobservedFields: ["mesh", "materialOverride"] },
 		]);

@@ -388,7 +388,8 @@ func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 		properties["texture"] = _resource(node.texture)
 	if node is MeshInstance3D:
 		# v6: identity references only — engine class name plus a res:// path for resources
-		# saved as their own files. Built-in (embedded or unsaved) resources get a fixed marker,
+		# saved as their own files. Built-in resources (embedded, unsaved, or sub-resources of
+		# another file such as an imported .glb) get a fixed marker,
 		# because their path changes from "" to "res://scene::id" merely by saving the scene.
 		properties["mesh"] = _identity_ref(node.mesh)
 		properties["materialOverride"] = _identity_ref(node.material_override)

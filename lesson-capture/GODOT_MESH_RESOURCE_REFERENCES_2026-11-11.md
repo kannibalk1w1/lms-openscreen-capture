@@ -29,8 +29,11 @@ either `null` (no resource) or `{type, path}`:
 - `type`: the engine class name (an identifier of at most 100 characters), otherwise
   `unsupported-type`;
 - `path`:
-  - `built-in-or-unsaved` for any built-in resource, whether embedded in the scene or not
-    yet saved;
+  - `built-in-or-unsaved` for any resource Godot reports as built-in. That covers resources
+    embedded in this scene, resources not yet saved, **and sub-resources of other files,
+    such as meshes inside an imported `.glb`/`.gltf` scene or another scene's
+    sub-resource**. All of these share one marker, so two different `.glb` meshes of the
+    same class compare equal. This is privacy-safe but coarse;
   - otherwise the existing safe `res://` path rules, giving `external-or-unsupported`
     outside `res://`, for traversal or for control characters.
 
@@ -101,4 +104,22 @@ rendered output or game-runtime acceptance is claimed.
 
 ## Review
 
-Awaiting an independent review of the immutable source commit.
+[Independent review of `c3e12647`](CLAUDE_GODOT_MESH_REFERENCES_REVIEW_C3E12647_2026-11-11.md):
+**accepted with Lows**, no High or Medium; all coordinator gates hold.
+
+- The reviewer's real Godot probes confirmed that imported `.glb` meshes and other files'
+  sub-resources report `is_built_in()` and get the marker, so no `::` id is written. An
+  imported `.obj` keeps its file path. A `PlaceholderMesh` gets the marker.
+- SoftBody3D, a MeshInstance3D subclass, is included. CSG is not a MeshInstance3D and is
+  excluded. Non-owned instanced subscenes are excluded.
+
+Addressed in the follow-up commit:
+
+- **L1:** the docs, consent text and retake policy text now state that the marker also
+  covers sub-resources of other files, including imported `.glb` meshes.
+- **L2:** the decoder rejects `::` in reference paths, with a test.
+- **L3:** the cross-version test asserts the exact unknowns list.
+- **Nit:** a v6 `MeshInstance3D` must record both references, with a test.
+
+Both new guards are mutation-checked. The real Linux probe and the full suite (6,723 tests
+in 490 files) pass again.

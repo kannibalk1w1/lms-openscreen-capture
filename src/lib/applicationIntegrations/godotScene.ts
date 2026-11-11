@@ -33,7 +33,9 @@ const identityRef = z
 			z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,99}$/),
 			z.literal("unsupported-type"),
 		]),
-		path: resourcePath,
+		// Sub-resource ids ("file::id") are never part of a reference: such resources are
+		// reported with the built-in marker by the producer.
+		path: resourcePath.refine((value) => !value.includes("::")),
 	})
 	.strict();
 const nodeSchema = z
@@ -223,6 +225,8 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 			(!has3d || properties.mesh === undefined || properties.materialOverride === undefined)
 		)
 			throw new Error("Mesh/material references belong to a complete 3D node");
+		if (schemaVersion >= 6 && node.type === "MeshInstance3D" && !meshRefs)
+			throw new Error("A v6 MeshInstance3D records both mesh/material references");
 		if (has3d && spatial3d.some((value) => value === undefined))
 			throw new Error("Incomplete 3D scene transforms");
 		if (depths.has(node.id)) throw new Error("Duplicate scene node");
