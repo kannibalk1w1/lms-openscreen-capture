@@ -86,6 +86,18 @@ describe("rejects malformed, misplaced or cross-version sprite references", () =
 		["an animation name", walker3d(0, { ...walk, animation: "PRIVATE_ANIM" })],
 		["frame data", walker3d(0, { ...walk, frames: [] })],
 		[
+			"3D animated sprite with 2D transforms",
+			node(0, "AnimatedSprite3D", "Walker", { ...flat, spriteFrames: null }),
+		],
+		[
+			"2D animated sprite with 3D transforms",
+			node(0, "AnimatedSprite2D", "Walker", { ...spatial, spriteFrames: null }),
+		],
+		[
+			"incomplete 2D transforms",
+			node(0, "AnimatedSprite2D", "Walker", { position: [0, 0], spriteFrames: null }),
+		],
+		[
 			"a sub-resource id",
 			walker3d(0, { type: "SpriteFrames", path: "res://world.tscn::SpriteFrames_1" }),
 		],

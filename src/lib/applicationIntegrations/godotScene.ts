@@ -269,6 +269,16 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 			throw new Error("A Sprite3D texture reference belongs to a complete 3D node");
 		if (spriteFrames && !has2d && !has3d)
 			throw new Error("A SpriteFrames reference belongs to a 2D or 3D node");
+		if (
+			spriteFrames &&
+			((has2d &&
+				[properties.position, properties.rotation, properties.scale].some(
+					(v) => v === undefined,
+				)) ||
+				(node.type === "AnimatedSprite2D" && !has2d) ||
+				(node.type === "AnimatedSprite3D" && !has3d))
+		)
+			throw new Error("An animated sprite records complete transforms in its own dimension");
 		if (spriteTexture && spriteFrames)
 			throw new Error("A node records a sprite texture or SpriteFrames, not both");
 		if (schemaVersion >= 8 && node.type === "Sprite3D" && !spriteTexture)
