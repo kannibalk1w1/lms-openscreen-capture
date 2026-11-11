@@ -46,8 +46,13 @@ Path names are still sensitive metadata: review a manifest before sharing it.
   - Directory depth: 32. Entries visited: 4 × the file limit.
   - Output rows: 200 per list and 256 KiB of row JSON in total, as clean prefixes with
     complete counts.
-- **Hitting a limit:** the scan stops with `coverage: "limited"` and a `limitReason`;
-  depth-limited folders are listed as unobserved.
+- **Hitting a limit:** file and entry limits **stop** the scan (`limitReason`
+  `file-limit`/`entry-limit`; paths not reached are then unknown). A folder whose listing
+  is larger than the remaining entry budget is skipped as a whole, so the recorded subset
+  never depends on directory order. A file over the remaining byte budget is listed as
+  `byte-limit` and the scan continues. Folders beyond the depth limit are listed as
+  `depth-limit`. Any limit gives `coverage: "limited"`; only stopping limits turn absent
+  paths into `notReached` in a drift check.
 - **Unobserved reasons:**
   - `symbolic-link`: symlinks and Windows junctions/reparse points, which are never
     followed.
@@ -188,4 +193,36 @@ Revalidation:
 - Production Linux CLI/MCP: 14/14. Startup smoke passes.
 - Full suite: 6,689 tests in 487 files.
 
-Awaiting recheck.
+The [recheck of `b64f5859`](CLAUDE_PROJECT_MANIFEST_RECHECK_B64F5859_2026-11-11.md)
+**requested changes**:
+
+- **R-1a (Medium):** a nested entry overflow still produced a schema error.
+- **R-1b (Medium):** a byte-limit row followed by a file limit failed the new schema rule.
+- **R-2 (Low):** a bind mount of a *subfolder* passed the check.
+- **R-3 (Low):** a byte-limit-only manifest reported deleted files as not reached.
+- **R-4 (Low):** skipped oversized listings were undocumented.
+- **Nits:** wording.
+
+Fixed in the next commit:
+
+- R-1a: a per-entry `++entries > maxEntries` check, in addition to the streamed listing
+  budget.
+- R-1b: a later stopping limit takes precedence, and any byte-limit row needs some
+  `limitReason`. A schema failure of the tool's own output is reported as the fixed
+  `manifest-scan-inconsistent` code, never as a raw error.
+- R-2: after scanning, the output's parent is refused if its device/inode is any folder
+  the scan entered. A real unprivileged user-and-mount-namespace probe, `unshare
+  --map-root-user --mount`, bind-mounted the project's subfolder and the root
+  elsewhere; both outputs were refused (`manifest-output-invalid`) and nothing was
+  written into the project.
+- R-3: only file and entry limits produce `notReached`.
+- R-4: documented above.
+- Nits: the module and doc wording, and the "outermost" comment.
+
+Regression tests for R-1a, R-1b and R-3 fail on the previous code. Revalidation:
+
+- WinBoat Windows 11: 16/16.
+- Production Linux CLI/MCP: 14/14. Startup smoke passes.
+- Full suite: 6,692 tests in 487 files.
+
+Awaiting a second recheck.

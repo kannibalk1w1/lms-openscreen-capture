@@ -445,4 +445,48 @@ describe("review c233dcc6 follow-up", () => {
 		// Request + one entry + final write check = 3; five 1 MiB chunks plus EOF add six more.
 		expect(calls).toBeGreaterThanOrEqual(9);
 	});
+	it("keeps nested entry overflow within the cap as limited coverage (R-1a)", async () => {
+		const box = path.join(tmp, "Box");
+		await fs.mkdir(path.join(box, "a"), { recursive: true });
+		for (let i = 0; i < 3; i++)
+			await fs.symlink(path.join(tmp, `gone${i}`), path.join(box, "a", `l${i}`));
+		for (let i = 0; i < 3; i++)
+			await fs.symlink(path.join(tmp, `gone${i}`), path.join(box, `z${i}`));
+		await createProjectManifestFile({
+			rootPath: box,
+			outputPath: path.join(out, "r1a.json"),
+			maxFiles: 1,
+		});
+		const manifest = await read("r1a.json");
+		expect(manifest).toMatchObject({ coverage: "limited", limitReason: "entry-limit" });
+		expect(manifest.unobserved.length + manifest.files.length).toBeLessThanOrEqual(4);
+	});
+
+	it("keeps a byte-limit row consistent when a later file limit stops the scan (R-1b)", async () => {
+		const box = path.join(tmp, "Box");
+		await fs.mkdir(box);
+		await fs.writeFile(path.join(box, "a.bin"), Buffer.alloc(100));
+		await fs.writeFile(path.join(box, "b.gd"), "b");
+		await fs.writeFile(path.join(box, "c.gd"), "c");
+		await createProjectManifestFile({
+			rootPath: box,
+			outputPath: path.join(out, "r1b.json"),
+			maxFiles: 1,
+			maxBytes: 50,
+		});
+		const manifest = await read("r1b.json");
+		expect(manifest).toMatchObject({ coverage: "limited", limitReason: "file-limit" });
+		expect(manifest.unobserved).toContainEqual({ path: "a.bin", reason: "byte-limit" });
+		expect(manifest.files.map((file: { path: string }) => file.path)).toEqual(["b.gd"]);
+	});
+
+	it("still reports a deleted file as missing after a byte-limit-only manifest (R-3)", async () => {
+		await fs.writeFile(path.join(project, "aaa.bin"), Buffer.alloc(100));
+		await create("bytes-only.json", { maxBytes: 80 });
+		await fs.rm(path.join(project, "project.godot"));
+		const result = await drift("bytes-only.json");
+		expect(result.missing.rows).toEqual(["project.godot"]);
+		expect(result.counts.notReached).toBe(0);
+		expect(result.outcome).toBe("drift-observed");
+	});
 });

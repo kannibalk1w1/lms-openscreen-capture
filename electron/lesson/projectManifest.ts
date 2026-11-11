@@ -15,7 +15,8 @@ import { readSelectedFileSnapshot } from "./selectedFile";
  *
  * Symbolic links (and Windows reparse points Node reports as links) are never followed;
  * special files, unreadable or unstable files and excluded tool folders are listed as
- * unobserved. File, byte, depth and entry limits stop the scan with limited coverage.
+ * unobserved. File and entry limits stop the scan; a file over the remaining byte budget
+ * and folders beyond the depth limit are listed and skipped. Any limit gives limited coverage.
  * A manifest describes what was observed; it never certifies that a project is correct,
  * complete, runnable or restorable. Path names are sensitive metadata.
  */
@@ -38,6 +39,7 @@ export class ProjectManifestError extends Error {
 			| "manifest-output-invalid"
 			| "manifest-output-exists"
 			| "manifest-write-failed"
+			| "manifest-scan-inconsistent"
 			| "manifest-unavailable"
 			| "manifest-changed"
 			| "manifest-invalid",
@@ -136,8 +138,11 @@ const manifestSchema = z
 			manifest.files.length > manifest.limits.maxFiles ||
 			manifest.unobserved.length + manifest.files.length > manifest.limits.maxFiles * 4 ||
 			manifest.counts.bytes > manifest.limits.maxBytes ||
-			manifest.unobserved.some((entry) => entry.reason === "byte-limit") !==
-				(manifest.limitReason === "byte-limit")
+			// A byte-limit row needs some limit reason; a later stopping limit takes precedence.
+			(manifest.unobserved.some((entry) => entry.reason === "byte-limit") &&
+				manifest.limitReason === undefined) ||
+			(manifest.limitReason === "byte-limit" &&
+				!manifest.unobserved.some((entry) => entry.reason === "byte-limit"))
 		)
 			ctx.addIssue({ code: "custom", message: "Manifest exceeds its own limits" });
 		if (
@@ -157,6 +162,10 @@ type Scan = {
 	unobserved: UnobservedRow[];
 	coverage: "complete" | "limited";
 	limitReason?: "file-limit" | "byte-limit" | "entry-limit";
+	/** True when a file or entry limit stopped the scan: unseen paths are then unknown. */
+	stopped: boolean;
+	/** Device/inode identities of every directory the scan entered. */
+	directories: Set<string>;
 };
 
 /** Errors raised by the caller's currency check: never downgraded to "unreadable". */
@@ -246,15 +255,24 @@ async function scanProject(
 	let entries = 0;
 	const maxEntries = limits.maxFiles * 4;
 	let limitReason: Scan["limitReason"];
+	const directories = new Set<string>();
 	// Read through a closure: nested walks may set a stopping limit.
 	const stopped = () => limitReason === "file-limit" || limitReason === "entry-limit";
 	const walk = async (directory: string, relative: string[], depth: number): Promise<void> => {
 		// Streamed, so one huge directory cannot exceed the entry budget in memory.
 		const names: string[] = [];
 		try {
+			try {
+				const stat = await fs.lstat(directory);
+				directories.add(`${stat.dev}:${stat.ino}`);
+			} catch {
+				// opendir below reports an unreadable directory.
+			}
 			const dir = await fs.opendir(directory);
 			for await (const entry of dir) {
-				if (entries + names.length >= maxEntries) {
+				// A listing larger than the remaining budget is skipped as a whole, so the
+				// recorded subset never depends on the OS's directory order.
+				if (names.length >= maxEntries - entries) {
 					limitReason = "entry-limit";
 					break;
 				}
@@ -270,7 +288,10 @@ async function scanProject(
 		for (const name of names) {
 			if (stopped()) return;
 			current();
-			entries++;
+			if (++entries > maxEntries) {
+				limitReason = "entry-limit";
+				return;
+			}
 			const parts = [...relative, name];
 			const rel = parts.join("/");
 			const absolutePath = path.join(directory, name);
@@ -317,6 +338,8 @@ async function scanProject(
 				? "limited"
 				: "complete",
 		...(limitReason ? { limitReason } : {}),
+		stopped: stopped(),
+		directories,
 	};
 }
 
@@ -373,7 +396,17 @@ export async function createProjectManifestFile(
 		maxBytes: request.maxBytes ?? PROJECT_MANIFEST_DEFAULT_MAX_BYTES,
 	};
 	const scan = await scanProject(root, limits, assertCurrent);
-	const manifest: ProjectManifest = manifestSchema.parse({
+	// A bind mount (or other alias) of any scanned folder is still inside the project.
+	try {
+		const parent = statSync(path.dirname(target));
+		if (scan.directories.has(`${parent.dev}:${parent.ino}`))
+			throw new ProjectManifestError("manifest-output-invalid");
+	} catch (error) {
+		throw error instanceof ProjectManifestError
+			? error
+			: new ProjectManifestError("manifest-output-invalid");
+	}
+	const built = manifestSchema.safeParse({
 		format: "openscreen-project-manifest",
 		version: 1,
 		scope: "explicit-folder",
@@ -390,6 +423,8 @@ export async function createProjectManifestFile(
 		files: scan.files,
 		unobserved: scan.unobserved,
 	});
+	if (!built.success) throw new ProjectManifestError("manifest-scan-inconsistent");
+	const manifest: ProjectManifest = built.data;
 	const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 	if (bytes.length > MAX_MANIFEST_FILE_BYTES)
 		throw new ProjectManifestError("manifest-output-invalid");
@@ -467,7 +502,7 @@ export async function checkProjectDriftFile(
 	const beforeUnobserved = new Map(manifest.unobserved.map((entry) => [entry.path, entry.reason]));
 	const afterUnobserved = new Map(current.unobserved.map((entry) => [entry.path, entry.reason]));
 	// A path under an unobserved directory on one side is unknown there, not missing/added.
-	/** The reason of the path itself or its nearest unobserved ancestor, if any. */
+	/** The reason of the outermost unobserved ancestor, or of the path itself, if any. */
 	const underUnobserved = (file: string, unobservedPaths: Map<string, Reason>) => {
 		const parts = file.split("/");
 		for (let i = 1; i < parts.length; i++) {
@@ -493,7 +528,7 @@ export async function checkProjectDriftFile(
 			else unchanged++;
 		} else if (underUnobserved(file, afterUnobserved))
 			nowUnobserved.push({ path: file, reason: underUnobserved(file, afterUnobserved) as Reason });
-		else if (current.coverage === "limited") notReached.push(file);
+		else if (current.stopped) notReached.push(file);
 		else missing.push(file);
 	}
 	for (const [file] of after) {
@@ -503,7 +538,8 @@ export async function checkProjectDriftFile(
 				path: file,
 				reason: underUnobserved(file, beforeUnobserved) as Reason,
 			});
-		else if (manifest.coverage === "limited") notReached.push(file);
+		else if (manifest.limitReason === "file-limit" || manifest.limitReason === "entry-limit")
+			notReached.push(file);
 		else added.push(file);
 	}
 	const unknowns: string[] = [];
