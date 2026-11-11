@@ -44,6 +44,8 @@ export async function projectLesson(
 			...step,
 			// Static guides carry no video: do not export unresolved media references.
 			mediaSelection: undefined,
+			retakes: undefined,
+			verification: undefined,
 			...(!output.includeImages ? { imageId: undefined, imageAlt: "" } : {}),
 			...(!output.includeCode ? { code: undefined } : {}),
 		}));
@@ -58,6 +60,7 @@ export async function projectLesson(
 		steps,
 		assets,
 		extensions: undefined,
+		handoffs: undefined,
 	};
 }
 export async function renderLessonGuide(lesson: LessonManifest, ids: string[]) {

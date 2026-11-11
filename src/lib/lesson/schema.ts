@@ -90,7 +90,18 @@ export const lessonImageSchema = z
 		source: lessonSourceSchema,
 	})
 	.strict();
-export const lessonStepSchema = z
+export const lessonVerificationSchema = z
+	.object({
+		id,
+		method: z.literal("manual-run-check"),
+		outcome: z.enum(["passed", "failed", "unavailable"]),
+		expected: z.string().trim().min(1).max(2000),
+		observed: z.string().trim().min(1).max(4000),
+		subjectSha256: z.string().regex(/^[a-f0-9]{64}$/),
+		checkedAt: z.iso.datetime(),
+	})
+	.strict();
+const lessonStepContentSchema = z
 	.object({
 		id,
 		title,
@@ -100,11 +111,37 @@ export const lessonStepSchema = z
 		mediaSelection: lessonMediaSelectionSchema.optional(),
 		imageId: id.optional(),
 		imageAlt: z.string().max(1000).default(""),
+		verification: lessonVerificationSchema.optional(),
 		slideRef: lmsReferenceSchema.optional(),
 		code: z
 			.object({ language: z.string().max(40), text: z.string().max(40000) })
 			.strict()
 			.optional(),
+	})
+	.strict();
+export const lessonRetakeSchema = z
+	.object({
+		id,
+		kind: z.enum(["replacement", "restore"]),
+		reason: z.string().trim().min(1).max(2000),
+		lessonRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+		sourceLessonId: id,
+		sourceRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+		sourceStepId: id,
+		previous: lessonStepContentSchema,
+	})
+	.strict();
+export const lessonStepSchema = lessonStepContentSchema.extend({
+	retakes: z.array(lessonRetakeSchema).max(8).optional(),
+});
+export const lessonHandoffSchema = z
+	.object({
+		id,
+		from: z.enum(["human", "tutor", "agent"]),
+		to: z.enum(["human", "tutor", "agent"]),
+		lessonRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+		note: z.string().trim().min(1).max(4000),
+		nextStepId: id.optional(),
 	})
 	.strict();
 export const lessonManifestSchema = z
@@ -126,6 +163,7 @@ export const lessonManifestSchema = z
 		output: lessonOutputSchema.optional(),
 		steps: z.array(lessonStepSchema).max(200),
 		assets: z.array(lessonImageSchema).max(40),
+		handoffs: z.array(lessonHandoffSchema).max(16).optional(),
 		extensions: z.record(z.string().regex(/^[a-z][a-z0-9.-]{0,79}$/), z.json()).optional(),
 	})
 	.strict()
@@ -141,6 +179,19 @@ export const lessonManifestSchema = z
 			if (steps.has(step.id) || (step.imageId && !assets.has(step.imageId)))
 				ctx.addIssue({ code: "custom", message: "Duplicate step or missing image" });
 			steps.add(step.id);
+			for (const retake of step.retakes ?? []) {
+				if (
+					retake.previous.id !== step.id ||
+					(retake.previous.imageId && !assets.has(retake.previous.imageId))
+				)
+					ctx.addIssue({
+						code: "custom",
+						message: "Invalid retake snapshot or missing historical image",
+					});
+			}
+			const retakeIds = step.retakes?.map((r) => r.id) ?? [];
+			if (new Set(retakeIds).size !== retakeIds.length)
+				ctx.addIssue({ code: "custom", message: "Duplicate retake" });
 		}
 	});
 export type LessonManifest = z.infer<typeof lessonManifestSchema>;

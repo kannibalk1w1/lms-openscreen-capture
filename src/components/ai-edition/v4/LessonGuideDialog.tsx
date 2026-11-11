@@ -48,6 +48,7 @@ import { LessonPackagePanel } from "./LessonPackagePanel";
 import { LessonRangeControls } from "./LessonRangeControls";
 import { LessonReviewControls } from "./LessonReviewControls";
 import { LessonTitleInput } from "./LessonTitleInput";
+import { LessonWorkflowControls } from "./LessonWorkflowControls";
 import { LocalLessonDraftControls } from "./LocalLessonDraftControls";
 export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const t = useScopedT("timeline");
@@ -414,6 +415,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 						}}
 					/>
 
+					<LessonWorkflowControls
+						key={`${projectId}:${lesson.id}`}
+						lesson={lesson}
+						onChange={(next) => author(() => next)}
+					/>
 					<LessonOutputControls
 						output={output}
 						onChange={(output) => author(() => reviseLesson(lesson, { output }))}
@@ -908,7 +914,11 @@ export function LessonGuideDialog({ open, onClose }: { open: boolean; onClose: (
 												reviseLesson(lesson, {
 													steps,
 													assets: lesson.assets.filter((asset) =>
-														steps.some((value) => value.imageId === asset.id),
+														steps.some(
+															(value) =>
+																value.imageId === asset.id ||
+																value.retakes?.some((r) => r.previous.imageId === asset.id),
+														),
 													),
 												}),
 											);

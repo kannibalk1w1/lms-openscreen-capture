@@ -110,7 +110,12 @@ export function attachLessonIllustration(
 	);
 	const assets = [
 		...current.assets.filter(
-			(asset) => asset.id !== request.imageId || steps.some((step) => step.imageId === asset.id),
+			(asset) =>
+				asset.id !== request.imageId ||
+				steps.some(
+					(step) =>
+						step.imageId === asset.id || step.retakes?.some((r) => r.previous.imageId === asset.id),
+				),
 		),
 		image,
 	];

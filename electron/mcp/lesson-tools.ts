@@ -41,6 +41,8 @@ import {
 import type { LessonFileLifecycle } from "../lesson/fileLifecycle";
 import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRange";
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
+import { lessonWorkflowFileSchema } from "../lesson/workflowContracts";
+import { applyLessonWorkflowFile } from "../lesson/workflowFile";
 import { registerGodotCheckpointTools } from "./godot-checkpoint-tools";
 import { registerLessonPackageTools } from "./package-tools";
 import { registerProjectManifestTools } from "./project-manifest-tools";
@@ -387,4 +389,35 @@ export function registerLessonTools(
 	);
 	registerGodotCheckpointTools(server, transport, editsAllowed);
 	registerProjectManifestTools(server, transport, editsAllowed);
+	server.registerTool(
+		"applyLessonWorkflowFile",
+		{
+			description:
+				"Apply one explicit replace/restore/manual-run-check/handoff action to a selected editable lesson at expectedRevision and save a NEW private file at outputPath. Replacements read only the explicit sourcePath lesson. Preserves previous takes and unrelated steps. No project execution, file discovery, media rendering, external agent messages or automatic correctness verification. Manual checks are author reports. Requires MCP edits; originals unchanged.",
+			inputSchema: lessonWorkflowFileSchema,
+			annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+		},
+		async (args, extra) => {
+			const current = () => {
+				extra.signal.throwIfAborted();
+				lifecycle?.signal.throwIfAborted();
+				if (!editsAllowed()) throw new Error("consent_required");
+			};
+			try {
+				current();
+				const pending = applyLessonWorkflowFile(args, current);
+				lifecycle?.track(pending);
+				const result = await pending;
+				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+			} catch {
+				return failure(
+					!editsAllowed()
+						? "consent_required"
+						: extra.signal.aborted
+							? "cancelled"
+							: "lesson-file-operation-failed",
+				);
+			}
+		},
+	);
 }

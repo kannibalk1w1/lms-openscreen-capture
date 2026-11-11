@@ -38,6 +38,7 @@ import {
 	createProjectManifestFile,
 	ProjectManifestError,
 } from "../lesson/projectManifest";
+import { applyLessonWorkflowFile } from "../lesson/workflowFile";
 import type { CliLessonCommand } from "./args";
 import type { CliWriter } from "./projectCommands";
 
@@ -52,6 +53,13 @@ export async function runLessonCommand(
 	} = {},
 ): Promise<number> {
 	try {
+		if (command.action === "workflow") {
+			const result = await applyLessonWorkflowFile(command.request, () =>
+				options.signal?.throwIfAborted(),
+			);
+			out(JSON.stringify(command.json ? { event: "done", result } : result) + "\n");
+			return 0;
+		}
 		if (
 			command.action === "inspect-godot-checkpoints" ||
 			command.action === "compare-godot-checkpoints" ||

@@ -7,6 +7,7 @@ import {
 	createLessonPackageSchema,
 } from "../lesson/packageContracts";
 import { checkProjectDriftSchema, createProjectManifestSchema } from "../lesson/projectManifest";
+import { lessonWorkflowChangeSchema, lessonWorkflowFileSchema } from "../lesson/workflowContracts";
 // Pure argv parser for the OpenScreen CLI. No Electron imports so it can be
 // unit-tested under plain vitest.
 
@@ -103,6 +104,7 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| { action: "move-step"; request: MoveLessonStepFileRequest }
 	| { action: "edit-step"; request: UpdateLessonStepFileRequest }
 	| { action: "remove-step"; request: RemoveLessonStepFileRequest }
+	| { action: "workflow"; request: z.infer<typeof lessonWorkflowFileSchema> }
 	| { action: "query"; query: LessonQuery }
 	| { action: "export"; outputDirectory: string; stepIds: string[] }
 );
@@ -197,6 +199,8 @@ Usage:
                             Advisory cross-take comparison by node path; exact unless a tolerance is given
                             (tolerance applies to transform values only; comparing a take with itself
                             is a consistency check, not independent confirmation)
+  openscreen lesson workflow <lesson.json> --revision <n> --out <new-lesson.json> --change <JSON> [--json]
+                            Replace/restore a step, record a manual run check or save a file-carried handoff
   openscreen lesson inspect-capture <capture.json|journal.jsonl> [--json] [--offset <n>] [--limit <n>]
                             Inspect one selected capture; returns bounded labels and raw SHA-256, never payloads
   openscreen lesson import-capture <capture.json|journal.jsonl> --out <new-lesson.json> --title <text> --sha256 <inspect-hash> --observation <id> [--observation <id> ...] [--json]
@@ -713,6 +717,41 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 
 function parseLessonCommand(args: string[], cwd: string): CliCommand {
 	const [action, file] = args;
+	if (action === "workflow") {
+		if (!file || file.startsWith("-")) throw new Error("Choose an explicit lesson file");
+		const values: Record<string, string> = {};
+		let json = false;
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) json = true;
+			else if (["--out", "--revision", "--change"].includes(flag) && !(flag in values)) {
+				const [value, next] = takeValue(args, i, flag);
+				i = next;
+				values[flag] = value;
+			} else throw new Error("Unexpected lesson workflow option");
+		}
+		if (!/^\d+$/.test(values["--revision"] ?? ""))
+			throw new Error("Choose the inspected lesson revision");
+		let change;
+		try {
+			change = JSON.parse(values["--change"] ?? "null");
+		} catch {
+			throw new Error("Choose valid workflow JSON");
+		}
+		if (change?.operation === "replace" && typeof change.sourcePath === "string")
+			change = { ...change, sourcePath: resolvePath(change.sourcePath, cwd) };
+		const parsedChange = lessonWorkflowChangeSchema.safeParse(change);
+		if (!parsedChange.success) throw new Error("Choose a valid lesson workflow action");
+		const parsed = lessonWorkflowFileSchema.safeParse({
+			manifestPath: resolvePath(file, cwd),
+			outputPath: values["--out"] ? resolvePath(values["--out"], cwd) : undefined,
+			expectedRevision: Number(values["--revision"]),
+			change: parsedChange.data,
+		});
+		if (!parsed.success) throw new Error("Choose an output file and inspected lesson revision");
+		const request = parsed.data;
+		return { kind: "lesson", action, manifestPath: request.manifestPath, request, json };
+	}
 	if (action === "inspect-godot-checkpoints" || action === "compare-godot-checkpoints") {
 		if (!file || file.startsWith("-")) throw new Error("Choose an explicit raw Godot journal");
 		const journalPath = resolvePath(file, cwd),

@@ -143,7 +143,12 @@ export async function removeLessonStepFile(input: unknown) {
 	const next = await validateLesson(
 		reviseLesson(lesson, {
 			steps,
-			assets: lesson.assets.filter((asset) => steps.some((step) => step.imageId === asset.id)),
+			assets: lesson.assets.filter((asset) =>
+				steps.some(
+					(step) =>
+						step.imageId === asset.id || step.retakes?.some((r) => r.previous.imageId === asset.id),
+				),
+			),
 		}),
 	);
 	await writeNewLesson(request.outputPath, next);

@@ -64,7 +64,14 @@ it("lists metadata only and drafts selected real Godot evidence through MCP", as
 	const raw = await fs.readFile(fixture, "utf8");
 	await fs.writeFile(source, raw);
 	const tools = (await client.listTools()).tools;
-	expect(tools.slice(-8, -5).map((tool) => tool.name)).toEqual([
+	expect(
+		tools
+			.slice(
+				tools.findIndex((tool) => tool.name === "illustrateLessonStep"),
+				tools.findIndex((tool) => tool.name === "illustrateLessonStep") + 3,
+			)
+			.map((tool) => tool.name),
+	).toEqual([
 		"illustrateLessonStep",
 		"inspectApplicationCaptureFile",
 		"draftLessonFromApplicationCapture",
