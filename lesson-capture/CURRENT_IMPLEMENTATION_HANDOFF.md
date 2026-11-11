@@ -1,3 +1,11 @@
+# MeshInstance3D resource references awaiting review — 11 November 2026
+
+Claude builder, from accepted checkpoint 2298045f. New slice: [raw v6 mesh/material identity
+references](GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md) for owned MeshInstance3D nodes.
+Real Linux and WinBoat probes, production CLI/MCP 13/13, startup smoke and full suite
+6,721/490 pass; independent review pending. A1 is still blocked on the owner's WinBoat
+desktop. No pushes; main fd2775e2.
+
 # Claude builder checkpoint — 11 November 2026
 
 Coordinator chose A1 (WinBoat GUI acceptance) + B2 (project manifest), then a retake GUI.

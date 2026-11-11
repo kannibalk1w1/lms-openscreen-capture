@@ -120,3 +120,8 @@ captured scene: signal, source, target and method names, flags and the number of
 arguments, never their values. Connections touching anything outside the scene, or
 using unsupported callables, are only counted. See
 [signal connection scope and validation](../../lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md).
+
+Raw v6 (current producer) also records, for owned MeshInstance3D nodes, `mesh` and
+`material_override` identity references: the engine class name plus a `res://` path when the
+resource is its own file, otherwise `built-in-or-unsaved`. No resource names or contents are
+recorded. See [mesh reference scope and validation](../../lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md).

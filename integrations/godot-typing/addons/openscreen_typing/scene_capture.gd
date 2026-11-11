@@ -275,7 +275,7 @@ func _property_edited(property: String) -> void:
 	var target := _editor.get_inspector().get_edited_object()
 	if not target is Node or (target != _root and (target.owner != _root or not _root.is_ancestor_of(target))):
 		return
-	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture"):
+	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture") or (target is MeshInstance3D and property in ["mesh", "material_override"]):
 		_pending_trigger = "inspector"
 
 func _snapshot() -> Dictionary:
@@ -386,10 +386,26 @@ func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 		}
 	if node is Sprite2D:
 		properties["texture"] = _resource(node.texture)
+	if node is MeshInstance3D:
+		# v6: identity references only — engine class name plus a res:// path for resources
+		# saved as their own files. Built-in (embedded or unsaved) resources get a fixed marker,
+		# because their path changes from "" to "res://scene::id" merely by saving the scene.
+		properties["mesh"] = _identity_ref(node.mesh)
+		properties["materialOverride"] = _identity_ref(node.material_override)
 	properties["script"] = _resource(node.get_script())
 	nodes.append({"id": identity, "parent": parent, "name": str(node.name), "type": node.get_class(), "properties": properties})
 	for child in node.get_children():
 		_collect(child, identity, depth + 1, nodes)
+
+func _identity_ref(resource: Resource) -> Variant:
+	if resource == null:
+		return null
+	var type := resource.get_class()
+	if not _identifier(type):
+		type = "unsupported-type"
+	if resource.is_built_in() or resource.resource_path.is_empty():
+		return {"type": type, "path": "built-in-or-unsaved"}
+	return {"type": type, "path": _resource_path(resource.resource_path)}
 
 func _resource(resource: Resource) -> Variant:
 	return _resource_path(resource.resource_path) if resource else null
@@ -422,7 +438,7 @@ func _has_control(text: String) -> bool:
 func _write(payload: Dictionary) -> bool:
 	if not active():
 		return false
-	payload["schemaVersion"] = 5
+	payload["schemaVersion"] = 6
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence

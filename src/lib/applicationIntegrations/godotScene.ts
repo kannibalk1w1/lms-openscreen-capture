@@ -25,6 +25,17 @@ const resourcePath = z
 	});
 const vector = z.tuple([z.number().finite(), z.number().finite()]);
 const vector3 = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]);
+// v6: an identity reference — engine class name and either a res:// path (resource saved as its
+// own file) or a fixed marker. Never a resource's name, contents or loaded state.
+const identityRef = z
+	.object({
+		type: z.union([
+			z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,99}$/),
+			z.literal("unsupported-type"),
+		]),
+		path: resourcePath,
+	})
+	.strict();
 const nodeSchema = z
 	.object({
 		id: nodeId,
@@ -42,6 +53,8 @@ const nodeSchema = z
 				position3: vector3.optional(),
 				rotation3: vector3.optional(),
 				scale3: vector3.optional(),
+				mesh: identityRef.nullable().optional(),
+				materialOverride: identityRef.nullable().optional(),
 			})
 			.strict(),
 	})
@@ -97,7 +110,14 @@ const runSchema = z.union([
 type SceneHistory = z.infer<typeof historySchema>;
 type SceneRun = z.infer<typeof runSchema>;
 const envelope = z.object({
-	schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+	schemaVersion: z.union([
+		z.literal(1),
+		z.literal(2),
+		z.literal(3),
+		z.literal(4),
+		z.literal(5),
+		z.literal(6),
+	]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
 	sequence: z.number().int().min(0).max(4095),
@@ -195,6 +215,14 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 		if (schemaVersion < 3 && has3d)
 			throw new Error("3D transforms require scene journal schema v3");
 		if (has2d && has3d) throw new Error("Mixed 2D and 3D scene transforms");
+		const meshRefs = properties.mesh !== undefined || properties.materialOverride !== undefined;
+		if (meshRefs && schemaVersion < 6)
+			throw new Error("Mesh/material references require scene journal schema v6");
+		if (
+			meshRefs &&
+			(!has3d || properties.mesh === undefined || properties.materialOverride === undefined)
+		)
+			throw new Error("Mesh/material references belong to a complete 3D node");
 		if (has3d && spatial3d.some((value) => value === undefined))
 			throw new Error("Incomplete 3D scene transforms");
 		if (depths.has(node.id)) throw new Error("Duplicate scene node");
@@ -645,6 +673,8 @@ export function compareGodotSceneCheckpoints(
 		"position3",
 		"rotation3",
 		"scale3",
+		"mesh",
+		"materialOverride",
 	] as const;
 	const valueFor = (node: SceneNode, field: (typeof fields)[number]) =>
 		field === "name" || field === "parent"

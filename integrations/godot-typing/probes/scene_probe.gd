@@ -290,6 +290,8 @@ func _probe() -> void:
 		return
 	if not await _probe_connections(editor):
 		return
+	if not await _probe_meshes(editor):
+		return
 	print("SCENE_PROBE_PASSED")
 	get_tree().quit(0)
 
@@ -489,4 +491,48 @@ func _probe_connections(editor: EditorInterface) -> bool:
 		for canary in ["BOUND_VALUE_CANARY", "nonpersistent_canary", "UNOWNED_SOURCE_CANARY", "resource_canary", "OUTSIDE_TARGET_CANARY", "PRIVATE_CONNECTION_SCRIPT_CANARY", "Gradient", "child_entered_tree", "_noop_lambda_target", "replacing_by", "editor_description_changed"]:
 			if not _require(not text.contains(canary), name + " withholds " + canary):
 				return false
+	return true
+
+# v6: MeshInstance3D mesh/material-override identity references (no names or contents).
+func _probe_meshes(editor: EditorInterface) -> bool:
+	editor.open_scene_from_path("res://mesh.tscn")
+	await _wait()
+	var root := editor.get_edited_scene_root() as Node3D
+	if not _require(root != null and root.scene_file_path == "res://mesh.tscn", "mesh scene opened"):
+		return false
+	var take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(take.begin("res://mesh.jsonl", root, editor, get_undo_redo()), "mesh take start"):
+		return false
+	var crate := MeshInstance3D.new()
+	crate.name = "Crate"
+	root.add_child(crate)
+	crate.owner = root
+	var built_in := BoxMesh.new()
+	built_in.resource_name = "PRIVATE_BUILTIN_NAME_CANARY"
+	crate.mesh = built_in
+	var built_in_material := StandardMaterial3D.new()
+	built_in_material.resource_name = "PRIVATE_MATERIAL_NAME_CANARY"
+	crate.material_override = built_in_material
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Built-in mesh", take.active_session_id()), "built-in checkpoint"):
+		return false
+	# Saving gives built-in resources a res://scene::id path; the reference must not change.
+	editor.save_scene()
+	await _wait()
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Saved scene", take.active_session_id()), "saved checkpoint"):
+		return false
+	editor.edit_node(crate)
+	await _wait()
+	crate.mesh = load("res://cube.tres")
+	crate.material_override = load("res://mat.tres")
+	editor.get_inspector().property_edited.emit("mesh")
+	await _pump(take)
+	if not _require(take.mark_checkpoint("File resources", take.active_session_id()), "file checkpoint"):
+		return false
+	take.stop()
+	var text := FileAccess.get_file_as_string("res://mesh.jsonl")
+	for canary in ["PRIVATE_BUILTIN_NAME_CANARY", "PRIVATE_MATERIAL_NAME_CANARY", "PRIVATE_FILE_NAME_CANARY", "mesh.tscn::", "0.123"]:
+		if not _require(not text.contains(canary), "mesh journal withholds " + canary):
+			return false
 	return true

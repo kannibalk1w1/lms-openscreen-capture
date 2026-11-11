@@ -40,6 +40,18 @@ fs.writeFileSync(
 	'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="green"/></svg>',
 );
 fs.writeFileSync(
+	path.join(fixture, "mesh.tscn"),
+	'[gd_scene format=3]\n[node name="World" type="Node3D"]\n',
+);
+fs.writeFileSync(
+	path.join(fixture, "cube.tres"),
+	'[gd_resource type="BoxMesh" format=3]\n[resource]\nresource_name = "PRIVATE_FILE_NAME_CANARY"\nsize = Vector3(0.123, 2, 2)\n',
+);
+fs.writeFileSync(
+	path.join(fixture, "mat.tres"),
+	'[gd_resource type="StandardMaterial3D" format=3]\n[resource]\nalbedo_color = Color(0.123, 0.5, 0.5, 1)\n',
+);
+fs.writeFileSync(
 	path.join(fixture, "connections.gd"),
 	"@tool\nextends Area2D\n# PRIVATE_CONNECTION_SCRIPT_CANARY\nfunc _on_timeout(_a = null): pass\nfunc _on_ready(_v = null): pass\nfunc nonpersistent_canary(): pass\nfunc resource_canary(): pass\nfunc make_lambda():\n\treturn func _on_timeout(_x = null): print(self)\n",
 );
@@ -97,8 +109,8 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
-if (records.some((entry) => entry.schemaVersion !== 5))
-	throw new Error("New producer did not write schema v5 consistently");
+if (records.some((entry) => entry.schemaVersion !== 6))
+	throw new Error("New producer did not write schema v6 consistently");
 for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
 	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
 		throw new Error(`Missing ${label} marker`);
@@ -334,6 +346,64 @@ console.log(
 fs.writeFileSync(
 	path.join(fixture, "connections-review.json"),
 	JSON.stringify({ connectionsJournal, reopenedConnections }, null, 2),
+);
+// v6 mesh/material identity references from real MeshInstance3D property changes.
+const meshText = fs.readFileSync(path.join(fixture, "mesh.jsonl"), "utf8");
+const meshJournal = parseGodotSceneJournal(meshText);
+const meshMarkers = listGodotSceneCheckpoints(meshText);
+const crateRefs = (sequence) => {
+	const records = meshText.trim().split("\n").map(JSON.parse);
+	const marker = records[sequence];
+	const crate = records[marker.snapshotSequence].state.nodes.find((node) => node.name === "Crate");
+	// Godot writes object keys alphabetically; compare fields, not key order.
+	const ref = (value) => value && { type: value.type, path: value.path };
+	return (
+		crate && {
+			mesh: ref(crate.properties.mesh),
+			materialOverride: ref(crate.properties.materialOverride),
+		}
+	);
+};
+const [builtIn, saved, files] = meshMarkers.map((marker) => crateRefs(marker.recordSequence));
+if (
+	JSON.stringify(builtIn) !==
+		JSON.stringify({
+			mesh: { type: "BoxMesh", path: "built-in-or-unsaved" },
+			materialOverride: { type: "StandardMaterial3D", path: "built-in-or-unsaved" },
+		}) ||
+	JSON.stringify(saved) !== JSON.stringify(builtIn) ||
+	JSON.stringify(files) !==
+		JSON.stringify({
+			mesh: { type: "BoxMesh", path: "res://cube.tres" },
+			materialOverride: { type: "StandardMaterial3D", path: "res://mat.tres" },
+		})
+)
+	throw new Error(`Unexpected real mesh references: ${JSON.stringify({ builtIn, saved, files })}`);
+const saveCompare = compareGodotSceneCheckpoints(
+	meshText,
+	meshMarkers[0].recordSequence,
+	meshMarkers[1].recordSequence,
+);
+const fileCompare = compareGodotSceneCheckpoints(
+	meshText,
+	meshMarkers[1].recordSequence,
+	meshMarkers[2].recordSequence,
+);
+if (
+	saveCompare.changed.some(
+		(node) => node.fields.includes("mesh") || node.fields.includes("materialOverride"),
+	) ||
+	JSON.stringify(fileCompare.changed.find((node) => node.nameAfter === "Crate")?.fields) !==
+		JSON.stringify(["mesh", "materialOverride"]) ||
+	!meshText.split("\n").some((line) => line.includes('"trigger":"inspector"'))
+)
+	throw new Error("Mesh comparison/save semantics or Inspector trigger missing");
+fs.writeFileSync(
+	path.join(fixture, "mesh-review.json"),
+	JSON.stringify({ meshJournal, saveCompare, fileCompare }, null, 2),
+);
+console.log(
+	`MESH_REFERENCES_PASSED: built-in -> saved (unchanged) -> res:// files; ${meshJournal.observations.length} observations; names/contents withheld`,
 );
 console.log(
 	`CONNECTIONS_PASSED: baseline/add/remove/reopen; ${unrecorded.payload.after} out-of-scope or unsupported persistent connections counted, not described`,

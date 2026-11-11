@@ -174,3 +174,11 @@ Raw v5 states carry the saved signal connections between observed nodes (names, 
 bound-argument count only) plus a count of excluded ones. Added/removed connections are
 sampled relationship differences, not proof of the Signals-dock route or of emission.
 [Exact scope and Linux/WinBoat/production evidence](lesson-capture/GODOT_SIGNAL_CONNECTIONS_2026-11-10.md).
+
+## MeshInstance3D resource references (v6)
+
+New takes write raw journal v6. They add identity references for an owned MeshInstance3D's
+`mesh` and `material_override`: the engine class name, plus a `res://` path only for a
+resource saved as its own file, otherwise `built-in-or-unsaved`. No names, contents or
+rendering are recorded. References are identity, not content equality.
+[Exact scope and Linux/WinBoat/production evidence](lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md).

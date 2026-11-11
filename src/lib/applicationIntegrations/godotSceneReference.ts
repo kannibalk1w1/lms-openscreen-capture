@@ -36,7 +36,11 @@ const FIELDS = [
 	"position3",
 	"rotation3",
 	"scale3",
+	"mesh",
+	"materialOverride",
 ] as const;
+/** v1–v5 journals never recorded MeshInstance3D mesh/material references. */
+const MESH_REFERENCE_FIELDS = ["mesh", "materialOverride"] as const;
 /**
  * The only fields an explicit tolerance applies to: continuous transform properties.
  * Names, types, resource paths, visibility, path identity, connection flags and counts are
@@ -59,6 +63,7 @@ type Unknown =
 	| "reference-coverage-limited"
 	| "candidate-coverage-limited"
 	| "node3d-fields-unobserved"
+	| "mesh-references-unobserved"
 	| "connections-unobserved"
 	| "connections-partially-recorded";
 
@@ -187,6 +192,9 @@ function sameValue(a: unknown, b: unknown, tolerance: number): boolean {
 		return (
 			a.length === b.length && a.every((value, index) => sameValue(value, b[index], tolerance))
 		);
+	// Identity references ({type, path}) compare as exact text; no tolerance applies.
+	if (a !== null && b !== null && typeof a === "object" && typeof b === "object")
+		return JSON.stringify(a) === JSON.stringify(b);
 	return a === b;
 }
 
@@ -198,8 +206,15 @@ function fieldValue(node: SceneNode, field: Field): unknown {
  * Fields a source of this version could not have recorded for this node. Inheritance is
  * never inferred from type names: a legacy node without a 2D transform may be a Node3D.
  */
-function unrecordable(node: SceneNode, version: number): readonly Field[] {
-	return version < 3 && node.properties.position === undefined ? LEGACY_UNRECORDED : [];
+function unrecordable(node: SceneNode, version: number, other: SceneNode): readonly Field[] {
+	const fields: Field[] =
+		version < 3 && node.properties.position === undefined ? [...LEGACY_UNRECORDED] : [];
+	// A pre-v6 journal could not record mesh/material references: unknown, not "none", whenever
+	// the other side recorded one for this path.
+	if (version < 6)
+		for (const field of MESH_REFERENCE_FIELDS)
+			if (other.properties[field] !== undefined) fields.push(field);
+	return fields;
 }
 
 type IndexedConnection = { from: number; to: number; detail: ConnectionDetail };
@@ -281,8 +296,8 @@ export function compareGodotCheckpointToReference(
 			continue;
 		}
 		const unobservable = new Set<Field>([
-			...unrecordable(node, reference.schemaVersion),
-			...unrecordable(other, candidate.schemaVersion),
+			...unrecordable(node, reference.schemaVersion, other),
+			...unrecordable(other, candidate.schemaVersion, node),
 		]);
 		const compared: Field[] = id === 0 ? ["name", ...FIELDS] : [...FIELDS];
 		const fields = compared.filter(
@@ -295,7 +310,16 @@ export function compareGodotCheckpointToReference(
 				),
 		);
 		const unobservedFields = compared.filter((field) => unobservable.has(field));
-		if (unobservedFields.length) unknowns.add("node3d-fields-unobserved");
+		if (
+			unobservedFields.some(
+				(field) => !(MESH_REFERENCE_FIELDS as readonly string[]).includes(field),
+			)
+		)
+			unknowns.add("node3d-fields-unobserved");
+		if (
+			unobservedFields.some((field) => (MESH_REFERENCE_FIELDS as readonly string[]).includes(field))
+		)
+			unknowns.add("mesh-references-unobserved");
 		if (fields.length) {
 			counts.differing++;
 			keep("differing", differing, () => ({
