@@ -288,3 +288,48 @@ that gap would need OS-level locking that a user-space tool cannot impose. Withi
 window, the guarantee is that the output's parent was not any project directory at the
 moment of the check. A project with any unreadable directory, or one beyond the walk caps,
 cannot be manifested at all, by design.
+
+## Boundary review of `4520b7fd`
+
+[Targeted boundary review](CLAUDE_PROJECT_MANIFEST_BOUNDARY_REVIEW_4520B7FD_2026-11-11.md):
+**changes requested**. On Linux it confirmed the same-identity alias cases (a–g, i). The gaps:
+
+- **F1 (Medium, Windows):** a volume mounted inside the project (`mountvol`) is a directory
+  entry of link type that `lstat` reports as a directory. The identity walk skipped it,
+  while the scan descended into it, so an output on that volume was accepted.
+- **F2:** overlay upper-layer and FUSE aliases carry *different* identities.
+- **F3 (Low):** a mount over the output parent between the check and the write.
+- **F4–F6 (Nits):** cancellation inside one huge listing, Number inodes on Windows, and a
+  vanishing folder failing closed.
+
+Fixed in the next commit:
+
+- **F1:**
+  - Both the scan and the walk now track directory entries reported as links. The scan
+    lists such a reparse/mount point as `symbolic-link` and does not follow it.
+  - The walk **fails closed** (`manifest-output-unverifiable`) for any project containing
+    one.
+  - A real WinBoat Windows 11 probe mounted the C: volume at `proj\vol` (cleanup in
+    `finally`, with removal verified afterwards). The ordinary output and the output on
+    the mounted volume were both refused as `manifest-output-unverifiable`, and nothing was
+    written. An earlier probe attempt was invalid: PowerShell 5.1 quoting of a trailing
+    backslash made `mountvol` print its usage, so nothing was mounted. That run is not
+    counted.
+- **F2:** on Linux, if `statfs` shows overlayfs, FUSE, NFS, SMB/CIFS, 9p, Ceph or AFS for the
+  root, the output parent or any nested mount inside the project, the request fails
+  closed. A real unprivileged overlay probe (`mount -t overlay` in `unshare
+  --map-root-user --mount`) with the project in the merged view refused both the
+  upper-layer output and an ordinary outside output. Projects on such filesystems cannot be
+  manifested. On Windows and macOS, filesystem-type checks are not performed; their
+  same-identity and mount-point rules above apply.
+- **F3:** after the `wx` write the boundary is proven again. If it fails, only the file
+  this call just created (matching device/inode) is removed and the request fails. The
+  remaining window is between that second proof and the caller using the receipt.
+- **F4:** the caller's currency check runs every 1,024 entries inside a listing.
+- **F5:** the walk uses BigInt device/inode.
+- **F6:** a folder vanishing during the walk stays fail-closed, by design.
+
+Unit tests (Linux) cover a mocked overlay root type (refused, no file) and a post-write proof
+failure (the single written file is removed). The earlier bind-mount alias probes still
+refuse all three alias kinds and accept a genuine outside folder. Production Linux CLI/MCP
+14/14, startup smoke and the full suite (6,700 tests in 487+1 files) pass.

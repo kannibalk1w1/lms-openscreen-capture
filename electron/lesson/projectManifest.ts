@@ -260,6 +260,7 @@ async function scanProject(
 	const walk = async (directory: string, relative: string[], depth: number): Promise<void> => {
 		// Streamed, so one huge directory cannot exceed the entry budget in memory.
 		const names: string[] = [];
+		const linkNames = new Set<string>();
 		try {
 			const dir = await fs.opendir(directory);
 			for await (const entry of dir) {
@@ -270,6 +271,7 @@ async function scanProject(
 					break;
 				}
 				names.push(entry.name);
+				if (entry.isSymbolicLink()) linkNames.add(entry.name);
 			}
 		} catch {
 			if (relative.length) unobserved.push({ path: relative.join("/"), reason: "unreadable" });
@@ -300,7 +302,10 @@ async function scanProject(
 				unobserved.push({ path: rel, reason: "unreadable" });
 				continue;
 			}
-			if (named.isSymbolicLink()) unobserved.push({ path: rel, reason: "symbolic-link" });
+			// A directory entry that reports a link but lstat reports a directory is a reparse or
+			// mount point (for example a Windows volume mounted inside the project): not followed.
+			if (named.isSymbolicLink() || (linkNames.has(name) && named.isDirectory()))
+				unobserved.push({ path: rel, reason: "symbolic-link" });
 			else if (named.isDirectory()) {
 				if (depth === 0 && (PROJECT_MANIFEST_EXCLUSIONS as readonly string[]).includes(name))
 					unobserved.push({ path: rel, reason: "excluded-directory" });
@@ -359,30 +364,65 @@ const current = (assertCurrent: () => void) => () => {
  * followed). If it cannot be completed — an unreadable directory, the depth or entry cap — the
  * output cannot be proven to lie outside the project and is refused (fail closed).
  */
+/**
+ * Linux filesystems whose aliases can carry identities different from the project's own
+ * directories (overlay upper/lower layers, FUSE, network filesystems). The identity proof does
+ * not hold there, so writes fail closed.
+ */
+const ALIAS_UNSAFE_FILESYSTEMS = new Set([
+	0x794c7630, // overlayfs
+	0x65735546, // FUSE / fuse-overlayfs
+	0x6969, // NFS
+	0x517b, // SMB
+	0xff534d42, // CIFS
+	0xfe534d42, // SMB2
+	0x01021997, // 9p
+	0x00c36400, // Ceph
+	0x5346414f, // AFS
+]);
+
+async function assertIdentityFilesystem(target: string): Promise<void> {
+	if (process.platform !== "linux") return;
+	let type: number;
+	try {
+		type = Number((await fs.statfs(target)).type);
+	} catch {
+		throw new ProjectManifestError("manifest-output-unverifiable");
+	}
+	if (ALIAS_UNSAFE_FILESYSTEMS.has(type >>> 0))
+		throw new ProjectManifestError("manifest-output-unverifiable");
+}
+
 async function assertOutputParentOutsideProject(
 	root: string,
 	outputParent: string,
 	assertCurrent: () => void,
 ): Promise<void> {
-	let target: Stats;
+	let target: import("node:fs").BigIntStats;
 	try {
-		target = statSync(outputParent);
+		// BigInt identities: Windows file indexes can exceed 2^53.
+		target = statSync(outputParent, { bigint: true });
 	} catch {
 		throw new ProjectManifestError("manifest-output-invalid");
 	}
-	const key = (stat: Stats) => `${stat.dev}:${stat.ino}`;
+	await assertIdentityFilesystem(outputParent);
+	await assertIdentityFilesystem(root);
+	const key = (stat: import("node:fs").BigIntStats) => `${stat.dev}:${stat.ino}`;
 	const wanted = key(target);
 	let entries = 0;
-	const visit = async (directory: string, depth: number): Promise<void> => {
-		let stat: Stats;
+	const visit = async (directory: string, depth: number, parentDev?: bigint): Promise<void> => {
+		let stat: import("node:fs").BigIntStats;
 		try {
-			stat = await fs.lstat(directory);
+			stat = await fs.lstat(directory, { bigint: true });
 		} catch {
 			throw new ProjectManifestError("manifest-output-unverifiable");
 		}
 		if (key(stat) === wanted) throw new ProjectManifestError("manifest-output-invalid");
 		if (depth > PROJECT_IDENTITY_WALK_MAX_DEPTH)
 			throw new ProjectManifestError("manifest-output-unverifiable");
+		// A nested mount inside the project: its filesystem must also support the proof.
+		if (parentDev !== undefined && stat.dev !== parentDev)
+			await assertIdentityFilesystem(directory);
 		let dir: import("node:fs").Dir;
 		try {
 			dir = await fs.opendir(directory);
@@ -390,20 +430,23 @@ async function assertOutputParentOutsideProject(
 			throw new ProjectManifestError("manifest-output-unverifiable");
 		}
 		const children: string[] = [];
+		const linkEntries = new Set<string>();
 		try {
 			for await (const entry of dir) {
 				if (++entries > PROJECT_IDENTITY_WALK_MAX_ENTRIES)
 					throw new ProjectManifestError("manifest-output-unverifiable");
-				// Dirent types come from the directory itself: links are never followed.
-				if (entry.isDirectory()) children.push(entry.name);
-				else if (entry.isSymbolicLink() || entry.isFile()) continue;
-				else if (
-					!entry.isBlockDevice() &&
-					!entry.isCharacterDevice() &&
-					!entry.isFIFO() &&
-					!entry.isSocket()
+				if (entries % 1024 === 0) assertCurrent();
+				if (entry.isFile()) continue;
+				if (
+					entry.isBlockDevice() ||
+					entry.isCharacterDevice() ||
+					entry.isFIFO() ||
+					entry.isSocket()
 				)
-					children.push(entry.name); // unknown type: inspect with lstat below
+					continue;
+				// Directories, links and unknown types are inspected with lstat below.
+				if (entry.isSymbolicLink()) linkEntries.add(entry.name);
+				children.push(entry.name);
 			}
 		} catch (error) {
 			if (error instanceof ProjectManifestError) throw error;
@@ -412,13 +455,18 @@ async function assertOutputParentOutsideProject(
 		for (const name of children) {
 			assertCurrent();
 			const child = path.join(directory, name);
-			let childStat: Stats;
+			let childStat: import("node:fs").Stats;
 			try {
 				childStat = await fs.lstat(child);
 			} catch {
 				throw new ProjectManifestError("manifest-output-unverifiable");
 			}
-			if (childStat.isDirectory()) await visit(child, depth + 1);
+			if (childStat.isSymbolicLink()) continue;
+			if (!childStat.isDirectory()) continue;
+			// A directory whose entry reports a link is a reparse/mount point (for example a
+			// Windows volume mounted in the project): what it exposes cannot be bounded here.
+			if (linkEntries.has(name)) throw new ProjectManifestError("manifest-output-unverifiable");
+			await visit(child, depth + 1, stat.dev);
 		}
 	};
 	await visit(root, 0);
@@ -511,6 +559,20 @@ export async function createProjectManifestFile(
 				? "manifest-output-exists"
 				: "manifest-write-failed",
 		);
+	}
+	// Re-prove after writing: an alias mounted over the output parent between the check and the
+	// write is caught here, and only the file this call just created is removed.
+	const written = statSync(target, { bigint: true });
+	try {
+		await assertOutputParentOutsideProject(root, path.dirname(target), () => undefined);
+	} catch (error) {
+		try {
+			const now = statSync(target, { bigint: true });
+			if (now.dev === written.dev && now.ino === written.ino) await fs.unlink(target);
+		} catch {
+			// Already gone; nothing else is touched.
+		}
+		throw error;
 	}
 	return {
 		format: "openscreen-project-manifest-receipt" as const,
