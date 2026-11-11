@@ -489,4 +489,24 @@ describe("review c233dcc6 follow-up", () => {
 		expect(result.counts.notReached).toBe(0);
 		expect(result.outcome).toBe("drift-observed");
 	});
+	it.runIf(process.platform === "linux")(
+		"lists undecodable names once as unsupported instead of failing (S-2)",
+		async () => {
+			const box = Buffer.from(path.join(tmp, "Names"));
+			await fs.mkdir(box);
+			for (const bytes of [
+				[0xff, 0x61],
+				[0xfe, 0x61],
+			])
+				await fs.writeFile(Buffer.concat([box, Buffer.from("/"), Buffer.from(bytes)]), "x");
+			await fs.writeFile(path.join(tmp, "Names", "ok.gd"), "ok");
+			await createProjectManifestFile({
+				rootPath: path.join(tmp, "Names"),
+				outputPath: path.join(out, "names.json"),
+			});
+			const manifest = await read("names.json");
+			expect(manifest.files.map((file: { path: string }) => file.path)).toEqual(["ok.gd"]);
+			expect(manifest.unobserved).toEqual([{ path: "\uFFFDa", reason: "unsupported-name" }]);
+		},
+	);
 });

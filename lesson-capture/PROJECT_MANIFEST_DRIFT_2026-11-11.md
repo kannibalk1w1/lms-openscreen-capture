@@ -63,6 +63,8 @@ Path names are still sensitive metadata: review a manifest before sharing it.
     read with `O_NOFOLLOW`.
   - `excluded-directory`: `.git`, `.godot` and `.import` at the selected root only.
   - `depth-limit`.
+  - `unsupported-name`: a name that is not valid Unicode (on Linux such names decode
+    with U+FFFD and could collide); listed once, not hashed or entered.
   - `byte-limit`: a file larger than the remaining byte budget is listed and skipped, and
     the scan continues (`limitReason: "byte-limit"`, limited coverage). File and entry
     limits still stop the scan.
@@ -165,7 +167,7 @@ Fixed in the follow-up commit:
 
 - M-1/L-6: the output's real parent and every ancestor are compared with the selected root
   by device and inode identity, so `..`-prefixed names, case-insensitive spellings, 8.3
-  short names and bind mounts are refused. Regression tests cover both `..` forms and a
+  short names are refused. Bind mounts are covered by the scan-identity check below. Regression tests cover both `..` forms and a
   sibling `<root>..json`, which is allowed.
 - L-1: entries are counted while streaming; the schema caps unobserved rows at 4 × the
   file limit; limited coverage is reported as `entry-limit`.
@@ -225,4 +227,20 @@ Regression tests for R-1a, R-1b and R-3 fail on the previous code. Revalidation:
 - Production Linux CLI/MCP: 14/14. Startup smoke passes.
 - Full suite: 6,692 tests in 487 files.
 
-Awaiting a second recheck.
+The [second recheck of `d4de449f`](CLAUDE_PROJECT_MANIFEST_RECHECK2_D4DE449F_2026-11-11.md)
+**accepts it with Lows**. Both are closed in the next commit:
+
+- **S-1:** a bind mount of a folder the scan does not enter (an excluded `.godot`, a
+  depth-limited or an unreadable folder) slipped through. Now every folder the scan
+  meets, including skipped ones, is in the identity set. A real `unshare
+  --map-root-user --mount` probe refuses both a bind-mounted subfolder and a bind-mounted
+  excluded `.godot`, and writes nothing into the project.
+
+  **Residual limitation:** after a file or entry limit stops a scan, folders never reached
+  are not in the set. The pre-scan ancestor-identity check still applies, but an
+  out-of-tree alias, such as a bind mount, of an unreached folder cannot be detected.
+  Nothing is overwritten (`wx`) in that case.
+- **S-2:** undecodable names are listed once as `unsupported-name`, with a Linux
+  regression test.
+- **S-3:** the `manifest-scan-inconsistent` code has no direct test, because valid scans no
+  longer reach it; it remains a defensive fixed code.

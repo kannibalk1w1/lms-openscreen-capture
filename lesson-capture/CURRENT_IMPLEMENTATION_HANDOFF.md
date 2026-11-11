@@ -1,11 +1,14 @@
-# Project manifest and drift detection awaiting review — 11 November 2026
+# Project manifest and drift detection accepted — 11 November 2026
 
 Claude builder. Coordinator chose A1 (WinBoat VM GUI physical test) + B2. B2 built:
 [opt-in project manifest/drift](PROJECT_MANIFEST_DRIFT_2026-11-11.md) — explicit folder,
 paths+sizes+SHA-256 only, new output outside the folder, links/junctions never followed,
 bounded, hash-bound drift with changed/missing/added/unobserved/not-reached; CLI + MCP.
 Real WinBoat Windows 11 11/11 (junction not followed), production Linux CLI/MCP 14/14,
-startup smoke, full 6,680/487. Independent review pending; A1 next. No archive/restore.
+startup smoke and full suite pass. Review c233dcc6 requested changes (M-1 output scope), fixed
+in b64f5859; recheck requested changes (R-1a/R-1b), fixed in d4de449f; second recheck
+accepted with Lows, closed next. A1 prepared (b40adf4f), waiting for the owner's WinBoat
+desktop session. No archive/restore.
 No pushes; main fd2775e2.
 
 # Godot reference comparison CLI/MCP accepted — 10 November 2026

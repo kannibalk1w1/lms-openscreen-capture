@@ -70,6 +70,7 @@ const reason = z.enum([
 	"excluded-directory",
 	"depth-limit",
 	"byte-limit",
+	"unsupported-name",
 ]);
 type Reason = z.infer<typeof reason>;
 const relativePath = z
@@ -292,6 +293,11 @@ async function scanProject(
 				limitReason = "entry-limit";
 				return;
 			}
+			// Undecodable (non-UTF-8) names all read back with U+FFFD and could collide.
+			if (name.includes("\uFFFD")) {
+				unobserved.push({ path: [...relative, name].join("/"), reason: "unsupported-name" });
+				continue;
+			}
 			const parts = [...relative, name];
 			const rel = parts.join("/");
 			const absolutePath = path.join(directory, name);
@@ -304,6 +310,8 @@ async function scanProject(
 			}
 			if (named.isSymbolicLink()) unobserved.push({ path: rel, reason: "symbolic-link" });
 			else if (named.isDirectory()) {
+				// Skipped folders are still inside the project: an output aliasing one is refused.
+				directories.add(`${named.dev}:${named.ino}`);
 				if (depth === 0 && (PROJECT_MANIFEST_EXCLUSIONS as readonly string[]).includes(name))
 					unobserved.push({ path: rel, reason: "excluded-directory" });
 				else if (depth + 1 >= PROJECT_MANIFEST_MAX_DEPTH)
@@ -330,6 +338,9 @@ async function scanProject(
 		a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
 	files.sort(byPath);
 	unobserved.sort(byPath);
+	// Several undecodable names can produce one identical unobserved row; keep one.
+	for (let i = unobserved.length - 1; i > 0; i--)
+		if (unobserved[i].path === unobserved[i - 1].path) unobserved.splice(i, 1);
 	return {
 		files,
 		unobserved,
