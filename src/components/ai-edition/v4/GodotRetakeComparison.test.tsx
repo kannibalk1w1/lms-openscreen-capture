@@ -127,3 +127,22 @@ it("ignores a slower earlier replacement read once a newer file is chosen", asyn
 	expect(screen.queryByLabelText(/slow\.jsonl/)).toBeNull();
 	expect(screen.getByLabelText(/newer\.jsonl/)).toBeTruthy();
 });
+
+it("resets every selection and result when the original changes", async () => {
+	const props = { originalSha256: sha(linux), originalCheckpoints: linuxCheckpoints };
+	const view = render(<GodotRetakeComparison originalText={linux} {...props} />);
+	const original = () => screen.getByLabelText("lesson.retake.original") as HTMLSelectElement;
+	fireEvent.change(original(), { target: { value: marker(linux, "3D baseline") } });
+	fireEvent.change(screen.getByLabelText("lesson.retake.choose"), {
+		target: { files: [new File([windows], "retake.jsonl")] },
+	});
+	fireEvent.change(await screen.findByLabelText(/lesson\.retake\.replacementCheckpointFor/), {
+		target: { value: marker(windows, "3D baseline") },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "lesson.retake.compare" }));
+	await screen.findByRole("region", { name: "lesson.retake.result" });
+	view.rerender(<GodotRetakeComparison originalText={`${linux}\n`} {...props} />);
+	expect(original().value).toBe("");
+	expect(screen.queryByRole("region", { name: "lesson.retake.result" })).toBeNull();
+	expect(screen.queryByLabelText(/lesson\.retake\.replacementCheckpointFor/)).toBeNull();
+});

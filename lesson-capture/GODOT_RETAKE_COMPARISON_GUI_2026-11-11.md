@@ -101,3 +101,22 @@ Validation:
 - Full suite: 6,702 tests in 488 files.
 
 These are still jsdom-only tests.
+
+## Recheck of `fbe11c00`
+
+[Recheck](CLAUDE_RETAKE_GUI_RECHECK_FBE11C00_2026-11-11.md): **accepted with Lows**. L1–L4 and
+the nits are fixed; L5 is partly fixed. Closed in the next commit:
+
+- **N1:** three mutants survived because some behaviour was untested. New tests cover:
+  - a BOM-prefixed original: the shown identity is the SHA-256 of the stored bytes, not of
+    the decoded text. Tested through the real capture review with the real Linux/Windows
+    takes, so the review must pass the right hash;
+  - a changed original resetting every selection and the result.
+
+  Both mutants (re-encoded-text hash; no original reset) are killed. The busy-guard mutant
+  in `compare()` stays equivalent, because the button is already disabled while busy.
+- **N2:** if Web Crypto hashing fails, only the retake panel is hidden, because its
+  identities must be bound. The generic review and the within-take comparison still work,
+  and a test covers this.
+
+Full suite after these changes: 6,706 tests in 489 files.

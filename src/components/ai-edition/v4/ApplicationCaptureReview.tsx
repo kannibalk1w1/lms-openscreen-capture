@@ -92,7 +92,15 @@ export function ApplicationCaptureReview({
 				}
 			}
 			// Hash before showing anything, so the journal and its checkpoint panels appear together.
-			const sourceSha256 = checkpoints.length >= 1 ? await bytesSha256(sourceBytes) : "";
+			// Without a hash the retake panel is hidden (its identities must be bound); the generic
+			// review and within-take comparison still work.
+			let sourceSha256 = "";
+			if (checkpoints.length >= 1)
+				try {
+					sourceSha256 = await bytesSha256(sourceBytes);
+				} catch {
+					sourceSha256 = "";
+				}
 			if (current !== epoch.current) return;
 			setJournal(parsed);
 			setCheckpointSource(
@@ -213,7 +221,7 @@ export function ApplicationCaptureReview({
 							/>
 						</fieldset>
 					)}
-					{checkpointSource && (
+					{checkpointSource?.sha256 && (
 						<fieldset disabled={busy} style={{ border: 0, padding: 0 }}>
 							<GodotRetakeComparison
 								key={checkpointSource.id}
