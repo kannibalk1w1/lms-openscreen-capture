@@ -190,3 +190,10 @@ owned MeshInstance3D, by surface index: at most 32 per node, with a truncation f
 1,024-entry cap per snapshot. A node with no mesh records `null`, not stale overrides.
 Overrides are identity references only, with no matching across different meshes.
 [Exact scope and evidence](lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md).
+
+## Sprite3D texture and AnimatedSprite SpriteFrames references (v8)
+
+New takes write raw journal v8. They add identity references for a Sprite3D's `texture`
+(`spriteTexture`) and an AnimatedSprite2D/3D's `sprite_frames` (`spriteFrames`). No animation
+names, frames, pixels or playback state are recorded.
+[Exact scope and evidence](lesson-capture/GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md).

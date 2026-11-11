@@ -278,7 +278,7 @@ func _property_edited(property: String) -> void:
 	var target := _editor.get_inspector().get_edited_object()
 	if not target is Node or (target != _root and (target.owner != _root or not _root.is_ancestor_of(target))):
 		return
-	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture") or (target is MeshInstance3D and (property in ["mesh", "material_override"] or property.begins_with("surface_material_override/"))):
+	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture") or (target is MeshInstance3D and (property in ["mesh", "material_override"] or property.begins_with("surface_material_override/"))) or (target is Sprite3D and property == "texture") or ((target is AnimatedSprite2D or target is AnimatedSprite3D) and property == "sprite_frames"):
 		_pending_trigger = "inspector"
 
 func _snapshot() -> Dictionary:
@@ -398,6 +398,12 @@ func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 		properties["mesh"] = _identity_ref(node.mesh)
 		properties["materialOverride"] = _identity_ref(node.material_override)
 		properties["surfaceOverrides"] = _surface_overrides(node)
+	# v8: the explicit texture of a Sprite3D and the SpriteFrames of an AnimatedSprite2D/3D, as
+	# identity references only — never animation names, frames, pixels or playback state.
+	if node is Sprite3D:
+		properties["spriteTexture"] = _identity_ref(node.texture)
+	if node is AnimatedSprite2D or node is AnimatedSprite3D:
+		properties["spriteFrames"] = _identity_ref(node.sprite_frames)
 	properties["script"] = _resource(node.get_script())
 	nodes.append({"id": identity, "parent": parent, "name": str(node.name), "type": node.get_class(), "properties": properties})
 	for child in node.get_children():
@@ -463,7 +469,7 @@ func _has_control(text: String) -> bool:
 func _write(payload: Dictionary) -> bool:
 	if not active():
 		return false
-	payload["schemaVersion"] = 7
+	payload["schemaVersion"] = 8
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence

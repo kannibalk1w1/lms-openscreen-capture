@@ -1,3 +1,11 @@
+# Sprite references awaiting review — 11 November 2026
+
+Claude builder, from accepted 320b4912 and tests/docs 4f7a175a/955a1355. New slice: [raw v8
+Sprite3D texture and AnimatedSprite SpriteFrames references](GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md).
+Real Linux/WinBoat probes, production CLI/MCP 13/13, startup smoke and full suite 6,759/492
+pass; independent review pending. A1 still blocked on the owner's WinBoat desktop. No pushes;
+main fd2775e2.
+
 # Per-surface material overrides accepted — 11 November 2026
 
 Claude builder, from accepted ac715a7c/1b1a751a. New slice: [raw v7 per-surface material

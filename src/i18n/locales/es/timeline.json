@@ -659,7 +659,7 @@
 			"invalid": "That file is not a valid raw Godot journal with at least one checkpoint.",
 			"failed": "These checkpoints could not be compared.",
 			"result": "Retake comparison",
-			"policy": "Field policy: the scene root's name, and every matched node's type, script and texture paths (compared as text), visibility, 2D/3D transforms and MeshInstance3D mesh/material-override references and explicit per-surface overrides (by surface index; surfaces are not matched across different meshes) (engine class name plus file path or built-in marker, compared as text — not resource contents; all built-in and sub-resources, including meshes inside imported .glb files, share one marker), are compared exactly. Selection, the journal's scene path and stop reason are not compared. Saved connections are compared by endpoint path, signal, method, flags and bound-argument count.",
+			"policy": "Field policy: the scene root's name, and every matched node's type, script and texture paths (compared as text), visibility, 2D/3D transforms and Sprite3D texture and AnimatedSprite SpriteFrames references, MeshInstance3D mesh/material-override references and explicit per-surface overrides (by surface index; surfaces are not matched across different meshes) (engine class name plus file path or built-in marker, compared as text — not resource contents; all built-in and sub-resources, including meshes inside imported .glb files, share one marker), are compared exactly. Selection, the journal's scene path and stop reason are not compared. Saved connections are compared by endpoint path, signal, method, flags and bound-argument count.",
 			"sameTake": "Both checkpoints come from the same take: this is a consistency check, not independent confirmation.",
 			"unknowns": "Unknown or partial evidence",
 			"source": "{{label}} · {{scene}} · journal v{{version}} · take …{{session}} · coverage {{coverage}} · SHA-256 {{sha}}…",
@@ -685,7 +685,8 @@
 				"connections-partially-recorded": "Some saved connections were outside the observed scene or unsupported.",
 				"mesh-references-unobserved": "An older journal could not record mesh or material references.",
 				"surface-overrides-unobserved": "An older journal could not record per-surface material overrides.",
-				"surface-overrides-partial": "Some per-surface material overrides were not fully recorded (more than 32 surfaces, or unavailable)."
+				"surface-overrides-partial": "Some per-surface material overrides were not fully recorded (more than 32 surfaces, or unavailable).",
+				"sprite-references-unobserved": "An older journal could not record Sprite3D texture or SpriteFrames references."
 			},
 			"connection": {
 				"original": "Only in original: {{from}}.{{signal}} → {{to}}.{{method}}",

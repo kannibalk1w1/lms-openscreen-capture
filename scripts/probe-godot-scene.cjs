@@ -40,6 +40,14 @@ fs.writeFileSync(
 	'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="green"/></svg>',
 );
 fs.writeFileSync(
+	path.join(fixture, "sprites.tscn"),
+	'[gd_scene format=3]\n[node name="SpriteRoot" type="Node3D"]\n',
+);
+fs.writeFileSync(
+	path.join(fixture, "walk.tres"),
+	'[gd_resource type="SpriteFrames" format=3]\n[resource]\nanimations = [{"frames": [], "loop": true, "name": &"PRIVATE_FRAMES_FILE_CANARY", "speed": 5.0}]\n',
+);
+fs.writeFileSync(
 	path.join(fixture, "mesh.tscn"),
 	'[gd_scene format=3]\n[node name="World" type="Node3D"]\n',
 );
@@ -109,8 +117,8 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
-if (records.some((entry) => entry.schemaVersion !== 7))
-	throw new Error("New producer did not write schema v7 consistently");
+if (records.some((entry) => entry.schemaVersion !== 8))
+	throw new Error("New producer did not write schema v8 consistently");
 for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
 	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
 		throw new Error(`Missing ${label} marker`);
@@ -427,6 +435,50 @@ const capped = parseGodotSceneJournal(
 );
 if (capped.coverage !== "limited" || capped.stopReason !== "limit")
 	throw new Error("Surface entry cap must stop with a valid limited footer");
+const spriteText = fs.readFileSync(path.join(fixture, "sprites.jsonl"), "utf8");
+parseGodotSceneJournal(spriteText);
+const spriteAt = (label) => {
+	const records = spriteText.trim().split("\n").map(JSON.parse);
+	const marker = records.find(
+		(record) => record.event === "scene-checkpoint" && record.label === label,
+	);
+	const nodes = records[marker.snapshotSequence].state.nodes;
+	const ref = (value) => (value ? `${value.type}@${value.path}` : value);
+	const by = (name) => nodes.find((node) => node.name === name).properties;
+	return {
+		billboard: ref(by("Billboard").spriteTexture),
+		walker2d: ref(by("Walker2D").spriteFrames),
+		walker3d: ref(by("Walker3D").spriteFrames),
+	};
+};
+const spriteStates = ["Empty sprites", "Assigned sprites", "Saved sprites", "Cleared frames"].map(
+	spriteAt,
+);
+const expectedSprites = [
+	{ billboard: null, walker2d: null, walker3d: null },
+	{
+		billboard: "CompressedTexture2D@res://slime.svg",
+		walker2d: "SpriteFrames@built-in-or-unsaved",
+		walker3d: "SpriteFrames@res://walk.tres",
+	},
+	{
+		billboard: "CompressedTexture2D@res://slime.svg",
+		walker2d: "SpriteFrames@built-in-or-unsaved",
+		walker3d: "SpriteFrames@res://walk.tres",
+	},
+	{
+		billboard: "CompressedTexture2D@res://slime.svg",
+		walker2d: "SpriteFrames@built-in-or-unsaved",
+		walker3d: null,
+	},
+];
+if (JSON.stringify(spriteStates) !== JSON.stringify(expectedSprites))
+	throw new Error(`Unexpected real sprite references: ${JSON.stringify(spriteStates)}`);
+if (!spriteText.split("\n").some((line) => line.includes('"trigger":"inspector"')))
+	throw new Error("Missing SpriteFrames Inspector trigger");
+console.log(
+	"SPRITE_REFERENCES_PASSED: null -> texture/SpriteFrames identities -> save unchanged -> cleared null; animation names withheld",
+);
 console.log(
 	"SURFACE_OVERRIDES_PASSED: explicit override by index; 40 surfaces truncated to 32; no mesh -> null; entry cap -> limited footer",
 );

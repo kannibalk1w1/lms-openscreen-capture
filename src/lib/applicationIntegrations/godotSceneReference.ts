@@ -39,7 +39,11 @@ const FIELDS = [
 	"mesh",
 	"materialOverride",
 	"surfaceOverrides",
+	"spriteTexture",
+	"spriteFrames",
 ] as const;
+/** v1–v7 journals never recorded Sprite3D texture or SpriteFrames references. */
+const SPRITE_REFERENCE_FIELDS = ["spriteTexture", "spriteFrames"] as const;
 /** v1–v5 journals never recorded MeshInstance3D mesh/material references. */
 const MESH_REFERENCE_FIELDS = ["mesh", "materialOverride"] as const;
 /**
@@ -67,6 +71,7 @@ type Unknown =
 	| "mesh-references-unobserved"
 	| "surface-overrides-unobserved"
 	| "surface-overrides-partial"
+	| "sprite-references-unobserved"
 	| "connections-unobserved"
 	| "connections-partially-recorded";
 
@@ -220,6 +225,9 @@ function unrecordable(node: SceneNode, version: number, other: SceneNode): reado
 	// v1–v6 never recorded per-surface overrides.
 	if (version < 7 && other.properties.surfaceOverrides !== undefined)
 		fields.push("surfaceOverrides");
+	if (version < 8)
+		for (const field of SPRITE_REFERENCE_FIELDS)
+			if (other.properties[field] !== undefined) fields.push(field);
 	return fields;
 }
 
@@ -342,10 +350,17 @@ export function compareGodotCheckpointToReference(
 			unobservedFields.some(
 				(field) =>
 					!(MESH_REFERENCE_FIELDS as readonly string[]).includes(field) &&
+					!(SPRITE_REFERENCE_FIELDS as readonly string[]).includes(field) &&
 					field !== "surfaceOverrides",
 			)
 		)
 			unknowns.add("node3d-fields-unobserved");
+		if (
+			unobservedFields.some((field) =>
+				(SPRITE_REFERENCE_FIELDS as readonly string[]).includes(field),
+			)
+		)
+			unknowns.add("sprite-references-unobserved");
 		if (unobservedFields.includes("surfaceOverrides"))
 			unknowns.add(surfacesPartial ? "surface-overrides-partial" : "surface-overrides-unobserved");
 		if (

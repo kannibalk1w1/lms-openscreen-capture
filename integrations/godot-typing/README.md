@@ -129,3 +129,8 @@ recorded. See [mesh reference scope and validation](../../lesson-capture/GODOT_M
 Raw v7 (current producer) also records each owned MeshInstance3D's explicit per-surface
 material overrides by surface index: at most 32 per node, `null` when there is no mesh, and
 identity references only. See [surface override scope and validation](../../lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md).
+
+Raw v8 (current producer) also records Sprite3D `texture` and AnimatedSprite2D/3D
+`sprite_frames` identity references: the class name plus a `res://` path or the built-in
+marker. No animation names, frames, pixels or playback state are recorded. See
+[sprite reference scope and validation](../../lesson-capture/GODOT_SPRITE_RESOURCE_REFERENCES_2026-11-11.md).

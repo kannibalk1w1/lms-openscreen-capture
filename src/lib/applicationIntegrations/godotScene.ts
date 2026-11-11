@@ -77,6 +77,8 @@ const nodeSchema = z
 				mesh: identityRef.nullable().optional(),
 				materialOverride: identityRef.nullable().optional(),
 				surfaceOverrides: surfaceOverrides.nullable().optional(),
+				spriteTexture: identityRef.nullable().optional(),
+				spriteFrames: identityRef.nullable().optional(),
 			})
 			.strict(),
 	})
@@ -140,6 +142,7 @@ const envelope = z.object({
 		z.literal(5),
 		z.literal(6),
 		z.literal(7),
+		z.literal(8),
 	]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
@@ -257,6 +260,25 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 			if ((properties.mesh === null) !== (properties.surfaceOverrides === null))
 				throw new Error("Surface overrides must match the presence of a mesh");
 		}
+		// v8 sprite references: explicit property identity only, on the node types that own them.
+		const spriteTexture = properties.spriteTexture !== undefined;
+		const spriteFrames = properties.spriteFrames !== undefined;
+		if ((spriteTexture || spriteFrames) && schemaVersion < 8)
+			throw new Error("Sprite references require scene journal schema v8");
+		if (spriteTexture && (!has3d || spatial3d.some((value) => value === undefined)))
+			throw new Error("A Sprite3D texture reference belongs to a complete 3D node");
+		if (spriteFrames && !has2d && !has3d)
+			throw new Error("A SpriteFrames reference belongs to a 2D or 3D node");
+		if (spriteTexture && spriteFrames)
+			throw new Error("A node records a sprite texture or SpriteFrames, not both");
+		if (schemaVersion >= 8 && node.type === "Sprite3D" && !spriteTexture)
+			throw new Error("A v8 Sprite3D records its texture reference");
+		if (
+			schemaVersion >= 8 &&
+			(node.type === "AnimatedSprite2D" || node.type === "AnimatedSprite3D") &&
+			!spriteFrames
+		)
+			throw new Error("A v8 animated sprite records its SpriteFrames reference");
 		if (schemaVersion >= 6 && node.type === "MeshInstance3D" && !meshRefs)
 			throw new Error("A v6 MeshInstance3D records both mesh/material references");
 		if (has3d && spatial3d.some((value) => value === undefined))
@@ -712,6 +734,8 @@ export function compareGodotSceneCheckpoints(
 		"mesh",
 		"materialOverride",
 		"surfaceOverrides",
+		"spriteTexture",
+		"spriteFrames",
 	] as const;
 	const valueFor = (node: SceneNode, field: (typeof fields)[number]) =>
 		field === "name" || field === "parent"

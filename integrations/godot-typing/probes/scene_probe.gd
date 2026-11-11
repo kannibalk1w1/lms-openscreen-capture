@@ -292,6 +292,8 @@ func _probe() -> void:
 		return
 	if not await _probe_meshes(editor):
 		return
+	if not await _probe_sprites(editor):
+		return
 	print("SCENE_PROBE_PASSED")
 	get_tree().quit(0)
 
@@ -592,3 +594,56 @@ func _surface_mesh(count: int) -> ArrayMesh:
 		arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0, 0, index), Vector3(1, 0, index), Vector3(0, 1, index)])
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+# v8: Sprite3D texture and AnimatedSprite2D/3D SpriteFrames identity references.
+func _probe_sprites(editor: EditorInterface) -> bool:
+	editor.open_scene_from_path("res://sprites.tscn")
+	await _wait()
+	var root := editor.get_edited_scene_root() as Node3D
+	if not _require(root != null, "sprites scene opened"):
+		return false
+	var take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(take.begin("res://sprites.jsonl", root, editor, get_undo_redo()), "sprites take start"):
+		return false
+	var billboard := Sprite3D.new()
+	billboard.name = "Billboard"
+	root.add_child(billboard)
+	billboard.owner = root
+	var walker2d := AnimatedSprite2D.new()
+	walker2d.name = "Walker2D"
+	root.add_child(walker2d)
+	walker2d.owner = root
+	var walker3d := AnimatedSprite3D.new()
+	walker3d.name = "Walker3D"
+	root.add_child(walker3d)
+	walker3d.owner = root
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Empty sprites", take.active_session_id()), "empty sprites checkpoint"):
+		return false
+	billboard.texture = load("res://slime.svg")
+	var frames := SpriteFrames.new()
+	frames.add_animation("PRIVATE_ANIM_CANARY")
+	walker2d.sprite_frames = frames
+	walker2d.animation = "PRIVATE_ANIM_CANARY"
+	walker3d.sprite_frames = load("res://walk.tres")
+	editor.edit_node(walker3d)
+	await _wait()
+	editor.get_inspector().property_edited.emit("sprite_frames")
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Assigned sprites", take.active_session_id()), "assigned checkpoint"):
+		return false
+	editor.save_scene()
+	await _wait()
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Saved sprites", take.active_session_id()), "saved sprites checkpoint"):
+		return false
+	walker3d.sprite_frames = null
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Cleared frames", take.active_session_id()), "cleared checkpoint"):
+		return false
+	take.stop()
+	var text := FileAccess.get_file_as_string("res://sprites.jsonl")
+	for canary in ["PRIVATE_ANIM_CANARY", "PRIVATE_FRAMES_FILE_CANARY", "sprites.tscn::", "autoplay"]:
+		if not _require(not text.contains(canary), "sprite journal withholds " + canary):
+			return false
+	return true
