@@ -38,6 +38,24 @@ const identityRef = z
 		path: resourcePath.refine((value) => !value.includes("::")),
 	})
 	.strict();
+// v7: explicit per-surface material overrides of a MeshInstance3D, by surface index. null means
+// no mesh (no surfaces to describe); "unavailable" means Godot's override count disagreed with the
+// mesh's surface count, or the per-snapshot entry cap was reached.
+const surfaceOverrides = z.union([
+	z.literal("unavailable"),
+	z
+		.object({
+			count: z.number().int().min(0).max(256),
+			overrides: z.array(identityRef.nullable()).max(32),
+			truncated: z.boolean(),
+		})
+		.strict()
+		.refine(
+			(value) =>
+				value.overrides.length === Math.min(value.count, 32) &&
+				value.truncated === value.count > 32,
+		),
+]);
 const nodeSchema = z
 	.object({
 		id: nodeId,
@@ -57,6 +75,7 @@ const nodeSchema = z
 				scale3: vector3.optional(),
 				mesh: identityRef.nullable().optional(),
 				materialOverride: identityRef.nullable().optional(),
+				surfaceOverrides: surfaceOverrides.nullable().optional(),
 			})
 			.strict(),
 	})
@@ -119,6 +138,7 @@ const envelope = z.object({
 		z.literal(4),
 		z.literal(5),
 		z.literal(6),
+		z.literal(7),
 	]),
 	sessionId: z.string().regex(/^godot-scene-[a-f0-9]{32}$/),
 	instanceId: z.string().regex(/^[a-f0-9]{32}$/),
@@ -225,6 +245,17 @@ function validateState(state: SceneState, rootId?: string, schemaVersion = 2): v
 			(!has3d || properties.mesh === undefined || properties.materialOverride === undefined)
 		)
 			throw new Error("Mesh/material references belong to a complete 3D node");
+		if (properties.surfaceOverrides !== undefined && schemaVersion < 7)
+			throw new Error("Surface overrides require scene journal schema v7");
+		if (properties.surfaceOverrides !== undefined && !meshRefs)
+			throw new Error("Surface overrides belong to a node with mesh references");
+		if (meshRefs && schemaVersion >= 7) {
+			if (properties.surfaceOverrides === undefined)
+				throw new Error("A v7 mesh node records its surface overrides");
+			// Surfaces exist only with a mesh; without one they are not applicable.
+			if ((properties.mesh === null) !== (properties.surfaceOverrides === null))
+				throw new Error("Surface overrides must match the presence of a mesh");
+		}
 		if (schemaVersion >= 6 && node.type === "MeshInstance3D" && !meshRefs)
 			throw new Error("A v6 MeshInstance3D records both mesh/material references");
 		if (has3d && spatial3d.some((value) => value === undefined))
@@ -679,6 +710,7 @@ export function compareGodotSceneCheckpoints(
 		"scale3",
 		"mesh",
 		"materialOverride",
+		"surfaceOverrides",
 	] as const;
 	const valueFor = (node: SceneNode, field: (typeof fields)[number]) =>
 		field === "name" || field === "parent"

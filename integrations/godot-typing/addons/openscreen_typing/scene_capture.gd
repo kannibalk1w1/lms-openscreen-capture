@@ -5,6 +5,8 @@ extends RefCounted
 signal status_changed(message: String)
 const MAX_NODES := 512
 const MAX_CONNECTIONS := 256
+const MAX_SURFACES_PER_NODE := 32
+const MAX_SURFACE_ENTRIES := 1024
 const MAX_RECORDS := 4096
 const MAX_BYTES := 8 * 1024 * 1024
 const INTERVAL_MS := 250
@@ -27,6 +29,7 @@ var _history: UndoRedo
 var _history_manager: EditorUndoRedoManager
 var _history_key := ""
 var _run_key := ""
+var _surface_entries := 0
 var _identifier_pattern := RegEx.create_from_string("^[A-Za-z_][A-Za-z0-9_]*$")
 
 func active() -> bool:
@@ -275,10 +278,11 @@ func _property_edited(property: String) -> void:
 	var target := _editor.get_inspector().get_edited_object()
 	if not target is Node or (target != _root and (target.owner != _root or not _root.is_ancestor_of(target))):
 		return
-	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture") or (target is MeshInstance3D and property in ["mesh", "material_override"]):
+	if property == "script" or (target is Node2D and property in ["position", "rotation", "scale", "visible"]) or (target is Node3D and property in ["position", "rotation", "scale", "visible"]) or (target is Sprite2D and property == "texture") or (target is MeshInstance3D and (property in ["mesh", "material_override"] or property.begins_with("surface_material_override/"))):
 		_pending_trigger = "inspector"
 
 func _snapshot() -> Dictionary:
+	_surface_entries = 0
 	var nodes: Array = []
 	_collect(_root, "", 0, nodes)
 	var selected: Array[String] = []
@@ -393,10 +397,30 @@ func _collect(node: Node, parent: String, depth: int, nodes: Array) -> void:
 		# because their path changes from "" to "res://scene::id" merely by saving the scene.
 		properties["mesh"] = _identity_ref(node.mesh)
 		properties["materialOverride"] = _identity_ref(node.material_override)
+		properties["surfaceOverrides"] = _surface_overrides(node)
 	properties["script"] = _resource(node.get_script())
 	nodes.append({"id": identity, "parent": parent, "name": str(node.name), "type": node.get_class(), "properties": properties})
 	for child in node.get_children():
 		_collect(child, identity, depth + 1, nodes)
+
+# v7: explicit per-surface material overrides by surface index, identity references only.
+# Without a mesh there is no surface to describe: Godot keeps the last override array then,
+# but it is not applied, so it is reported as null (not applicable) rather than as data.
+func _surface_overrides(node: MeshInstance3D) -> Variant:
+	if node.mesh == null:
+		return null
+	var count := clampi(node.mesh.get_surface_count(), 0, 256)
+	if node.get_surface_override_material_count() != count:
+		return "unavailable"
+	var shown := mini(count, MAX_SURFACES_PER_NODE)
+	_surface_entries += shown
+	if _surface_entries > MAX_SURFACE_ENTRIES:
+		_limited = true
+		return "unavailable"
+	var overrides: Array = []
+	for index in shown:
+		overrides.append(_identity_ref(node.get_surface_override_material(index)))
+	return {"count": count, "overrides": overrides, "truncated": count > shown}
 
 func _identity_ref(resource: Resource) -> Variant:
 	if resource == null:
@@ -439,7 +463,7 @@ func _has_control(text: String) -> bool:
 func _write(payload: Dictionary) -> bool:
 	if not active():
 		return false
-	payload["schemaVersion"] = 6
+	payload["schemaVersion"] = 7
 	payload["sessionId"] = _session
 	payload["instanceId"] = _instance
 	payload["sequence"] = _sequence

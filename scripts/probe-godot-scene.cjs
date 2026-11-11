@@ -109,8 +109,8 @@ if (
 	!records.some((entry) => entry.trigger === "inspector")
 )
 	throw new Error("Missing rapid selection/Inspector sampling evidence");
-if (records.some((entry) => entry.schemaVersion !== 6))
-	throw new Error("New producer did not write schema v6 consistently");
+if (records.some((entry) => entry.schemaVersion !== 7))
+	throw new Error("New producer did not write schema v7 consistently");
 for (const label of ["3D baseline", "3D transforms later", "3D stop boundary"])
 	if (!records.some((entry) => entry.event === "scene-checkpoint" && entry.label === label))
 		throw new Error(`Missing ${label} marker`);
@@ -398,6 +398,38 @@ if (
 	!meshText.split("\n").some((line) => line.includes('"trigger":"inspector"'))
 )
 	throw new Error("Mesh comparison/save semantics or Inspector trigger missing");
+const surfaceAt = (label) => {
+	const records = meshText.trim().split("\n").map(JSON.parse);
+	const marker = records.find(
+		(record) => record.event === "scene-checkpoint" && record.label === label,
+	);
+	const crate = records[marker.snapshotSequence].state.nodes.find((node) => node.name === "Crate");
+	return crate.properties;
+};
+const surfaceOverride = surfaceAt("Surface override").surfaceOverrides;
+const fortySurfaces = surfaceAt("Forty surfaces").surfaceOverrides;
+const noMesh = surfaceAt("No mesh");
+if (
+	surfaceOverride?.count !== 1 ||
+	surfaceOverride.overrides[0]?.path !== "res://mat.tres" ||
+	fortySurfaces?.count !== 40 ||
+	fortySurfaces.truncated !== true ||
+	fortySurfaces.overrides.length !== 32 ||
+	fortySurfaces.overrides[0]?.path !== "res://mat.tres" ||
+	noMesh.mesh !== null ||
+	noMesh.surfaceOverrides !== null
+)
+	throw new Error(
+		`Unexpected real surface overrides: ${JSON.stringify({ surfaceOverride, fortySurfaces, noMesh })}`,
+	);
+const capped = parseGodotSceneJournal(
+	fs.readFileSync(path.join(fixture, "mesh-cap.jsonl"), "utf8"),
+);
+if (capped.coverage !== "limited" || capped.stopReason !== "limit")
+	throw new Error("Surface entry cap must stop with a valid limited footer");
+console.log(
+	"SURFACE_OVERRIDES_PASSED: explicit override by index; 40 surfaces truncated to 32; no mesh -> null; entry cap -> limited footer",
+);
 fs.writeFileSync(
 	path.join(fixture, "mesh-review.json"),
 	JSON.stringify({ meshJournal, saveCompare, fileCompare }, null, 2),

@@ -182,3 +182,11 @@ New takes write raw journal v6. They add identity references for an owned MeshIn
 resource saved as its own file, otherwise `built-in-or-unsaved`. No names, contents or
 rendering are recorded. References are identity, not content equality.
 [Exact scope and Linux/WinBoat/production evidence](lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md).
+
+## Per-surface material overrides (v7)
+
+New takes write raw journal v7. They add the explicit per-surface material overrides of each
+owned MeshInstance3D, by surface index: at most 32 per node, with a truncation flag and a
+1,024-entry cap per snapshot. A node with no mesh records `null`, not stale overrides.
+Overrides are identity references only, with no matching across different meshes.
+[Exact scope and evidence](lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md).

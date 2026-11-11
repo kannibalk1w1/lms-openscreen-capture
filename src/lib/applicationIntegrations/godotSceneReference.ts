@@ -38,6 +38,7 @@ const FIELDS = [
 	"scale3",
 	"mesh",
 	"materialOverride",
+	"surfaceOverrides",
 ] as const;
 /** v1–v5 journals never recorded MeshInstance3D mesh/material references. */
 const MESH_REFERENCE_FIELDS = ["mesh", "materialOverride"] as const;
@@ -64,6 +65,8 @@ type Unknown =
 	| "candidate-coverage-limited"
 	| "node3d-fields-unobserved"
 	| "mesh-references-unobserved"
+	| "surface-overrides-unobserved"
+	| "surface-overrides-partial"
 	| "connections-unobserved"
 	| "connections-partially-recorded";
 
@@ -214,6 +217,9 @@ function unrecordable(node: SceneNode, version: number, other: SceneNode): reado
 	if (version < 6)
 		for (const field of MESH_REFERENCE_FIELDS)
 			if (other.properties[field] !== undefined) fields.push(field);
+	// v1–v6 never recorded per-surface overrides.
+	if (version < 7 && other.properties.surfaceOverrides !== undefined)
+		fields.push("surfaceOverrides");
 	return fields;
 }
 
@@ -312,10 +318,17 @@ export function compareGodotCheckpointToReference(
 		const unobservedFields = compared.filter((field) => unobservable.has(field));
 		if (
 			unobservedFields.some(
-				(field) => !(MESH_REFERENCE_FIELDS as readonly string[]).includes(field),
+				(field) =>
+					!(MESH_REFERENCE_FIELDS as readonly string[]).includes(field) &&
+					field !== "surfaceOverrides",
 			)
 		)
 			unknowns.add("node3d-fields-unobserved");
+		if (unobservedFields.includes("surfaceOverrides")) unknowns.add("surface-overrides-unobserved");
+		// Truncated or unavailable surface lists were only partly observed on that side.
+		for (const value of [node.properties.surfaceOverrides, other.properties.surfaceOverrides])
+			if (value === "unavailable" || (value && typeof value === "object" && value.truncated))
+				unknowns.add("surface-overrides-partial");
 		if (
 			unobservedFields.some((field) => (MESH_REFERENCE_FIELDS as readonly string[]).includes(field))
 		)

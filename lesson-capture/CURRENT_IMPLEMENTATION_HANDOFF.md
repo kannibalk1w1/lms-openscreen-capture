@@ -1,3 +1,10 @@
+# Per-surface material overrides awaiting review — 11 November 2026
+
+Claude builder, from accepted ac715a7c/1b1a751a. New slice: [raw v7 per-surface material
+override references](GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md). Real Linux/WinBoat probes,
+production CLI/MCP 17/17, startup smoke and full suite 6,738/491 pass; independent review
+pending. A1 still blocked on the owner's WinBoat desktop. No pushes; main fd2775e2.
+
 # MeshInstance3D resource references accepted — 11 November 2026
 
 Claude builder, from accepted checkpoint 2298045f. New slice: [raw v6 mesh/material identity

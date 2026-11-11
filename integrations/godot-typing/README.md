@@ -125,3 +125,7 @@ Raw v6 (current producer) also records, for owned MeshInstance3D nodes, `mesh` a
 `material_override` identity references: the engine class name plus a `res://` path when the
 resource is its own file, otherwise `built-in-or-unsaved`. No resource names or contents are
 recorded. See [mesh reference scope and validation](../../lesson-capture/GODOT_MESH_RESOURCE_REFERENCES_2026-11-11.md).
+
+Raw v7 (current producer) also records each owned MeshInstance3D's explicit per-surface
+material overrides by surface index: at most 32 per node, `null` when there is no mesh, and
+identity references only. See [surface override scope and validation](../../lesson-capture/GODOT_SURFACE_MATERIAL_OVERRIDES_2026-11-11.md).

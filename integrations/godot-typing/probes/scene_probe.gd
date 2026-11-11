@@ -530,9 +530,65 @@ func _probe_meshes(editor: EditorInterface) -> bool:
 	await _pump(take)
 	if not _require(take.mark_checkpoint("File resources", take.active_session_id()), "file checkpoint"):
 		return false
+	# v7: an explicit per-surface override, then a 40-surface mesh, then no mesh at all.
+	crate.set_surface_override_material(0, load("res://mat.tres"))
+	editor.get_inspector().property_edited.emit("surface_material_override/0")
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Surface override", take.active_session_id()), "surface checkpoint"):
+		return false
+	crate.mesh = _surface_mesh(40)
+	await _pump(take)
+	if not _require(take.mark_checkpoint("Forty surfaces", take.active_session_id()), "wide checkpoint"):
+		return false
+	crate.mesh = null
+	await _pump(take)
+	if not _require(take.mark_checkpoint("No mesh", take.active_session_id()), "no-mesh checkpoint"):
+		return false
 	take.stop()
+	# The per-snapshot surface entry cap (1,024) stops a take with a valid limited footer.
+	var many := Node3D.new()
+	many.name = "ManySurfaces"
+	root.add_child(many)
+	many.owner = root
+	var wide := _surface_mesh(32)
+	for index in 33:
+		var piece := MeshInstance3D.new()
+		piece.name = "Piece%d" % index
+		many.add_child(piece)
+		piece.owner = root
+		piece.mesh = wide
+	var capped = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(not capped.begin("res://mesh-cap.jsonl", root, editor, get_undo_redo()), "surface cap refuses an oversized start"):
+		return false
+	many.free()
+	var capped_take = preload("res://addons/openscreen_typing/scene_capture.gd").new()
+	if not _require(capped_take.begin("res://mesh-cap.jsonl", root, editor, get_undo_redo()), "surface cap take start"):
+		return false
+	var later := Node3D.new()
+	later.name = "LaterSurfaces"
+	root.add_child(later)
+	later.owner = root
+	for index in 33:
+		var piece := MeshInstance3D.new()
+		piece.name = "Later%d" % index
+		later.add_child(piece)
+		piece.owner = root
+		piece.mesh = wide
+	await _pump(capped_take)
+	if not _require(not capped_take.active(), "surface cap stopped capture"):
+		return false
+	later.free()
 	var text := FileAccess.get_file_as_string("res://mesh.jsonl")
 	for canary in ["PRIVATE_BUILTIN_NAME_CANARY", "PRIVATE_MATERIAL_NAME_CANARY", "PRIVATE_FILE_NAME_CANARY", "mesh.tscn::", "0.123"]:
 		if not _require(not text.contains(canary), "mesh journal withholds " + canary):
 			return false
 	return true
+
+func _surface_mesh(count: int) -> ArrayMesh:
+	var mesh := ArrayMesh.new()
+	for index in count:
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0, 0, index), Vector3(1, 0, index), Vector3(0, 1, index)])
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
