@@ -50,6 +50,8 @@ it("registers only selected-file query/export tools and no recovery channel", as
 		"inspectGodotCheckpointsFile",
 		"compareGodotCheckpointsFile",
 		"compareGodotReferenceFile",
+		"createProjectManifestFile",
+		"checkProjectDriftFile",
 	]);
 	tools.splice(0, 4);
 	expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });

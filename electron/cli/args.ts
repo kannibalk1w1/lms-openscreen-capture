@@ -6,6 +6,7 @@ import {
 	type CreateLessonPackageRequest,
 	createLessonPackageSchema,
 } from "../lesson/packageContracts";
+import { checkProjectDriftSchema, createProjectManifestSchema } from "../lesson/projectManifest";
 // Pure argv parser for the OpenScreen CLI. No Electron imports so it can be
 // unit-tested under plain vitest.
 
@@ -68,6 +69,20 @@ export type CliLessonCommand = { kind: "lesson"; manifestPath: string } & (
 	| {
 			action: "compare-godot-checkpoints";
 			request: z.infer<typeof compareGodotCheckpointsFileSchema>;
+	  }
+	| {
+			kind: "lesson";
+			action: "manifest-project";
+			manifestPath: string;
+			request: z.infer<typeof createProjectManifestSchema>;
+			json: boolean;
+	  }
+	| {
+			kind: "lesson";
+			action: "check-project-drift";
+			manifestPath: string;
+			request: z.infer<typeof checkProjectDriftSchema>;
+			json: boolean;
 	  }
 	| {
 			kind: "lesson";
@@ -172,6 +187,12 @@ Usage:
                             List authored raw marker records and exact source SHA-256
   openscreen lesson compare-godot-checkpoints <journal.jsonl> --from <record> --to <record> --sha256 <inspection-hash> [--json]
                             Read-only sampled endpoint comparison within one original take
+  openscreen lesson manifest-project <project-folder> --out <new-manifest.json> [--max-files <n>] [--max-bytes <n>] [--json]
+                            Record relative paths, sizes and SHA-256 of one explicit folder's files (no
+                            contents, links not followed) into a new file outside the folder
+  openscreen lesson check-project-drift <project-folder> --manifest <manifest.json> --sha256 <hash> [--json]
+                            Report changed/missing/added/unobserved paths against a hash-bound manifest;
+                            observations only, not proof that a project is correct or restorable
   openscreen lesson compare-godot-reference <reference.jsonl> --reference-record <record> --reference-sha256 <hash> --candidate <candidate.jsonl> --candidate-record <record> --candidate-sha256 <hash> [--tolerance <0-1>] [--json]
                             Advisory cross-take comparison by node path; exact unless a tolerance is given
                             (tolerance applies to transform values only; comparing a take with itself
@@ -733,6 +754,56 @@ function parseLessonCommand(args: string[], cwd: string): CliCommand {
 		if (!result.success)
 			throw new Error("Choose two distinct checkpoint records and the inspected SHA-256");
 		return { kind: "lesson", action, manifestPath: journalPath, request: result.data, json };
+	}
+
+	if (action === "manifest-project" || action === "check-project-drift") {
+		if (!file || file.startsWith("-")) throw new Error("Choose one explicit project folder");
+		const rootPath = resolvePath(file, cwd),
+			values: Record<string, string> = {};
+		let json = false;
+		const allowed =
+			action === "manifest-project"
+				? ["--out", "--max-files", "--max-bytes"]
+				: ["--manifest", "--sha256"];
+		for (let i = 2; i < args.length; i++) {
+			const flag = args[i];
+			if (flag === "--json" && !json) {
+				json = true;
+				continue;
+			}
+			if (!allowed.includes(flag) || flag in values)
+				throw new Error("Unexpected project manifest option");
+			const [value, next] = takeValue(args, i, flag);
+			i = next;
+			values[flag] = value;
+		}
+		const integer = (value: string | undefined) =>
+			value === undefined ? undefined : /^\d{1,12}$/.test(value) ? Number(value) : NaN;
+		const fileOption = (value: string | undefined) =>
+			value === undefined || value.startsWith("-") ? undefined : resolvePath(value, cwd);
+		if (action === "manifest-project") {
+			const result = createProjectManifestSchema.safeParse({
+				rootPath,
+				outputPath: fileOption(values["--out"]),
+				...(values["--max-files"] === undefined
+					? {}
+					: { maxFiles: integer(values["--max-files"]) }),
+				...(values["--max-bytes"] === undefined
+					? {}
+					: { maxBytes: integer(values["--max-bytes"]) }),
+			});
+			if (!result.success)
+				throw new Error("Choose a project folder, a new --out file and valid limits");
+			return { kind: "lesson", action, manifestPath: rootPath, request: result.data, json };
+		}
+		const result = checkProjectDriftSchema.safeParse({
+			rootPath,
+			manifestPath: fileOption(values["--manifest"]),
+			manifestSha256: values["--sha256"],
+		});
+		if (!result.success)
+			throw new Error("Choose a project folder, its --manifest file and the manifest SHA-256");
+		return { kind: "lesson", action, manifestPath: rootPath, request: result.data, json };
 	}
 
 	if (action === "compare-godot-reference") {

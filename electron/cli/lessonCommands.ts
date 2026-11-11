@@ -33,6 +33,11 @@ import {
 	lessonPackageMessages,
 	verifyLessonPackage,
 } from "../lesson/package";
+import {
+	checkProjectDriftFile,
+	createProjectManifestFile,
+	ProjectManifestError,
+} from "../lesson/projectManifest";
 import type { CliLessonCommand } from "./args";
 import type { CliWriter } from "./projectCommands";
 
@@ -59,6 +64,21 @@ export async function runLessonCommand(
 					: command.action === "compare-godot-checkpoints"
 						? compareGodotCheckpointsFile(command.request, assertCurrent)
 						: compareGodotReferenceFile(command.request, assertCurrent);
+			out(
+				JSON.stringify(
+					command.json ? { event: "done", result } : result,
+					null,
+					command.json ? undefined : 2,
+				) + "\n",
+			);
+			return 0;
+		}
+		if (command.action === "manifest-project" || command.action === "check-project-drift") {
+			const assertCurrent = () => options.signal?.throwIfAborted();
+			const result =
+				command.action === "manifest-project"
+					? await createProjectManifestFile(command.request, assertCurrent)
+					: await checkProjectDriftFile(command.request, assertCurrent);
 			out(
 				JSON.stringify(
 					command.json ? { event: "done", result } : result,
@@ -212,7 +232,8 @@ export async function runLessonCommand(
 			failure instanceof LessonPackageError ||
 			failure instanceof LessonFileRangeError ||
 			failure instanceof ApplicationCaptureFileError ||
-			failure instanceof GodotCheckpointFileError
+			failure instanceof GodotCheckpointFileError ||
+			failure instanceof ProjectManifestError
 				? failure.code
 				: // Fixed codes only, such as a trimmed time; still no paths, payloads or raw errors.
 					command.action === "illustrate" && failure instanceof LessonOperationError

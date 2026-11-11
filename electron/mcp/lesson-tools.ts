@@ -43,6 +43,7 @@ import { confirmLessonFileRange, LessonFileRangeError } from "../lesson/fileRang
 import { confirmLessonFileRangeSchema } from "../lesson/fileRangeContracts";
 import { registerGodotCheckpointTools } from "./godot-checkpoint-tools";
 import { registerLessonPackageTools } from "./package-tools";
+import { registerProjectManifestTools } from "./project-manifest-tools";
 
 export function registerLessonTools(
 	server: McpServer,
@@ -385,4 +386,5 @@ export function registerLessonTools(
 		},
 	);
 	registerGodotCheckpointTools(server, transport, editsAllowed);
+	registerProjectManifestTools(server, transport, editsAllowed);
 }
