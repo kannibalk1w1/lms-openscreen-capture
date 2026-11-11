@@ -373,3 +373,19 @@ unverifiable. That is a fail-closed false refusal, never a write.
 Revalidation: real WinBoat Windows 11 16/16 (handle-based write); production Linux CLI/MCP
 14/14; startup smoke; full suite 6,702 tests in 488 files (run together with the retake GUI
 follow-up).
+
+## Second boundary recheck of `955519d5`
+
+[Second recheck](CLAUDE_PROJECT_MANIFEST_BOUNDARY_RECHECK2_955519D5_2026-11-11.md): **accepted
+with Lows**. R1 is fixed under forced mounts before and after open, and a project file is
+never removed. R2 is fixed at all 10 cancellation points. R3 is fixed: the 18 allow-list
+codes are correct, tmpfs is accepted, and ramfs, overlay and fuse-overlayfs are refused in
+real mounts. R4 is fixed.
+
+- **L1 (Low), fixed in the next commit:** a failed write (for example ENOSPC) left a partial
+  file, so a retry then reported `manifest-output-exists`. The write-failure path now
+  removes the partial file by its handle identity. A test forces a partial write followed by
+  a failure and finds no file left; the test fails without the cleanup.
+- **Note:** a project or output on NFS/SMB home folders, sshfs or ntfs-3g (fuseblk) cannot be
+  manifested. The request fails closed with `manifest-output-unverifiable`. This is by
+  design: choose a project and an output folder on a local disk filesystem.

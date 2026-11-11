@@ -577,7 +577,7 @@ export async function createProjectManifestFile(
 	assertCurrent();
 	// The identity of the new file comes from the handle that created it, never from the path,
 	// so the cleanup below can only ever remove that exact file.
-	let written: import("node:fs").BigIntStats;
+	let written: import("node:fs").BigIntStats | undefined;
 	let handle: fs.FileHandle;
 	try {
 		handle = await fs.open(
@@ -597,7 +597,8 @@ export async function createProjectManifestFile(
 		await handle.writeFile(bytes);
 	} catch {
 		await handle.close().catch(() => undefined);
-		await removeIfSame(target, undefined);
+		// A partial file this call created is removed; nothing else can match its identity.
+		await removeIfSame(target, written);
 		throw new ProjectManifestError("manifest-write-failed");
 	}
 	await handle.close();

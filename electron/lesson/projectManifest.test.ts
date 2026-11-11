@@ -589,4 +589,22 @@ describe("review c233dcc6 follow-up", () => {
 			expect(await fs.readFile(target, "utf8")).toBe("PROJECT FILE");
 		},
 	);
+	it("removes its own partial file when the write fails (boundary recheck L1)", async () => {
+		const originalOpen = fsPromises.open.bind(fsPromises);
+		vi.spyOn(fsPromises, "open").mockImplementation((async (
+			...args: Parameters<typeof originalOpen>
+		) => {
+			const handle = await originalOpen(...args);
+			if (String(args[0]).endsWith("partial.json"))
+				Object.defineProperty(handle, "writeFile", {
+					value: async () => {
+						await handle.write(Buffer.from("{ partial"));
+						throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+					},
+				});
+			return handle;
+		}) as typeof fsPromises.open);
+		expect(await code(create("partial.json"))).toBe("manifest-write-failed");
+		expect(await fs.readdir(out)).not.toContain("partial.json");
+	});
 });
