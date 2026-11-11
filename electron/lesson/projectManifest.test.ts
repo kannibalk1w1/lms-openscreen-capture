@@ -509,4 +509,19 @@ describe("review c233dcc6 follow-up", () => {
 			expect(manifest.unobserved).toEqual([{ path: "\uFFFDa", reason: "unsupported-name" }]);
 		},
 	);
+	it("fails closed when the project's directories cannot all be identified", async () => {
+		const hidden = path.join(project, ".godot", "locked");
+		await fs.mkdir(hidden);
+		await fs.chmod(hidden, 0o000);
+		try {
+			expect(await code(create("unverifiable.json"))).toBe("manifest-output-unverifiable");
+			expect(await fs.readdir(out)).not.toContain("unverifiable.json");
+		} finally {
+			await fs.chmod(hidden, 0o700);
+		}
+		let deep = path.join(project, ".godot");
+		for (let i = 0; i < 258; i++) deep = path.join(deep, "d");
+		await fs.mkdir(deep, { recursive: true });
+		expect(await code(create("deep-walk.json"))).toBe("manifest-output-unverifiable");
+	});
 });

@@ -236,11 +236,55 @@ The [second recheck of `d4de449f`](CLAUDE_PROJECT_MANIFEST_RECHECK2_D4DE449F_202
   --map-root-user --mount` probe refuses both a bind-mounted subfolder and a bind-mounted
   excluded `.godot`, and writes nothing into the project.
 
-  **Residual limitation:** after a file or entry limit stops a scan, folders never reached
-  are not in the set. The pre-scan ancestor-identity check still applies, but an
-  out-of-tree alias, such as a bind mount, of an unreached folder cannot be detected.
-  Nothing is overwritten (`wx`) in that case.
+  **Superseded by the fail-closed output boundary below.**
 - **S-2:** undecodable names are listed once as `unsupported-name`, with a Linux
   regression test.
 - **S-3:** the `manifest-scan-inconsistent` code has no direct test, because valid scans no
   longer reach it; it remains a defensive fixed code.
+
+## Fail-closed output boundary (coordinator follow-up)
+
+The coordinator rejected the residual above. `wx` prevents overwriting, but it does **not**
+prevent creating a new file inside the selected project through an alias, so "outside the
+project" must be proven or the write refused.
+
+The scan's own directory set is therefore replaced with a dedicated **identity-only walk**,
+run after the scan and before the write:
+
+- It covers every directory under the selected root, including excluded (`.git`, `.godot`,
+  `.import`), depth-limited and unreadable-by-the-scan subtrees, and folders never reached
+  after a file or entry limit stopped the scan.
+- It reads no files and never follows links: directory types come from the directory
+  entries, and anything else is checked with `lstat`.
+- If the output's parent has the device/inode of **any** such directory, the request is
+  refused with `manifest-output-invalid`.
+- If the walk cannot be completed, the request fails closed with
+  `manifest-output-unverifiable` and nothing is written. That covers an unreadable
+  directory, more than 256 levels, or more than 1,000,000 entries.
+
+The pre-scan checks are unchanged: the output's real parent has no links, and no ancestor
+identity matches the root.
+
+Real alias evidence, from an unprivileged `unshare --map-root-user --mount` namespace on
+owned scratch folders:
+
+- bind mount of a **descendant** of the excluded `.godot` (`.godot/imported`): refused;
+- bind mount of a folder **never reached** after `maxFiles: 1` stopped the scan: refused;
+- bind mount of a **descendant of a depth-limited** folder (35 levels deep): refused;
+- a genuinely outside folder: accepted.
+
+The project's file count was unchanged (3 before, 3 after). Unit tests cover the fail-closed
+cases: an unreadable `.godot/locked` gives `manifest-output-unverifiable` and no output file,
+and a tree deeper than 256 levels under `.godot` gives `manifest-output-unverifiable`.
+Revalidation:
+
+- WinBoat Windows 11: 16/16 (NTFS directory identities).
+- Production Linux CLI/MCP: 14/14. Startup smoke passes.
+- Full suite: 6,694 tests in 487 files.
+
+**Remaining, irreducible:** the walk and the write are not atomic. A mount, rename or bind
+created inside the project *between* the walk and the `wx` write is not detected; closing
+that gap would need OS-level locking that a user-space tool cannot impose. Within that
+window, the guarantee is that the output's parent was not any project directory at the
+moment of the check. A project with any unreadable directory, or one beyond the walk caps,
+cannot be manifested at all, by design.

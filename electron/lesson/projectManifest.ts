@@ -40,6 +40,7 @@ export class ProjectManifestError extends Error {
 			| "manifest-output-exists"
 			| "manifest-write-failed"
 			| "manifest-scan-inconsistent"
+			| "manifest-output-unverifiable"
 			| "manifest-unavailable"
 			| "manifest-changed"
 			| "manifest-invalid",
@@ -165,8 +166,6 @@ type Scan = {
 	limitReason?: "file-limit" | "byte-limit" | "entry-limit";
 	/** True when a file or entry limit stopped the scan: unseen paths are then unknown. */
 	stopped: boolean;
-	/** Device/inode identities of every directory the scan entered. */
-	directories: Set<string>;
 };
 
 /** Errors raised by the caller's currency check: never downgraded to "unreadable". */
@@ -256,19 +255,12 @@ async function scanProject(
 	let entries = 0;
 	const maxEntries = limits.maxFiles * 4;
 	let limitReason: Scan["limitReason"];
-	const directories = new Set<string>();
 	// Read through a closure: nested walks may set a stopping limit.
 	const stopped = () => limitReason === "file-limit" || limitReason === "entry-limit";
 	const walk = async (directory: string, relative: string[], depth: number): Promise<void> => {
 		// Streamed, so one huge directory cannot exceed the entry budget in memory.
 		const names: string[] = [];
 		try {
-			try {
-				const stat = await fs.lstat(directory);
-				directories.add(`${stat.dev}:${stat.ino}`);
-			} catch {
-				// opendir below reports an unreadable directory.
-			}
 			const dir = await fs.opendir(directory);
 			for await (const entry of dir) {
 				// A listing larger than the remaining budget is skipped as a whole, so the
@@ -310,8 +302,6 @@ async function scanProject(
 			}
 			if (named.isSymbolicLink()) unobserved.push({ path: rel, reason: "symbolic-link" });
 			else if (named.isDirectory()) {
-				// Skipped folders are still inside the project: an output aliasing one is refused.
-				directories.add(`${named.dev}:${named.ino}`);
 				if (depth === 0 && (PROJECT_MANIFEST_EXCLUSIONS as readonly string[]).includes(name))
 					unobserved.push({ path: rel, reason: "excluded-directory" });
 				else if (depth + 1 >= PROJECT_MANIFEST_MAX_DEPTH)
@@ -350,8 +340,88 @@ async function scanProject(
 				: "complete",
 		...(limitReason ? { limitReason } : {}),
 		stopped: stopped(),
-		directories,
 	};
+}
+
+export const PROJECT_IDENTITY_WALK_MAX_ENTRIES = 1_000_000;
+export const PROJECT_IDENTITY_WALK_MAX_DEPTH = 256;
+const current = (assertCurrent: () => void) => () => {
+	try {
+		assertCurrent();
+	} catch (error) {
+		if (typeof error === "object" && error !== null) cancelled.add(error);
+		throw error;
+	}
+};
+
+/**
+ * Identity-only walk of every directory under the selected root (no file reads, links never
+ * followed). If it cannot be completed — an unreadable directory, the depth or entry cap — the
+ * output cannot be proven to lie outside the project and is refused (fail closed).
+ */
+async function assertOutputParentOutsideProject(
+	root: string,
+	outputParent: string,
+	assertCurrent: () => void,
+): Promise<void> {
+	let target: Stats;
+	try {
+		target = statSync(outputParent);
+	} catch {
+		throw new ProjectManifestError("manifest-output-invalid");
+	}
+	const key = (stat: Stats) => `${stat.dev}:${stat.ino}`;
+	const wanted = key(target);
+	let entries = 0;
+	const visit = async (directory: string, depth: number): Promise<void> => {
+		let stat: Stats;
+		try {
+			stat = await fs.lstat(directory);
+		} catch {
+			throw new ProjectManifestError("manifest-output-unverifiable");
+		}
+		if (key(stat) === wanted) throw new ProjectManifestError("manifest-output-invalid");
+		if (depth > PROJECT_IDENTITY_WALK_MAX_DEPTH)
+			throw new ProjectManifestError("manifest-output-unverifiable");
+		let dir: import("node:fs").Dir;
+		try {
+			dir = await fs.opendir(directory);
+		} catch {
+			throw new ProjectManifestError("manifest-output-unverifiable");
+		}
+		const children: string[] = [];
+		try {
+			for await (const entry of dir) {
+				if (++entries > PROJECT_IDENTITY_WALK_MAX_ENTRIES)
+					throw new ProjectManifestError("manifest-output-unverifiable");
+				// Dirent types come from the directory itself: links are never followed.
+				if (entry.isDirectory()) children.push(entry.name);
+				else if (entry.isSymbolicLink() || entry.isFile()) continue;
+				else if (
+					!entry.isBlockDevice() &&
+					!entry.isCharacterDevice() &&
+					!entry.isFIFO() &&
+					!entry.isSocket()
+				)
+					children.push(entry.name); // unknown type: inspect with lstat below
+			}
+		} catch (error) {
+			if (error instanceof ProjectManifestError) throw error;
+			throw new ProjectManifestError("manifest-output-unverifiable");
+		}
+		for (const name of children) {
+			assertCurrent();
+			const child = path.join(directory, name);
+			let childStat: Stats;
+			try {
+				childStat = await fs.lstat(child);
+			} catch {
+				throw new ProjectManifestError("manifest-output-unverifiable");
+			}
+			if (childStat.isDirectory()) await visit(child, depth + 1);
+		}
+	};
+	await visit(root, 0);
 }
 
 function outputOutsideRoot(outputPath: string, root: string): string {
@@ -407,16 +477,9 @@ export async function createProjectManifestFile(
 		maxBytes: request.maxBytes ?? PROJECT_MANIFEST_DEFAULT_MAX_BYTES,
 	};
 	const scan = await scanProject(root, limits, assertCurrent);
-	// A bind mount (or other alias) of any scanned folder is still inside the project.
-	try {
-		const parent = statSync(path.dirname(target));
-		if (scan.directories.has(`${parent.dev}:${parent.ino}`))
-			throw new ProjectManifestError("manifest-output-invalid");
-	} catch (error) {
-		throw error instanceof ProjectManifestError
-			? error
-			: new ProjectManifestError("manifest-output-invalid");
-	}
+	// Fail closed on aliases (bind mounts, mounted folders): the output's parent must not be
+	// ANY directory of the project, including excluded, depth-limited and unreached ones.
+	await assertOutputParentOutsideProject(root, path.dirname(target), current(assertCurrent));
 	const built = manifestSchema.safeParse({
 		format: "openscreen-project-manifest",
 		version: 1,
