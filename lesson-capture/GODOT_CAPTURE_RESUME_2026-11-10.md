@@ -2,8 +2,8 @@
 
 > **Superseded ownership note (10 November 2026, later):** the owner handed building to
 > Claude. The utilisation stop below was a Codex budget stop; it no longer blocks
-> Claude implementation. Current state: [handoff](CURRENT_IMPLEMENTATION_HANDOFF.md) and
-> [history/run slice](GODOT_HISTORY_RUN_CAPTURE_2026-11-10.md).
+> Claude implementation. Current state, accepted vs targeted coverage and the A1 owner
+> dependency: [handoff](CURRENT_IMPLEMENTATION_HANDOFF.md).
 
 Stopped new feature work on 10 November 2026 at **74% weekly Codex utilisation**, near
 the owner's requested roughly 75% cap. No session meter was available. Source HEAD

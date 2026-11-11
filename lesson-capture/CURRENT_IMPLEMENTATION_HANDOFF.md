@@ -1,3 +1,49 @@
+# Claude builder checkpoint — 11 November 2026
+
+Coordinator chose A1 (WinBoat GUI acceptance) + B2 (project manifest), then a retake GUI.
+State at this checkpoint (no pushes; main fd2775e2; learner player parked):
+
+**Independently accepted (immutable reviews in this folder):**
+
+- Godot raw journal v4 history/run (`1372a9c2`) and v5 saved signal connections (`e0786f0f`),
+  each with follow-ups.
+- Advisory cross-take reference comparison: library `0777440c`/`eff20dc1`, CLI/MCP
+  `87cc7dac`/`d16220f4`.
+- Opt-in project manifest/drift (`c233dcc6` → `b64f5859` → `d4de449f` → `e452ee7c`).
+- Fail-closed output boundary: `4520b7fd` → `0397cdb1` → `955519d5` (accepted with Lows).
+- Retake comparison GUI: `aea7f3fa` → `fbe11c00` (accepted with Lows).
+- Targeted recheck of `a907beba` + `4f04cd87`: accepted with Lows.
+
+**Targeted follow-up only, not separately re-reviewed:**
+
+- `47bc7c0a` label bound was later accepted inside the `0777440c` review.
+- The final docs/test commit after the targeted recheck: the digest-failure test assertion
+  and doc wording only.
+
+**Real evidence:**
+
+- Linux and WinBoat Windows 11 Godot 4.7.1 editor/API probes.
+- Production Linux CLI/MCP parity and startup smoke.
+- WinBoat `mountvol`, unprivileged bind/overlay namespace probes.
+- A real production Electron retake-panel probe (24/24).
+
+**Not done:**
+
+- **A1:** physical-style WinBoat GUI acceptance is prepared (`b40adf4f`, plan
+  `A1_WINBOAT_GUI_ACCEPTANCE_PLAN_2026-11-11.md`). It is **blocked on the owner**
+  providing a logged-in, visible WinBoat desktop window and about 15 minutes hands-off.
+  Coverage is unavailable until then.
+- **Deferred by decision:** archive/restore (B1) and live-KDE testing (A2).
+
+**Remaining roadmap:**
+
+- broader Godot resource and run-diagnostics semantics;
+- explicit retake replacement or persistence (a separate reviewable action);
+- tutor/agent handoff;
+- physical acceptance.
+
+Usage %/reset is not exposed to this session.
+
 # Project manifest and drift detection accepted — 11 November 2026
 
 Claude builder. Coordinator chose A1 (WinBoat VM GUI physical test) + B2. B2 built:

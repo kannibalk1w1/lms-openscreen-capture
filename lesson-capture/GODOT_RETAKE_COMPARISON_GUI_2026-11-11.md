@@ -120,3 +120,39 @@ the nits are fixed; L5 is partly fixed. Closed in the next commit:
   and a test covers this.
 
 Full suite after these changes: 6,706 tests in 489 files.
+
+## Real production Electron probe
+
+`../openscreen-evaluation/retake-gui-electron-2026-11-11/`, run on source `4f04cd87`:
+
+- **Setup:** the production `dist-electron/main.js` under `xvfb-run`, with an isolated
+  `--user-data-dir`.
+- **Automation boundary:** the editor is opened through the main-process IPC handler, and
+  Playwright supplies files to the real `<input type=file>` (CDP `setInputFiles`). Hashes,
+  decoding, comparison, stale-read guards, stores and components are all real.
+- **Results:** 24/24 checks passed with no runtime errors, and the app closed with no
+  leftover processes.
+  - A BOM-prefixed real original shows the SHA-256 of its stored bytes (not of the decoded
+    text) next to the real Windows take's distinct hash, and the two agree at
+    "3D baseline".
+  - The later checkpoint differs. Every selection change and every new replacement file
+    clears the result.
+  - The real v2 legacy take shows the unknown reason "connections unobserved".
+  - A synthetic wide v5 take renders 200 rows, names the shortened list and keeps the
+    complete count of 300.
+  - Self-comparison shows the same-take note.
+  - A large invalid file followed by a small valid one shows only the newer file and no
+    stale error.
+  - Re-importing the original resets the panel.
+  - The step count, unsaved-lesson state and project data are unchanged.
+- **Screenshots:** the agree result and the truncated result are retained.
+
+The first two runs reported "project listing changed" only because the response envelope's
+request ID and timestamp differ; the data was identical, and the final run compares data.
+**L3, from the targeted recheck:** the out-of-order check in this probe relies on file size
+and a wait, not a forced order. The deterministic proof is the unit race test. **L2:** the
+digest-failure test now also checks that the generic review renders and that no alert
+appears.
+
+This proves functional Electron UI behaviour. It is not physical input, screen-reader,
+WinBoat (A1), native-media or Signals-dock acceptance.

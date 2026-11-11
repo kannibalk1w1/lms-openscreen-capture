@@ -389,3 +389,27 @@ real mounts. R4 is fixed.
 - **Note:** a project or output on NFS/SMB home folders, sshfs or ntfs-3g (fuseblk) cannot be
   manifested. The request fails closed with `manifest-output-unverifiable`. This is by
   design: choose a project and an output folder on a local disk filesystem.
+
+## Targeted recheck of `a907beba` (with `4f04cd87`)
+
+[Targeted recheck](CLAUDE_TARGETED_RECHECK_A907BEBA_4F04CD87_2026-11-11.md): **accepted with
+Lows**. The partial-file cleanup removes only a regular file whose dev/ino matches the
+creating handle, and the no-cleanup mutant is killed.
+
+**L1, documented:** if `handle.stat()` itself fails immediately after `O_EXCL` creation, the
+new file's identity is unknown. The (possibly empty) file is then left in place rather than
+risk removing anything else, and the request reports `manifest-write-failed`.
+
+**Final statement of the output boundary:**
+
+- The manifest is created only by an exclusive create (`wx`/`O_EXCL`), which never
+  overwrites anything.
+- Before the write, every project directory is identity-checked against the output's
+  parent; the write fails closed if that cannot be established.
+- The boundary is re-proven after the write. If that fails, only the file this call created
+  is removed.
+- This is **not** an atomic containment or isolation guarantee. A mount, bind or rename
+  inside the project between the identity walk and the create (or between the re-proof and
+  later use) is not detected.
+- `wx` alone does not mean "no project writes"; that property rests on the identity proof
+  and its limits above.

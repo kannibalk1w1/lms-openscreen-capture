@@ -66,4 +66,7 @@ it("hides only the retake panel when hashing is unavailable", async () => {
 	choose("Import application capture or Godot journal", linux, "original.jsonl");
 	await screen.findByText("Compare scene checkpoints");
 	expect(screen.queryByText("Compare with a retake (advisory)")).toBeNull();
+	// The generic review still lists observations, and no error banner replaces it.
+	expect(screen.getByText(/godot-scene · res:\/\/enemy\.tscn · \d+ observations/)).toBeTruthy();
+	expect(screen.queryByRole("alert")).toBeNull();
 });
