@@ -540,18 +540,53 @@ describe("review c233dcc6 follow-up", () => {
 	it.runIf(process.platform === "linux")(
 		"re-proves after writing and removes only its own new file when the proof fails (F3)",
 		async () => {
-			const original = fsPromises.statfs.bind(fsPromises);
-			const writeFile = vi.spyOn(fsPromises, "writeFile");
+			const originalStatfs = fsPromises.statfs.bind(fsPromises);
+			const originalOpen = fsPromises.open.bind(fsPromises);
+			let created = false;
+			vi.spyOn(fsPromises, "open").mockImplementation((async (
+				...args: Parameters<typeof originalOpen>
+			) => {
+				const handle = await originalOpen(...args);
+				if (String(args[0]).endsWith("raced.json")) created = true;
+				return handle;
+			}) as typeof fsPromises.open);
 			vi.spyOn(fsPromises, "statfs").mockImplementation((async (target: string) => {
-				const stats = await original(target);
-				// The first proof passes; after the write the root reports an alias-unsafe type.
-				return writeFile.mock.calls.length > 0 && String(target) === project
-					? { ...stats, type: 0x65735546 }
-					: stats;
+				const stats = await originalStatfs(target);
+				// The first proof passes; after creation the root reports an alias-unsafe type.
+				return created && String(target) === project ? { ...stats, type: 0x65735546 } : stats;
 			}) as typeof fsPromises.statfs);
 			expect(await code(create("raced.json"))).toBe("manifest-output-unverifiable");
-			expect(writeFile).toHaveBeenCalledTimes(1);
+			expect(created).toBe(true);
 			expect(await fs.readdir(out)).not.toContain("raced.json");
+		},
+	);
+
+	it.runIf(process.platform === "linux")(
+		"never removes a different file that appears at the output path (boundary R1)",
+		async () => {
+			const originalStatfs = fsPromises.statfs.bind(fsPromises);
+			const originalOpen = fsPromises.open.bind(fsPromises);
+			const target = path.join(out, "swap.json");
+			let swapped = false;
+			vi.spyOn(fsPromises, "open").mockImplementation((async (
+				...args: Parameters<typeof originalOpen>
+			) => {
+				const handle = await originalOpen(...args);
+				if (String(args[0]) === target) {
+					// Simulate an alias landing between creation and the path check: another file
+					// now sits at the output path.
+					await fs.rename(target, `${target}.ours`);
+					await fs.writeFile(target, "PROJECT FILE");
+					swapped = true;
+				}
+				return handle;
+			}) as typeof fsPromises.open);
+			vi.spyOn(fsPromises, "statfs").mockImplementation((async (value: string) => {
+				const stats = await originalStatfs(value);
+				return swapped && String(value) === project ? { ...stats, type: 0x65735546 } : stats;
+			}) as typeof fsPromises.statfs);
+			expect(await code(create("swap.json"))).toBe("manifest-output-unverifiable");
+			expect(await fs.readFile(target, "utf8")).toBe("PROJECT FILE");
 		},
 	);
 });

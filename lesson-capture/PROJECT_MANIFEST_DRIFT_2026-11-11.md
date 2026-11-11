@@ -333,3 +333,43 @@ Unit tests (Linux) cover a mocked overlay root type (refused, no file) and a pos
 failure (the single written file is removed). The earlier bind-mount alias probes still
 refuse all three alias kinds and accept a genuine outside folder. Production Linux CLI/MCP
 14/14, startup smoke and the full suite (6,700 tests in 487+1 files) pass.
+
+## Boundary recheck of `0397cdb1`
+
+[Recheck](CLAUDE_PROJECT_MANIFEST_BOUNDARY_RECHECK_0397CDB1_2026-11-11.md): **changes
+requested**. It confirmed F1 (real WinBoat `mountvol`), F2 (overlay root, nested overlay and
+FUSE output, all in a namespace) and F5.
+
+- **R1 (Medium):** the F3 cleanup took the written file's identity *by path* after the write.
+  A mount over the output folder in that gap, holding a same-named project file, made the
+  cleanup delete that file. This was reproduced with a forced hook.
+- **R2 (Low):** a cancellation during a listing was reported as `unverifiable`.
+- **R3 (Low):** the deny-list of alias-unsafe filesystems was incomplete.
+- **R4 (Nit):** the pre-scan check compared identities as Number.
+
+Fixed in the next commit:
+
+- **R1:** the manifest is written through one handle opened with
+  `O_CREAT|O_EXCL|O_NOFOLLOW` (mode 0600). The new file's identity comes from that handle
+  (`handle.stat`), never from the path. Cleanup removes the path only while it is still a
+  regular file with exactly that identity. A regression test swaps a different "project"
+  file into the output path after creation and forces the re-proof to fail: that file
+  survives. The test fails on the previous path-based identity.
+- **R2:** caller cancellation errors propagate unchanged through the listing.
+- **R3:** the Linux check is now an **allow-list** of local disk filesystems. Anything else,
+  including any unknown type, fails closed. The list covers:
+  - ext2/3/4, XFS, Btrfs, F2FS, ZFS, bcachefs, JFS, ReiserFS, NILFS;
+  - tmpfs;
+  - FAT, exFAT, kernel NTFS;
+  - HFS+, ISO 9660, SquashFS, EROFS.
+
+  As a result, fuseblk (ntfs-3g), overlay, network and stacked filesystems all fail closed.
+- **R4:** BigInt identities in the pre-scan ancestor check.
+
+Noted, not changed: on Windows, any non-link reparse folder inside a project (for example
+OneDrive placeholders, untested because there is no signed-in OneDrive) makes the project
+unverifiable. That is a fail-closed false refusal, never a write.
+
+Revalidation: real WinBoat Windows 11 16/16 (handle-based write); production Linux CLI/MCP
+14/14; startup smoke; full suite 6,702 tests in 488 files (run together with the retake GUI
+follow-up).

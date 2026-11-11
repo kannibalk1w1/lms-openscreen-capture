@@ -365,20 +365,29 @@ const current = (assertCurrent: () => void) => () => {
  * output cannot be proven to lie outside the project and is refused (fail closed).
  */
 /**
- * Linux filesystems whose aliases can carry identities different from the project's own
- * directories (overlay upper/lower layers, FUSE, network filesystems). The identity proof does
- * not hold there, so writes fail closed.
+ * Linux local disk filesystems on which a directory's device/inode identity is its own. Anything
+ * else (overlay, FUSE, network, stacked or unknown filesystems) fails closed: aliases there can
+ * carry different identities, so the outside-project proof does not hold.
  */
-const ALIAS_UNSAFE_FILESYSTEMS = new Set([
-	0x794c7630, // overlayfs
-	0x65735546, // FUSE / fuse-overlayfs
-	0x6969, // NFS
-	0x517b, // SMB
-	0xff534d42, // CIFS
-	0xfe534d42, // SMB2
-	0x01021997, // 9p
-	0x00c36400, // Ceph
-	0x5346414f, // AFS
+const IDENTITY_SAFE_FILESYSTEMS = new Set([
+	0xef53, // ext2/3/4
+	0x58465342, // XFS
+	0x9123683e, // Btrfs
+	0x01021994, // tmpfs
+	0xf2f52010, // F2FS
+	0x2fc12fc1, // ZFS
+	0xca451a4e, // bcachefs
+	0x3153464a, // JFS
+	0x52654973, // ReiserFS
+	0x3434, // NILFS
+	0x4d44, // FAT
+	0x2011bab0, // exFAT
+	0x7366746e, // NTFS (ntfs3)
+	0x5346544e, // NTFS (ntfs-3g reports fuseblk; listed for the kernel driver only)
+	0x482b, // HFS+
+	0x9660, // ISO 9660
+	0x73717368, // SquashFS
+	0xe0f5e1e2, // EROFS
 ]);
 
 async function assertIdentityFilesystem(target: string): Promise<void> {
@@ -389,7 +398,7 @@ async function assertIdentityFilesystem(target: string): Promise<void> {
 	} catch {
 		throw new ProjectManifestError("manifest-output-unverifiable");
 	}
-	if (ALIAS_UNSAFE_FILESYSTEMS.has(type >>> 0))
+	if (!IDENTITY_SAFE_FILESYSTEMS.has(type >>> 0))
 		throw new ProjectManifestError("manifest-output-unverifiable");
 }
 
@@ -450,6 +459,7 @@ async function assertOutputParentOutsideProject(
 			}
 		} catch (error) {
 			if (error instanceof ProjectManifestError) throw error;
+			if (typeof error === "object" && error !== null && cancelled.has(error)) throw error;
 			throw new ProjectManifestError("manifest-output-unverifiable");
 		}
 		for (const name of children) {
@@ -472,6 +482,20 @@ async function assertOutputParentOutsideProject(
 	await visit(root, 0);
 }
 
+/** Remove `target` only if it is still exactly the file this call created. */
+async function removeIfSame(
+	target: string,
+	created: import("node:fs").BigIntStats | undefined,
+): Promise<void> {
+	if (!created) return;
+	try {
+		const now = await fs.lstat(target, { bigint: true });
+		if (now.isFile() && now.dev === created.dev && now.ino === created.ino) await fs.unlink(target);
+	} catch {
+		// Already gone or replaced: nothing else is touched.
+	}
+}
+
 function outputOutsideRoot(outputPath: string, root: string): string {
 	const target = path.resolve(outputPath);
 	let parent: string;
@@ -483,16 +507,16 @@ function outputOutsideRoot(outputPath: string, root: string): string {
 	if (parent !== path.dirname(target)) throw new ProjectManifestError("manifest-output-invalid");
 	// Compare filesystem identities, not spellings: walk the real parent's ancestors and refuse
 	// if any is the selected root (case-insensitive volumes, short names and bind mounts too).
-	let rootStat: Stats;
+	let rootStat: import("node:fs").BigIntStats;
 	try {
-		rootStat = statSync(root);
+		rootStat = statSync(root, { bigint: true });
 	} catch {
 		throw new ProjectManifestError("project-folder-unavailable");
 	}
 	for (let at = parent; ; at = path.dirname(at)) {
-		let stat: Stats;
+		let stat: import("node:fs").BigIntStats;
 		try {
-			stat = statSync(at);
+			stat = statSync(at, { bigint: true });
 		} catch {
 			throw new ProjectManifestError("manifest-output-invalid");
 		}
@@ -551,8 +575,16 @@ export async function createProjectManifestFile(
 	if (bytes.length > MAX_MANIFEST_FILE_BYTES)
 		throw new ProjectManifestError("manifest-output-invalid");
 	assertCurrent();
+	// The identity of the new file comes from the handle that created it, never from the path,
+	// so the cleanup below can only ever remove that exact file.
+	let written: import("node:fs").BigIntStats;
+	let handle: fs.FileHandle;
 	try {
-		await fs.writeFile(target, bytes, { flag: "wx", mode: 0o600 });
+		handle = await fs.open(
+			target,
+			constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
+			0o600,
+		);
 	} catch (error) {
 		throw new ProjectManifestError(
 			(error as NodeJS.ErrnoException).code === "EEXIST"
@@ -560,18 +592,21 @@ export async function createProjectManifestFile(
 				: "manifest-write-failed",
 		);
 	}
+	try {
+		written = await handle.stat({ bigint: true });
+		await handle.writeFile(bytes);
+	} catch {
+		await handle.close().catch(() => undefined);
+		await removeIfSame(target, undefined);
+		throw new ProjectManifestError("manifest-write-failed");
+	}
+	await handle.close();
 	// Re-prove after writing: an alias mounted over the output parent between the check and the
 	// write is caught here, and only the file this call just created is removed.
-	const written = statSync(target, { bigint: true });
 	try {
 		await assertOutputParentOutsideProject(root, path.dirname(target), () => undefined);
 	} catch (error) {
-		try {
-			const now = statSync(target, { bigint: true });
-			if (now.dev === written.dev && now.ino === written.ino) await fs.unlink(target);
-		} catch {
-			// Already gone; nothing else is touched.
-		}
+		await removeIfSame(target, written);
 		throw error;
 	}
 	return {
